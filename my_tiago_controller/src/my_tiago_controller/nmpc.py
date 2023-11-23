@@ -8,7 +8,7 @@ from acados_template import AcadosOcpSolver, AcadosSimSolver
 
 import casadi
 
-from my_tiago_controller.params import *
+from my_tiago_controller.Hparams import *
 from my_tiago_controller.utils import *
 
 class nmpc:
