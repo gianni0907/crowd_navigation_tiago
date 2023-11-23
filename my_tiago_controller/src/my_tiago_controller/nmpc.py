@@ -8,7 +8,7 @@ from acados_template import AcadosOcpSolver, AcadosSimSolver
 
 import casadi
 
-from my_tiago_controller.params import *
+from my_tiago_controller.Hparams import *
 from my_tiago_controller.utils import *
 
 class nmpc:
@@ -48,7 +48,7 @@ class nmpc:
         return casadi.cos(q[self.hparams.theta_idx])*(self.hparams.wheel_radius/2)*(u[self.hparams.wr_idx]+u[self.hparams.wl_idx])
 
     def __y_dot(self, q, u):
-        return casadi.sin(q[self.hparams.theta_idx])*(self.hparams.wheel_radius/self.hparams.wheel_separation)*(u[self.hparams.wr_idx]+u[self.hparams.wl_idx])
+        return casadi.sin(q[self.hparams.theta_idx])*(self.hparams.wheel_radius/2)*(u[self.hparams.wr_idx]+u[self.hparams.wl_idx])
     
     def __theta_dot(self, u):
         return (self.hparams.wheel_radius/self.hparams.wheel_separation)*(u[self.hparams.wr_idx]-u[self.hparams.wl_idx])
@@ -58,8 +58,8 @@ class nmpc:
         q = casadi.SX.sym('q', self.nq)
         qdot = casadi.SX.sym('qdot', self.nq)
         u = casadi.SX.sym('u', self.nu)
-        r = casadi.SX.sym('r', self.nq + self.nu)
-        r_e = casadi.SX.sym('r_e', self.nq)
+        # r = casadi.SX.sym('r', self.nq + self.nu)
+        # r_e = casadi.SX.sym('r_e', self.nq)
         f_expl = self.__f(q, u)
         f_impl = qdot - f_expl
 
