@@ -99,9 +99,10 @@ class nmpc:
         acados_cost.Vx = Vx
 
         Vu = np.zeros((ny, self.nu))
-        Vx[self.nq : ny, 0 :self.nu] = np.eye(self.nu)
+        Vu[self.nq : ny, 0 :self.nu] = np.eye(self.nu)
         acados_cost.Vu = Vu
-
+        print(Vu)
+        print(Vx)
         acados_cost.Vx_e = np.eye(ny_e)
 
         acados_cost.yref = np.zeros(ny)
