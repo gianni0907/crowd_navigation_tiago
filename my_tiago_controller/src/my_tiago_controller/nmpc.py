@@ -1,24 +1,21 @@
-import rospy
-
 import numpy as np
 import scipy.linalg
 
-from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions
-from acados_template import AcadosOcpSolver, AcadosSimSolver
+from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions, AcadosOcpSolver
 
 import casadi
 
-from my_tiago_controller.Hparams import *
+from my_tiago_controller.hparams import *
 from my_tiago_controller.utils import *
 
-class nmpc:
-    def __init__(self, N, T, x0, params):
+class NMPC:
+    def __init__(self, N, T):
         # Size of state and input:
         self.nq = 3
         self.nu = 2 # right and left wheel angular velocities
 
         # Parameters:
-        self.hparams = params
+        self.hparams = Hparams()
 
         # Number of control intervals:
         self.N = N
@@ -26,12 +23,21 @@ class nmpc:
         # Horizon duration:
         self.T = T
 
-        # Initial configuration
-        self.x0 = x0
-
-        # Create acados_ocp object to formulate the OCP
-        self.acados_ocp = self.__create_acados_ocp(self.N,self.T)
+        # Setup solver:
+        self.acados_ocp_solver = self.__create_acados_ocp_solver(self.N,self.T)
         
+    def init(self, x0: np.array):
+        lbx = np.array([self.hparams.lower_bound, self.hparams.lower_bound])
+        ubx = np.array([self.hparams.upper_bound, self.hparams.upper_bound])
+
+        for k in range(self.N):
+            self.acados_ocp_solver.set(k, 'x', np.array(x0))
+            self.acados_ocp_solver.set(k, 'u', np.zeros(self.nu))
+        self.acados_ocp_solver.set(self.N, 'x', np.array(x0))
+
+        for k in range(1, self.N):
+            self.acados_ocp_solver.constraints_set(k, 'lbx', lbx)
+            self.acados_ocp_solver.constraints_set(k, 'ubx', ubx)
 
     def __wrap_angle(self, theta):
         return casadi.atan2(casadi.sin(theta), casadi.cos(theta))
@@ -48,7 +54,7 @@ class nmpc:
         return casadi.cos(q[self.hparams.theta_idx])*(self.hparams.wheel_radius/2)*(u[self.hparams.wr_idx]+u[self.hparams.wl_idx])
 
     def __y_dot(self, q, u):
-        return casadi.sin(q[self.hparams.theta_idx])*(self.hparams.wheel_radius/self.hparams.wheel_separation)*(u[self.hparams.wr_idx]+u[self.hparams.wl_idx])
+        return casadi.sin(q[self.hparams.theta_idx])*(self.hparams.wheel_radius/2)*(u[self.hparams.wr_idx]+u[self.hparams.wl_idx])
     
     def __theta_dot(self, u):
         return (self.hparams.wheel_radius/self.hparams.wheel_separation)*(u[self.hparams.wr_idx]-u[self.hparams.wl_idx])
@@ -58,8 +64,6 @@ class nmpc:
         q = casadi.SX.sym('q', self.nq)
         qdot = casadi.SX.sym('qdot', self.nq)
         u = casadi.SX.sym('u', self.nu)
-        r = casadi.SX.sym('r', self.nq + self.nu)
-        r_e = casadi.SX.sym('r_e', self.nq)
         f_expl = self.__f(q, u)
         f_impl = qdot - f_expl
 
@@ -99,13 +103,13 @@ class nmpc:
         acados_cost.Vx = Vx
 
         Vu = np.zeros((ny, self.nu))
-        Vx[self.nq : ny, 0 :self.nu] = np.eye(self.nu)
+        Vx[self.nq : ny, 0 : self.nu] = np.eye(self.nu)
         acados_cost.Vu = Vu
 
         acados_cost.Vx_e = np.eye(ny_e)
 
-        acados_cost.yref = np.zeros(ny)
-        acados_cost.yref_e = np.zeros(ny_e)
+        acados_cost.yref = np.zeros((ny,))
+        acados_cost.yref_e = np.zeros((ny_e,))
         
         return acados_cost
     
@@ -120,9 +124,9 @@ class nmpc:
 
         # Linear inequality constraints on the state:
         acados_constraints.idxbx = np.array([self.hparams.x_idx,self.hparams.y_idx])
-        acados_constraints.lbx = np.array([self.hparams.lbx,self.hparams.lbx])
-        acados_constraints.ubx = np.array([self.hparams.ubx,self.hparams.ubx])
-        acados_constraints.x0 = self.x0
+        acados_constraints.lbx = np.zeros(len(acados_constraints.idxbx))
+        acados_constraints.ubx = np.zeros(len(acados_constraints.idxbx))
+        acados_constraints.x0 = np.zeros(self.nq)
 
         return acados_constraints
     
@@ -147,88 +151,28 @@ class nmpc:
         acados_ocp.solver_options = self.__create_acados_solver_options(T)
         
         return acados_ocp
-        
-def main():
-    N_horizon = 50
-    T_horizon = 2.0
-    x0 = np.array([0.0, 0.0, 0.0])
-    params = Hparams()
-    controller = nmpc(N_horizon, T_horizon, x0, params)
+    
+    def __create_acados_ocp_solver(self, N, T, use_cython=False) -> AcadosOcpSolver:
+        acados_ocp = self.__create_acados_ocp(N, T)
+        if use_cython:
+            AcadosOcpSolver.generate(acados_ocp, json_file='aaaacados_ocp_nlp.json')
+            AcadosOcpSolver.build(acados_ocp.code_export_directory, with_cython=True)
+            return AcadosOcpSolver.create_cython_solver('aaaacados_ocp_nlp.json')
+        else:
+            return AcadosOcpSolver(acados_ocp)
 
-    acados_ocp_solver = AcadosOcpSolver(
-        controller.acados_ocp, json_file="acados_ocp_" + controller.acados_ocp.model.name + ".json"
-    )
-    acados_integrator = AcadosSimSolver(
-        controller.acados_ocp, json_file="acados_ocp_" + controller.acados_ocp.model.name + ".json"
-    )
+    def update(
+            self,
+            configuration: np.array,
+            q_ref: np.array,
+            u_ref: np.array):
+        # Set parameters
+        for k in range(self.N):
+            self.acados_ocp_solver.set(k, 'yref', np.concatenate((q_ref[:, k], u_ref[:, k])))
+        self.acados_ocp_solver.set(self.N, 'yref',q_ref[:, self.N])
 
-    Nsim = 100
-    nx = controller.acados_ocp.model.x.size()[0]
-    nu = controller.acados_ocp.model.u.size()[0]
-    yref = np.zeros((nx + nu,))
-    yref_N = np.zeros((nx,))
+        # Solve NLP
+        self.u0 = self.acados_ocp_solver.solve_for_x0(configuration)
 
-    simX = np.ndarray((Nsim + 1, nx))
-    simU = np.ndarray((Nsim, nu))
-
-    xcurrent = x0
-    simX[0, :] = xcurrent
-
-    # Init solver
-    for stage in range(N_horizon + 1):
-        acados_ocp_solver.set(stage, "x", 0.0 * np.ones(xcurrent.shape))
-    for stage in range(N_horizon):
-        acados_ocp_solver.set(stage, "u", np.zeros((nu,)))
-
-    # Closed loop
-    for i in range(Nsim):
-
-        # Set initial state constraint
-        acados_ocp_solver.set(0, "lbx", xcurrent)
-        acados_ocp_solver.set(0, "ubx", xcurrent)
-
-        # Update yref
-        for j in range(N_horizon):
-            yref[:nx-1] = params.target_point
-            acados_ocp_solver.set(j, "yref", yref)
-        yref_N[:nx-1] = params.target_point
-        acados_ocp_solver.set(N_horizon, "yref", yref_N)
-
-        # Solve ocp
-        status = acados_ocp_solver.solve()
-        if status not in [0, 2]:
-            acados_ocp_solver.print_statistics()
-            plot_robot(
-                np.linspace(0, T_horizon / N_horizon * i, i + 1),
-                params.w_max,
-                simU[:i, :],
-                simX[: i + 1, :],
-            )
-            raise Exception(
-                f"acados acados_ocp_solver returned status {status} in closed loop instance {i} with {xcurrent}"
-            )
-
-        if status == 2:
-            print(
-                f"acados acados_ocp_solver returned status {status} in closed loop instance {i} with {xcurrent}"
-            )
-        simU[i, :] = acados_ocp_solver.get(0, "u")
-
-        # simulate system
-        acados_integrator.set("x", xcurrent)
-        acados_integrator.set("u", simU[i, :])
-
-        status = acados_integrator.solve()
-        if status != 0:
-            raise Exception(
-                f"acados integrator returned status {status} in closed loop instance {i}"
-            )
-
-        # update state
-        xcurrent = acados_integrator.get("x")
-        simX[i + 1, :] = xcurrent
-
-    # plot results
-    plot_robot(
-        np.linspace(0, T_horizon / N_horizon * Nsim, Nsim + 1), [params.w_max, None], simU, simX
-    )
+    def get_command(self):
+        return self.u0

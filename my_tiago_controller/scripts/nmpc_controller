@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
 
-import my_tiago_controller.nmpc as nmpc
+import my_tiago_controller.kinematicSimulation as KinSim
 if __name__ == '__main__':
-    nmpc.main()
+    KinSim.main()
