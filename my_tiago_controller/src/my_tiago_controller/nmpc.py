@@ -1,4 +1,4 @@
-import rospy
+import math
 
 import numpy as np
 import scipy.linalg
@@ -151,7 +151,7 @@ class nmpc:
 def main():
     N_horizon = 50
     T_horizon = 2.0
-    x0 = np.array([0.0, 0.0, 0.0])
+    x0 = np.array([0.0, 0.0, math.pi/2])
     params = Hparams()
     controller = nmpc(N_horizon, T_horizon, x0, params)
 
