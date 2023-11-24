@@ -56,8 +56,6 @@ class ControllerManager:
                 u_ref
             )
             self.control_input = self.nmpc_controller.get_command()
-            print(q_ref)
-            print(u_ref)
             print(self.configuration)
             print(self.control_input)
         except Exception as e:

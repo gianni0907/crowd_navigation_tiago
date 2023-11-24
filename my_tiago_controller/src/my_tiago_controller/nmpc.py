@@ -87,7 +87,7 @@ class NMPC:
 
         # Set wheighting matrices
         Q_mat = 2 * np.diag([1e3, 1e3, 0.0]) # [x, y, theta]
-        R_mat = 2 * 5 * np.diag([1e-2,1e-2]) # [wr, wl]
+        R_mat = 2 * 5 * np.diag([1e-2, 1e-2]) # [wr, wl]
 
         acados_cost.cost_type   = 'LINEAR_LS'
         acados_cost.cost_type_e = 'LINEAR_LS'
@@ -103,7 +103,7 @@ class NMPC:
         acados_cost.Vx = Vx
 
         Vu = np.zeros((ny, self.nu))
-        Vx[self.nq : ny, 0 : self.nu] = np.eye(self.nu)
+        Vu[self.nq : ny, 0 : self.nu] = np.eye(self.nu)
         acados_cost.Vu = Vu
 
         acados_cost.Vx_e = np.eye(ny_e)
@@ -155,9 +155,9 @@ class NMPC:
     def __create_acados_ocp_solver(self, N, T, use_cython=False) -> AcadosOcpSolver:
         acados_ocp = self.__create_acados_ocp(N, T)
         if use_cython:
-            AcadosOcpSolver.generate(acados_ocp, json_file='aaaacados_ocp_nlp.json')
+            AcadosOcpSolver.generate(acados_ocp, json_file='acados_ocp_nlp.json')
             AcadosOcpSolver.build(acados_ocp.code_export_directory, with_cython=True)
-            return AcadosOcpSolver.create_cython_solver('aaaacados_ocp_nlp.json')
+            return AcadosOcpSolver.create_cython_solver('acados_ocp_nlp.json')
         else:
             return AcadosOcpSolver(acados_ocp)
 
