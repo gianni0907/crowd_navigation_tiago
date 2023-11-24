@@ -1,6 +1,6 @@
 import math
 import matplotlib.pyplot as plt
-import scipy.spatial.transform
+from scipy.spatial.transform import Rotation as R
 
 import rospy
 import nav_msgs.msg
@@ -39,10 +39,10 @@ class ControllerManager:
     def init(self, configuration):
         # Init robot configuration
         self.configuration = configuration
+        self.nmpc_controller.init(self.configuration)
         print(self.configuration)
 
     def update(self):
-        self.nmpc_controller.init(self.configuration)
         q_ref = np.zeros((self.nmpc_controller.nq, self.nmpc_controller.N+1))
         for k in range(self.nmpc_controller.N):
             q_ref[:self.nmpc_controller.nq - 1, k] = self.target_point
@@ -82,14 +82,14 @@ class ControllerManager:
         odom_message.pose.pose.position.x = self.configuration[self.hparams.x_idx]
         odom_message.pose.pose.position.y = self.configuration[self.hparams.y_idx]
         odom_message.pose.pose.position.z = 0.0
-        # orientation = scipy.spatial.transform.Rotation.from_matrix(
-        #     [[math.cos(self.configuration[self.hparams.theta_idx]), -math.sin(self.configuration[self.hparams.theta_idx]), 0.0],
-        #      [math.sin(self.configuration[self.hparams.theta_idx]),  math.cos(self.configuration[self.hparams.theta_idx]), 0.0],
-        #      [                                                 0.0,                                                   0.0, 1.0]]
-        # ).as_quat()
-        # odom_message.pose.pose.orientation.x = orientation[0]
-        # odom_message.pose.pose.orientation.y = orientation[1]
-        # odom_message.pose.pose.orientation.z = orientation[2]
-        # odom_message.pose.pose.orientation.w = orientation[3]
+        orientation = R.from_dcm(
+            [[math.cos(self.configuration[self.hparams.theta_idx]), -math.sin(self.configuration[self.hparams.theta_idx]), 0.0],
+             [math.sin(self.configuration[self.hparams.theta_idx]),  math.cos(self.configuration[self.hparams.theta_idx]), 0.0],
+             [                                                 0.0,                                                   0.0, 1.0]]
+        ).as_quat()
+        odom_message.pose.pose.orientation.x = orientation[0]
+        odom_message.pose.pose.orientation.y = orientation[1]
+        odom_message.pose.pose.orientation.z = orientation[2]
+        odom_message.pose.pose.orientation.w = orientation[3]
         
         self.odometry_publisher.publish(odom_message)

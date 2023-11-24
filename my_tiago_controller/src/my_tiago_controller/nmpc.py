@@ -168,8 +168,8 @@ class NMPC:
             u_ref: np.array):
         # Set parameters
         for k in range(self.N):
-            self.acados_ocp_solver.set(k, 'yref', np.concatenate((q_ref[:, k], u_ref[:, k])))
-        self.acados_ocp_solver.set(self.N, 'yref',q_ref[:, self.N])
+            self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
+        self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])
 
         # Solve NLP
         self.u0 = self.acados_ocp_solver.solve_for_x0(configuration)
