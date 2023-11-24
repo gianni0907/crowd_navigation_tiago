@@ -58,8 +58,6 @@ class nmpc:
         q = casadi.SX.sym('q', self.nq)
         qdot = casadi.SX.sym('qdot', self.nq)
         u = casadi.SX.sym('u', self.nu)
-        # r = casadi.SX.sym('r', self.nq + self.nu)
-        # r_e = casadi.SX.sym('r_e', self.nq)
         f_expl = self.__f(q, u)
         f_impl = qdot - f_expl
 
