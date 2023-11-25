@@ -4,7 +4,7 @@ from scipy.spatial.transform import Rotation as R
 
 import rospy
 import nav_msgs.msg
-import std_msgs.msg
+import geometry_msgs.msg
 
 from my_tiago_controller.hparams import *
 from my_tiago_controller.kinematicModel import *
@@ -19,15 +19,13 @@ class ControllerManager:
         self.controller_frequency = controller_frequency
 
         # Wheel velocity command topics:
-        w_r_command_topic = "/my_tiago_controller/right_wheel_controller/command"
-        w_l_command_topic = "/my_tiago_controller/left_wheel_controller/command"
+        cmd_vel_topic = '/mobile_base_controller/cmd_vel'
 
         # Setup publishers for wheel velocity commands:
-        self.w_r_command_publisher = rospy.Publisher(w_r_command_topic, std_msgs.msg.Float64, queue_size=1)
-        self.w_l_command_publisher = rospy.Publisher(w_l_command_topic, std_msgs.msg.Float64, queue_size=1)
+        self.cmd_vel_publisher = rospy.Publisher(cmd_vel_topic, geometry_msgs.msg.Twist, queue_size=1)
 
         # Setup odometry publisher:
-        odometry_topic = 'odom'
+        odometry_topic = '/odom'
         self.odometry_publisher = rospy.Publisher(odometry_topic,nav_msgs.msg.Odometry, queue_size=1)
 
         # NMPC:
@@ -56,8 +54,6 @@ class ControllerManager:
                 u_ref
             )
             self.control_input = self.nmpc_controller.get_command()
-            print(self.configuration)
-            print(self.control_input)
         except Exception as e:
             rospy.logwarn("NMPC solver failed")
             rospy.logwarn('{}'.format(e))
@@ -65,12 +61,26 @@ class ControllerManager:
         
     def publish_command(self):
         # Set wheel angular velocity commands
-        w_r_command = self.control_input[self.hparams.wr_idx]
-        w_l_command = self.control_input[self.hparams.wl_idx]
+        w_r = self.control_input[self.hparams.wr_idx]
+        w_l = self.control_input[self.hparams.wl_idx]
+        wheel_radius = self.hparams.wheel_radius
+        wheel_separation = self.hparams.wheel_separation
+
+        # Compute driving and steering velocity commands
+        v = (wheel_radius/2)*(w_r+w_l)
+        omega = (wheel_radius/wheel_separation)*(w_r-w_l)
+
+        # Create a twist ROS message:
+        cmd_vel_msg = geometry_msgs.msg.Twist()
+        cmd_vel_msg.linear.x = v
+        cmd_vel_msg.linear.y = 0.0
+        cmd_vel_msg.linear.z = 0.0
+        cmd_vel_msg.angular.x = 0.0
+        cmd_vel_msg.angular.y = 0.0
+        cmd_vel_msg.angular.z = omega
 
         # Publish wheel velocity commands
-        self.w_r_command_publisher.publish(w_r_command)
-        self.w_l_command_publisher.publish(w_l_command)
+        self.cmd_vel_publisher.publish(cmd_vel_msg)
 
     def publish_odometry(self):
         # Publish odometry
@@ -92,4 +102,17 @@ class ControllerManager:
         odom_message.pose.pose.orientation.z = orientation[2]
         odom_message.pose.pose.orientation.w = orientation[3]
         
+        w_r = self.control_input[self.hparams.wr_idx]
+        w_l = self.control_input[self.hparams.wl_idx]
+        wheel_radius = self.hparams.wheel_radius
+        wheel_separation = self.hparams.wheel_separation
+        v = (wheel_radius/2)*(w_r+w_l)
+        omega = (wheel_radius/wheel_separation)*(w_r-w_l)
+
+        odom_message.twist.twist.linear.x =  v
+        odom_message.twist.twist.linear.y = 0.0
+        odom_message.twist.twist.linear.z = 0.0
+        odom_message.twist.twist.angular.x = 0.0
+        odom_message.twist.twist.angular.y = 0.0
+        odom_message.twist.twist.angular.z = omega
         self.odometry_publisher.publish(odom_message)

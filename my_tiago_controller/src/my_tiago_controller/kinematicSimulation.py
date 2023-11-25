@@ -45,7 +45,7 @@ def main():
     rospy.loginfo('Tiago control module [OK]')
 
     # Build controller manager
-    controller_frequency = 40.0 # [Hz]
+    controller_frequency = 100.0 # [Hz]
     dt = 1.0 / controller_frequency
     N_horizon = 5
     T_horizon = dt * 10.0 * N_horizon # [s]
