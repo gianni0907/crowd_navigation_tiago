@@ -1,7 +1,8 @@
-import math
-
 import numpy as np
 import scipy.linalg
+import rospy
+import nav_msgs.msg
+import geometry_msgs.msg
 
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions
 from acados_template import AcadosOcpSolver, AcadosSimSolver
@@ -31,7 +32,10 @@ class nmpc:
 
         # Create acados_ocp object to formulate the OCP
         self.acados_ocp = self.__create_acados_ocp(self.N,self.T)
-        
+
+        # Setup velocity command publisher:
+        cmd_vel_topic = '/mobile_base_controller/cmd_vel'
+        self.cmd_vel_publisher = rospy.Publisher(cmd_vel_topic, geometry_msgs.msg.Twist, queue_size=5)
 
     def __wrap_angle(self, theta):
         return casadi.atan2(casadi.sin(theta), casadi.cos(theta))
@@ -99,8 +103,7 @@ class nmpc:
         Vu = np.zeros((ny, self.nu))
         Vu[self.nq : ny, 0 :self.nu] = np.eye(self.nu)
         acados_cost.Vu = Vu
-        print(Vu)
-        print(Vx)
+
         acados_cost.Vx_e = np.eye(ny_e)
 
         acados_cost.yref = np.zeros(ny)
@@ -147,10 +150,39 @@ class nmpc:
         
         return acados_ocp
         
+    def publish_velocity_command(self, command):
+        # Set wheel angular velocity commands
+        w_r = command[self.hparams.wr_idx]
+        w_l = command[self.hparams.wl_idx]
+        wheel_radius = self.hparams.wheel_radius
+        wheel_separation = self.hparams.wheel_separation
+
+        # Compute driving and steering velocity commands
+        v = (wheel_radius/2)*(w_r+w_l)
+        omega = (wheel_radius/wheel_separation)*(w_r-w_l)
+
+        # Create a twist ROS message:
+        cmd_vel_msg = geometry_msgs.msg.Twist()
+        cmd_vel_msg.linear.x = v
+        cmd_vel_msg.linear.y = 0.0
+        cmd_vel_msg.linear.z = 0.0
+        cmd_vel_msg.angular.x = 0.0
+        cmd_vel_msg.angular.y = 0.0
+        cmd_vel_msg.angular.z = omega
+
+        # Publish wheel velocity commands
+        self.cmd_vel_publisher.publish(cmd_vel_msg)
+
 def main():
-    N_horizon = 50
-    T_horizon = 2.0
-    x0 = np.array([0.0, 0.0, math.pi/2])
+    rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
+    rospy.loginfo('Tiago control module [OK]')
+    controller_frequency = 10.0 # [Hz]
+    dt = 1.0 / controller_frequency
+    rate = rospy.Rate(controller_frequency/10.0)
+
+    N_horizon = 5
+    T_horizon = dt * 1 * N_horizon # [s]
+    x0 = np.array([0.0, 0.0, 0.0])
     params = Hparams()
     controller = nmpc(N_horizon, T_horizon, x0, params)
 
@@ -172,6 +204,8 @@ def main():
 
     xcurrent = x0
     simX[0, :] = xcurrent
+    print("Init configuration -----------")
+    print(simX[0,:])
 
     # Init solver
     for stage in range(N_horizon + 1):
@@ -195,38 +229,47 @@ def main():
 
         # Solve ocp
         status = acados_ocp_solver.solve()
-        if status not in [0, 2]:
-            acados_ocp_solver.print_statistics()
-            plot_robot(
-                np.linspace(0, T_horizon / N_horizon * i, i + 1),
-                params.w_max,
-                simU[:i, :],
-                simX[: i + 1, :],
-            )
-            raise Exception(
-                f"acados acados_ocp_solver returned status {status} in closed loop instance {i} with {xcurrent}"
-            )
+        # if status not in [0, 2]:
+        #     acados_ocp_solver.print_statistics()
+        #     plot_robot(
+        #         np.linspace(0, T_horizon / N_horizon * i, i + 1),
+        #         params.w_max,
+        #         simU[:i, :],
+        #         simX[: i + 1, :],
+        #     )
+        #     raise Exception(
+        #         f"acados acados_ocp_solver returned status {status} in closed loop instance {i} with {xcurrent}"
+        #     )
 
-        if status == 2:
-            print(
-                f"acados acados_ocp_solver returned status {status} in closed loop instance {i} with {xcurrent}"
-            )
+        # if status == 2:
+        #     print(
+        #         f"acados acados_ocp_solver returned status {status} in closed loop instance {i} with {xcurrent}"
+        #     )
         simU[i, :] = acados_ocp_solver.get(0, "u")
+        print(i, "-th control input --------")
+        print(simU[i,:])
+        if i==0:
+            controller.publish_velocity_command(simU[i,:])
+        else:
+            command = np.array([simU[0,0],-simU[0,0]])
+            controller.publish_velocity_command(command)
 
         # simulate system
         acados_integrator.set("x", xcurrent)
         acados_integrator.set("u", simU[i, :])
 
         status = acados_integrator.solve()
-        if status != 0:
-            raise Exception(
-                f"acados integrator returned status {status} in closed loop instance {i}"
-            )
+        # if status != 0:
+        #     raise Exception(
+        #         f"acados integrator returned status {status} in closed loop instance {i}"
+        #     )
 
         # update state
         xcurrent = acados_integrator.get("x")
         simX[i + 1, :] = xcurrent
-
+        print(i+1, "-th configuration ---------")
+        print(xcurrent)
+        rate.sleep()
     # plot results
     plot_robot(
         np.linspace(0, T_horizon / N_horizon * Nsim, Nsim + 1), [params.w_max, None], simU, simX
