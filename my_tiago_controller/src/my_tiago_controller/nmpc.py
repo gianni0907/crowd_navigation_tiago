@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.linalg
 import rospy
-import nav_msgs.msg
 import geometry_msgs.msg
 
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions
@@ -9,10 +8,10 @@ from acados_template import AcadosOcpSolver, AcadosSimSolver
 
 import casadi
 
-from my_tiago_controller.Hparams import *
+from my_tiago_controller.hparams import *
 from my_tiago_controller.utils import *
 
-class nmpc:
+class NMPC:
     def __init__(self, N, T, x0, params):
         # Size of state and input:
         self.nq = 3
@@ -178,13 +177,13 @@ def main():
     rospy.loginfo('Tiago control module [OK]')
     controller_frequency = 10.0 # [Hz]
     dt = 1.0 / controller_frequency
-    rate = rospy.Rate(controller_frequency/10.0)
+    rate = rospy.Rate(controller_frequency)
 
     N_horizon = 5
     T_horizon = dt * 1 * N_horizon # [s]
     x0 = np.array([0.0, 0.0, 0.0])
     params = Hparams()
-    controller = nmpc(N_horizon, T_horizon, x0, params)
+    controller = NMPC(N_horizon, T_horizon, x0, params)
 
     acados_ocp_solver = AcadosOcpSolver(
         controller.acados_ocp, json_file="acados_ocp_" + controller.acados_ocp.model.name + ".json"
