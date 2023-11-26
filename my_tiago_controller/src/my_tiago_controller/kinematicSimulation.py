@@ -45,10 +45,10 @@ def main():
     rospy.loginfo('Tiago control module [OK]')
 
     # Build controller manager
-    controller_frequency = 100.0 # [Hz]
+    controller_frequency = 15.0 # [Hz]
     dt = 1.0 / controller_frequency
     N_horizon = 5
-    T_horizon = dt * 10.0 * N_horizon # [s]
+    T_horizon = dt * 1.0 * N_horizon # [s]
     controller_manager = ControllerManager(
         controller_frequency=controller_frequency,
         nmpc_N=N_horizon,
@@ -58,9 +58,16 @@ def main():
     # Setup kinematic simulation
     starting_configuration = np.array([0.0, 0.0, 0.0])
     controller_manager.init(starting_configuration)
+    print("Init configuration ------------")
+    print(starting_configuration)
     tiago_kinematic_simulation = KinematicSimulation(controller_manager, dt)
     rate = rospy.Rate(controller_frequency)
+    cnt = 0
     while not rospy.is_shutdown():
         tiago_kinematic_simulation.update()
-
+        print(cnt,"-th command ***********")
+        print(tiago_kinematic_simulation.controller_manager.control_input)
+        print(cnt+1,"-th configuration -----")
+        print(tiago_kinematic_simulation.controller_manager.configuration)
+        cnt =cnt +1
         rate.sleep()

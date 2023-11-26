@@ -1,7 +1,7 @@
 import numpy as np
 
 class Hparams:
-    target_point = np.array([5.0,3.0]) # [m]
+    target_point = np.array([2.5, 2.5]) # [m]
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
     # input velocity limit for both left and right wheel

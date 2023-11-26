@@ -38,7 +38,6 @@ class ControllerManager:
         # Init robot configuration
         self.configuration = configuration
         self.nmpc_controller.init(self.configuration)
-        print(self.configuration)
 
     def update(self):
         q_ref = np.zeros((self.nmpc_controller.nq, self.nmpc_controller.N+1))
