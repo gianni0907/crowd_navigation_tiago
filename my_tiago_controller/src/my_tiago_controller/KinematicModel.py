@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from my_tiago_controller.hparams import *
+from my_tiago_controller.Hparams import *
  
 class KinematicModel:
     nq = 3 # q = (x, y, theta)

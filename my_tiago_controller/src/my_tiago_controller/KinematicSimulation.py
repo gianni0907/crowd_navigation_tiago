@@ -1,8 +1,9 @@
 import numpy as np
+import os
 import rospy
 
-from my_tiago_controller.kinematicModel import *
-from my_tiago_controller.controllerManager import *
+from my_tiago_controller.KinematicModel import *
+from my_tiago_controller.ControllerManager import *
 import my_tiago_controller.utils
 
 class KinematicSimulation:
@@ -30,7 +31,6 @@ class KinematicSimulation:
         # Publish data to ROS topics if specified:
         if self.publish_data:
             self.controller_manager.publish_command()
-            self.controller_manager.publish_odometry()
 
         return True
     
@@ -60,7 +60,9 @@ def main():
     x_sim[0, :] = starting_configuration
     x_real[0, :] = starting_configuration
     save = True
-    save_dir = '/home/gianba/thesis_ws/src/crowd_navigation_tiago/plots'
+    save_dir = '/tmp/crowd_navigation_tiago'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
     rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
     rospy.loginfo('Tiago control module [OK]')

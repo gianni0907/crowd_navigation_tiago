@@ -1,13 +1,11 @@
 import numpy as np
 import scipy.linalg
-import rospy
-import geometry_msgs.msg
 
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions, AcadosOcpSolver
 
 import casadi
 
-from my_tiago_controller.hparams import *
+from my_tiago_controller.Hparams import *
 from my_tiago_controller.utils import *
 
 class NMPC:

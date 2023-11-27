@@ -27,8 +27,6 @@ def plot_robot(
                 f"Directory to save plots not specified"
             )
         else:
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
             plots_filename = 'sim_plots.png'
             plots_path = os.path.join(save_dir, plots_filename)
 
