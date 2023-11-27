@@ -1,24 +1,20 @@
 import numpy as np
-import math
 import rospy
 
 from my_tiago_controller.kinematicModel import *
 from my_tiago_controller.controllerManager import *
 import my_tiago_controller.utils
+
 class KinematicSimulation:
     def __init__(
             self,
             controller_manager: ControllerManager,
             dt: float,
             publish_data=True):
-        self.__iter = 0
         self.dt = dt
         self.kinematic_model = KinematicModel()
         self.controller_manager = controller_manager
         self.publish_data = publish_data
-
-    def get_simulation_time(self):
-        return self.dt * self.__iter
     
     def update(self):
         self.controller_manager.update()
@@ -36,14 +32,9 @@ class KinematicSimulation:
             self.controller_manager.publish_command()
             self.controller_manager.publish_odometry()
 
-        self.__iter = self.__iter + 1
-
         return True
-
+    
 def main():
-    rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
-    rospy.loginfo('Tiago control module [OK]')
-
     # Build controller manager
     controller_frequency = 15.0 # [Hz]
     dt = 1.0 / controller_frequency
@@ -58,16 +49,48 @@ def main():
     # Setup kinematic simulation
     starting_configuration = np.array([0.0, 0.0, 0.0])
     controller_manager.init(starting_configuration)
+    tiago_kinematic_simulation = KinematicSimulation(controller_manager, dt)
+
+    # Set variables for plots
+    N_sim = 100
+    iter = 0
+    x_real = np.ndarray((N_sim + 1, controller_manager.nmpc_controller.nq))
+    x_sim = np.ndarray((N_sim + 1, controller_manager.nmpc_controller.nq))
+    u_sim = np.ndarray((N_sim, controller_manager.nmpc_controller.nu))
+    x_sim[0, :] = starting_configuration
+    x_real[0, :] = starting_configuration
+    save = True
+    save_dir = '/home/gianba/thesis_ws/src/crowd_navigation_tiago/plots'
+
+    rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
+    rospy.loginfo('Tiago control module [OK]')
+    rate = rospy.Rate(controller_frequency)
+
     print("Init configuration ------------")
     print(starting_configuration)
-    tiago_kinematic_simulation = KinematicSimulation(controller_manager, dt)
-    rate = rospy.Rate(controller_frequency)
-    cnt = 0
-    while not rospy.is_shutdown():
+
+    while not(rospy.is_shutdown()) and (iter < N_sim):
         tiago_kinematic_simulation.update()
-        print(cnt,"-th command ***********")
-        print(tiago_kinematic_simulation.controller_manager.control_input)
-        print(cnt+1,"-th configuration -----")
-        print(tiago_kinematic_simulation.controller_manager.configuration)
-        cnt =cnt +1
+        
+        x_real[iter + 1, :] = tiago_kinematic_simulation.controller_manager.get_latest_configuration()
+
+        u_sim[iter, :] = tiago_kinematic_simulation.controller_manager.control_input
+        print(iter,"-th command ***********")
+        print(u_sim[iter, :])
+        
+        x_sim[iter + 1, :] = tiago_kinematic_simulation.controller_manager.configuration
+        print(iter+1,"-th configuration -----")
+        print(x_sim[iter + 1, :])
+
+        iter = iter +1
         rate.sleep()
+
+    plot_robot(
+        np.linspace(0, T_horizon / N_horizon * N_sim, N_sim + 1),
+        [controller_manager.hparams.w_max, controller_manager.hparams.w_max],
+        u_sim,
+        x_sim,
+        x_real,
+        save,
+        save_dir
+    )

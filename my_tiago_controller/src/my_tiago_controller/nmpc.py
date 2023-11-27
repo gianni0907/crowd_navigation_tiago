@@ -1,5 +1,7 @@
 import numpy as np
 import scipy.linalg
+import rospy
+import geometry_msgs.msg
 
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions, AcadosOcpSolver
 

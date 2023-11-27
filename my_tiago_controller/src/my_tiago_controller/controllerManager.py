@@ -1,5 +1,4 @@
 import math
-import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 
 import rospy
@@ -18,16 +17,17 @@ class ControllerManager:
             nmpc_T):
         self.controller_frequency = controller_frequency
 
-        # Wheel velocity command topics:
+        # Setup publisher for wheel velocity commands:
         cmd_vel_topic = '/mobile_base_controller/cmd_vel'
-
-        # Setup publishers for wheel velocity commands:
         self.cmd_vel_publisher = rospy.Publisher(cmd_vel_topic, geometry_msgs.msg.Twist, queue_size=1)
 
-        # Setup odometry publisher:
+        # Setup (simulated) odometry publisher:
         odometry_topic = '/odom'
-        self.odometry_publisher = rospy.Publisher(odometry_topic,nav_msgs.msg.Odometry, queue_size=1)
+        self.odometry_publisher = rospy.Publisher(odometry_topic, nav_msgs.msg.Odometry, queue_size=1)
 
+        # Setup (actual) odometry listener
+        self.odometry_listener = rospy.Subscriber('/mobile_base_controller/odom', nav_msgs.msg.Odometry, self.odom_callback)
+        
         # NMPC:
         self.dt = 1.0 / self.controller_frequency
         self.hparams = Hparams()
@@ -115,3 +115,18 @@ class ControllerManager:
         odom_message.twist.twist.angular.y = 0.0
         odom_message.twist.twist.angular.z = omega
         self.odometry_publisher.publish(odom_message)
+
+    def odom_callback(self, msg):
+        self.actual_configuration = np.zeros((self.nmpc_controller.nq))
+        self.actual_configuration[self.hparams.x_idx] = msg.pose.pose.position.x
+        self.actual_configuration[self.hparams.y_idx] = msg.pose.pose.position.y
+
+        theta = R.from_quat([[msg.pose.pose.orientation.x,
+                          msg.pose.pose.orientation.y,
+                          msg.pose.pose.orientation.z,
+                          msg.pose.pose.orientation.w]]).as_rotvec()[0][2]
+
+        self.actual_configuration[self.hparams.theta_idx] = theta
+    
+    def get_latest_configuration(self):
+        return self.actual_configuration
