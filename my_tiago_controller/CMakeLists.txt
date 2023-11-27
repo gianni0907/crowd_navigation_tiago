@@ -62,9 +62,9 @@ catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES my_tiago_controller
   CATKIN_DEPENDS
-  rospy
-  geometry_msgs
-  nav_msgs
+    rospy
+    geometry_msgs
+    nav_msgs
 #  DEPENDS system_lib
 )
 include_directories(
