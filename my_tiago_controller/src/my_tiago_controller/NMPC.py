@@ -86,7 +86,7 @@ class NMPC:
         acados_cost = AcadosOcpCost()
 
         # Set wheighting matrices
-        Q_mat = 2 * np.diag([1e3, 1e3, 0.0]) # [x, y, theta]
+        Q_mat = 2 * np.diag([1e1, 1e1, 0.0]) # [x, y, theta]
         R_mat = 2 * 5 * np.diag([1e-2, 1e-2]) # [wr, wl]
 
         acados_cost.cost_type   = 'LINEAR_LS'
@@ -95,7 +95,7 @@ class NMPC:
         ny = self.nq + self.nu
         ny_e = self.nq
 
-        acados_cost.W_e = Q_mat
+        acados_cost.W_e = 100 * Q_mat
         acados_cost.W = scipy.linalg.block_diag(Q_mat,R_mat)
 
         Vx = np.zeros((ny, self.nq))
@@ -118,15 +118,25 @@ class NMPC:
         acados_constraints = AcadosOcpConstraints()
 
         # Linear inequality constraints on the control inputs:
-        acados_constraints.idxbu = np.array([self.hparams.wr_idx,self.hparams.wl_idx])
-        acados_constraints.lbu = np.array([self.hparams.w_max_neg,self.hparams.w_max_neg])
-        acados_constraints.ubu = np.array([self.hparams.w_max,self.hparams.w_max])
+        acados_constraints.idxbu = np.array([self.hparams.wr_idx, self.hparams.wl_idx])
+        acados_constraints.lbu = np.array([self.hparams.w_max_neg, self.hparams.w_max_neg])
+        acados_constraints.ubu = np.array([self.hparams.w_max, self.hparams.w_max])
+        
 
         # Linear inequality constraints on the state:
-        acados_constraints.idxbx = np.array([self.hparams.x_idx,self.hparams.y_idx])
+        acados_constraints.idxbx = np.array([self.hparams.x_idx, self.hparams.y_idx])
         acados_constraints.lbx = np.zeros(len(acados_constraints.idxbx))
         acados_constraints.ubx = np.zeros(len(acados_constraints.idxbx))
         acados_constraints.x0 = np.zeros(self.nq)
+
+        # Linear constraints on driving and steering velocity expressed in term of wheel angular velocities
+        D_mat = np.zeros((self.nu, self.nu))
+        D_mat[0 , :self.nu] = self.hparams.wheel_radius * 0.5 * np.ones((1,2))
+        D_mat[1, :self.nu] = (self.hparams.wheel_radius/self.hparams.wheel_separation) * np.array([1, -1])
+        acados_constraints.D = D_mat
+        acados_constraints.C = np.zeros((self.nu, self.nq))
+        acados_constraints.lg = np.array([self.hparams.driving_vel_min, self.hparams.steering_vel_max_neg])
+        acados_constraints.ug = np.array([self.hparams.driving_vel_max, self.hparams.steering_vel_max])
 
         return acados_constraints
     

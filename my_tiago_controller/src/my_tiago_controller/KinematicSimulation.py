@@ -36,9 +36,9 @@ class KinematicSimulation:
     
 def main():
     # Build controller manager
-    controller_frequency = 15.0 # [Hz]
+    controller_frequency = 50.0 # [Hz]
     dt = 1.0 / controller_frequency
-    N_horizon = 5
+    N_horizon = 25
     T_horizon = dt * N_horizon # [s]
     controller_manager = ControllerManager(
         controller_frequency=controller_frequency,
@@ -52,7 +52,7 @@ def main():
     tiago_kinematic_simulation = KinematicSimulation(controller_manager, dt)
 
     # Set variables for plots
-    N_sim = 100
+    N_sim = 200
     iter = 0
     x_real = np.ndarray((N_sim + 1, controller_manager.nmpc_controller.nq))
     x_sim = np.ndarray((N_sim + 1, controller_manager.nmpc_controller.nq))

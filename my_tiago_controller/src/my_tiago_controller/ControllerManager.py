@@ -76,6 +76,8 @@ class ControllerManager:
 
         # Publish wheel velocity commands
         self.cmd_vel_publisher.publish(cmd_vel_msg)
+        if omega > self.hparams.steering_vel_max or omega < self.hparams.steering_vel_max_neg:
+            print("Steering velocity limit exceeded!")
 
     def odom_callback(self, msg):
         self.configuration = np.zeros((self.nmpc_controller.nq))
@@ -96,7 +98,7 @@ def main():
     # Build controller manager
     controller_frequency = 50.0 # [Hz]
     dt = 1.0 / controller_frequency
-    N_horizon = 5
+    N_horizon = 25
     T_horizon = dt * N_horizon # [s]
     controller_manager = ControllerManager(
         controller_frequency=controller_frequency,
