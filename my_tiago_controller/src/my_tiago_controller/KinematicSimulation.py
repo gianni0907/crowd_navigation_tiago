@@ -39,7 +39,7 @@ def main():
     controller_frequency = 15.0 # [Hz]
     dt = 1.0 / controller_frequency
     N_horizon = 5
-    T_horizon = dt * 1.0 * N_horizon # [s]
+    T_horizon = dt * N_horizon # [s]
     controller_manager = ControllerManager(
         controller_frequency=controller_frequency,
         nmpc_N=N_horizon,

@@ -78,16 +78,44 @@ class ControllerManager:
         self.cmd_vel_publisher.publish(cmd_vel_msg)
 
     def odom_callback(self, msg):
-        self.actual_configuration = np.zeros((self.nmpc_controller.nq))
-        self.actual_configuration[self.hparams.x_idx] = msg.pose.pose.position.x
-        self.actual_configuration[self.hparams.y_idx] = msg.pose.pose.position.y
+        self.configuration = np.zeros((self.nmpc_controller.nq))
+        self.configuration[self.hparams.x_idx] = msg.pose.pose.position.x
+        self.configuration[self.hparams.y_idx] = msg.pose.pose.position.y
 
         theta = R.from_quat([[msg.pose.pose.orientation.x,
                           msg.pose.pose.orientation.y,
                           msg.pose.pose.orientation.z,
                           msg.pose.pose.orientation.w]]).as_rotvec()[0][2]
 
-        self.actual_configuration[self.hparams.theta_idx] = theta
+        self.configuration[self.hparams.theta_idx] = theta
     
     def get_latest_configuration(self):
-        return self.actual_configuration
+        return self.configuration
+    
+def main():
+    # Build controller manager
+    controller_frequency = 50.0 # [Hz]
+    dt = 1.0 / controller_frequency
+    N_horizon = 5
+    T_horizon = dt * N_horizon # [s]
+    controller_manager = ControllerManager(
+        controller_frequency=controller_frequency,
+        nmpc_N=N_horizon,
+        nmpc_T=T_horizon
+    )
+
+    # Setup initial configuration
+    starting_configuration = np.array([0.0, 0.0, 0.0])
+    controller_manager.init(starting_configuration)
+    
+    rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
+    rospy.loginfo('Tiago control module [OK]')
+    rate = rospy.Rate(controller_frequency)
+
+    print("Init configuration ------------")
+    print(starting_configuration)
+
+    while not(rospy.is_shutdown()):
+        controller_manager.update()
+        controller_manager.publish_command()
+        rate.sleep()    

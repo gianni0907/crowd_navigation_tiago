@@ -1,0 +1,5 @@
+<launch>
+  <group ns="my_tiago_controller">
+      <node pkg="my_tiago_controller" type="kinematic_simulation" name="kinematic_simulation" output="screen" />
+  </group>
+</launch>
