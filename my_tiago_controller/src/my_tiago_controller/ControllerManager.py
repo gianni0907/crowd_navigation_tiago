@@ -1,9 +1,8 @@
-import math
-from scipy.spatial.transform import Rotation as R
-
 import rospy
 import nav_msgs.msg
 import geometry_msgs.msg
+
+from scipy.spatial.transform import Rotation as R
 
 from my_tiago_controller.Hparams import *
 from my_tiago_controller.KinematicModel import *
@@ -21,7 +20,7 @@ class ControllerManager:
         cmd_vel_topic = '/mobile_base_controller/cmd_vel'
         self.cmd_vel_publisher = rospy.Publisher(cmd_vel_topic, geometry_msgs.msg.Twist, queue_size=1)
 
-        # Setup (actual) odometry listener
+        # Setup odometry listener
         self.odometry_listener = rospy.Subscriber('/mobile_base_controller/odom', nav_msgs.msg.Odometry, self.odom_callback)
         
         # NMPC:
@@ -76,8 +75,6 @@ class ControllerManager:
 
         # Publish wheel velocity commands
         self.cmd_vel_publisher.publish(cmd_vel_msg)
-        if omega > self.hparams.steering_vel_max or omega < self.hparams.steering_vel_max_neg:
-            print("Steering velocity limit exceeded!")
 
     def odom_callback(self, msg):
         self.configuration = np.zeros((self.nmpc_controller.nq))

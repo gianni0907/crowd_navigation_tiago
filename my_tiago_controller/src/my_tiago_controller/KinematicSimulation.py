@@ -16,6 +16,49 @@ class KinematicSimulation:
         self.kinematic_model = KinematicModel()
         self.controller_manager = controller_manager
         self.publish_data = publish_data
+
+        # Setup odometry publisher:
+        odometry_topic = "/odom"
+        self.odometry_publisher = rospy.Publisher(odometry_topic, nav_msgs.msg.Odometry, queue_size=1)
+
+    def publish_odometry(self):
+        # Publish odometry:
+        odom_message = nav_msgs.msg.Odometry()
+        odom_message.header.stamp = rospy.Time.now()
+        odom_message.header.frame_id = 'odom'
+        odom_message.child_frame_id = 'base_link'
+
+        configuration = self.controller_manager.configuration
+        control_input = self.controller_manager.control_input
+        wheel_radius = self.controller_manager.hparams.wheel_radius
+        wheel_separation = self.controller_manager.hparams.wheel_separation
+        x_idx = self.controller_manager.hparams.x_idx
+        y_idx = self.controller_manager.hparams.y_idx
+        theta_idx = self.controller_manager.hparams.theta_idx
+        wr_idx = self.controller_manager.hparams.wr_idx
+        wl_idx = self.controller_manager.hparams.wl_idx
+
+        odom_message.pose.pose.position.x = configuration[x_idx]
+        odom_message.pose.pose.position.y = configuration[y_idx]
+        odom_message.pose.pose.position.z = 0.0
+        orientation = scipy.spatial.transform.Rotation.from_dcm(
+            [[math.cos(configuration[theta_idx]), -math.sin(configuration[theta_idx]), 0.0],
+             [math.sin(configuration[theta_idx]),  math.cos(configuration[theta_idx]), 0.0],
+             [                               0.0,                                 0.0, 1.0]]
+        ).as_quat()
+        odom_message.pose.pose.orientation.x = orientation[0]
+        odom_message.pose.pose.orientation.y = orientation[1]
+        odom_message.pose.pose.orientation.z = orientation[2]
+        odom_message.pose.pose.orientation.w = orientation[3]
+
+        odom_message.twist.twist.linear.x = (wheel_radius/2)*(control_input[wr_idx]+control_input[wl_idx])
+        odom_message.twist.twist.linear.y = 0.0
+        odom_message.twist.twist.linear.z = 0.0
+        odom_message.twist.twist.angular.x = 0.0
+        odom_message.twist.twist.angular.y = 0.0
+        odom_message.twist.twist.angular.z = (wheel_radius/wheel_separation)*(control_input[wr_idx]-control_input[wl_idx])
+
+        self.odometry_publisher.publish(odom_message)
     
     def update(self):
         self.controller_manager.update()
@@ -31,6 +74,7 @@ class KinematicSimulation:
         # Publish data to ROS topics if specified:
         if self.publish_data:
             self.controller_manager.publish_command()
+            self.publish_odometry()
 
         return True
     
@@ -52,7 +96,7 @@ def main():
     tiago_kinematic_simulation = KinematicSimulation(controller_manager, dt)
 
     # Set variables for plots
-    N_sim = 200
+    N_sim = 250
     iter = 0
     x_real = np.ndarray((N_sim + 1, controller_manager.nmpc_controller.nq))
     x_sim = np.ndarray((N_sim + 1, controller_manager.nmpc_controller.nq))
