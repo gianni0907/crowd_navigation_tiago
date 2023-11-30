@@ -7,7 +7,6 @@ def plot_robot(
     u_max,
     U,
     X_sim,
-    X_real,
     save=False,
     save_dir=None
 ):
@@ -17,7 +16,6 @@ def plot_robot(
         u_max: maximum absolute value of u
         U: array with shape (N_sim, nu)
         X_sim: array with shape (N_sim+1, nx)
-        X_real: array with shape (N_sim+1, nx)
 
     """
 
@@ -54,12 +52,10 @@ def plot_robot(
     states_labels = ["$x$", "$y$", "$theta$"]
     for i in range(nx):
         plt.subplot(nx + nu, 1, i + nu+1)
-        (line,) = plt.plot(t, X_sim[:, i], label="est")
-        (line,) = plt.plot(t, X_real[:, i], label="real")
+        (line,) = plt.plot(t, X_sim[:, i])
         plt.ylabel(states_labels[i])
         plt.xlabel("$t$")
         plt.grid()
-        plt.legend(loc=1)
 
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, hspace=0.4)
     plt.savefig(plots_path)

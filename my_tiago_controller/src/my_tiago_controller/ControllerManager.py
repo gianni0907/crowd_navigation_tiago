@@ -7,6 +7,7 @@ from scipy.spatial.transform import Rotation as R
 from my_tiago_controller.Hparams import *
 from my_tiago_controller.KinematicModel import *
 from my_tiago_controller.NMPC import *
+from my_tiago_controller.Logger import *
 
 class ControllerManager:
     def __init__(
@@ -103,18 +104,49 @@ def main():
         nmpc_T=T_horizon
     )
 
-    # Setup initial configuration
-    starting_configuration = np.array([0.0, 0.0, 0.0])
-    controller_manager.init(starting_configuration)
-    
     rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
     rospy.loginfo('Tiago control module [OK]')
     rate = rospy.Rate(controller_frequency)
 
+    # Setup loggers for bagfiles
+    log = False
+    bag_dir = '/tmp/crowd_navigation_tiago/bagfiles'
+    if not os.path.exists(bag_dir):
+        os.makedirs(bag_dir)
+
+    if log:
+        odom_topic = "/mobile_base_controller/odom"
+        cmd_vel_topic = "/mobile_base_controller/cmd_vel"
+        odom_bagname = "odometry.bag"
+        cmd_vel_bagname = "commands.bag"
+    
+        odom_bag = os.path.join(bag_dir, odom_bagname)
+        cmd_vel_bag = os.path.join(bag_dir, cmd_vel_bagname)
+
+        odom_logger = Logger(odom_topic, odom_bag)
+        cmd_vel_logger = Logger(cmd_vel_topic, cmd_vel_bag)
+
+        # Start loggers
+        odom_logger.start_logging()
+        cmd_vel_logger.start_logging()
+
+    # Setup initial configuration
+    starting_configuration = np.array([0.0, 0.0, 0.0])
+    controller_manager.init(starting_configuration)
+    
     print("Init configuration ------------")
     print(starting_configuration)
 
-    while not(rospy.is_shutdown()):
-        controller_manager.update()
-        controller_manager.publish_command()
-        rate.sleep()    
+    try:
+        while not(rospy.is_shutdown()):
+            controller_manager.update()
+            controller_manager.publish_command()
+            rate.sleep()
+    except rospy.ROSInterruptException as e:
+        rospy.logwarn("ROS node shutting down")
+        rospy.logwarn('{}'.format(e))
+    finally:
+        if log:
+            # Stop loggers
+            odom_logger.stop_logging()
+            cmd_vel_logger.stop_logging()

@@ -19,16 +19,18 @@ class Logger:
         self.bag = rosbag.Bag(path, 'w')
         
     def logger_callback(self, msg):
-        rospy.loginfo("Received message: %s", msg)
+        # rospy.loginfo("Received message: %s", msg)
         self.bag.write(self.topic, msg)
 
     def start_logging(self):
-        if self.topic=="/mobile_base_controller/cmd_vel":
+        if self.topic=="/mobile_base_controller/cmd_vel" or self.topic=="/cmd_vel":
             rospy.Subscriber(self.topic, geometry_msgs.msg.Twist, self.logger_callback)
         elif self.topic=="/mobile_base_controller/odom" or self.topic=="/odom":
             rospy.Subscriber(self.topic, nav_msgs.msg.Odometry, self.logger_callback)
-        rospy.spin()
-
+        else:
+            raise Exception(
+                f"Topic specified not available for logging"
+            )
 
     def stop_logging(self):
         self.bag.close()
@@ -52,5 +54,7 @@ def main():
     except rospy.ROSInterruptException as e:
         rospy.logwarn("Logger initialization failed")
         rospy.logwarn('{}'.format(e))
-    finally:
-        logger.stop_logging()
+    while not(rospy.is_shutdown()):
+        pass
+
+    logger.stop_logging()
