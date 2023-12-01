@@ -25,7 +25,11 @@ class NMPC:
 
         # Setup solver:
         self.acados_ocp_solver = self.__create_acados_ocp_solver(self.N,self.T)
-        
+
+        # # Variables for Analysis of required time
+        # self.tmp_time = 0.0
+        # self.max_time = 0.0
+
     def init(self, x0: np.array):
         lbx = np.array([self.hparams.lower_bound, self.hparams.lower_bound])
         ubx = np.array([self.hparams.upper_bound, self.hparams.upper_bound])
@@ -183,6 +187,9 @@ class NMPC:
 
         # Solve NLP
         self.u0 = self.acados_ocp_solver.solve_for_x0(configuration)
+        # self.tmp_time = self.acados_ocp_solver.get_stats('time_tot')
+        # if self.tmp_time > self.max_time:
+        #     self.max_time = self.tmp_time
 
     def get_command(self):
         return self.u0

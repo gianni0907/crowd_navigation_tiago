@@ -171,6 +171,7 @@ def main():
         rospy.logwarn("ROS node shutting down")
         rospy.logwarn('{}'.format(e))
     finally:
+        # print(controller_manager.nmpc_controller.max_time)
         if log:
             # Stop loggers
             odom_logger.stop_logging()
