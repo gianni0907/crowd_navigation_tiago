@@ -1,0 +1,8 @@
+# Desired position of the robot:
+float64 x
+float64 y
+
+---
+
+# Whether the service request has been executed successfully or not:
+bool success

@@ -1,17 +1,14 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>my_tiago_controller</name>
+  <name>my_tiago_msgs</name>
   <version>0.0.0</version>
-  <description>The my_tiago_controller package</description>
+  <description>The my_tiago_msgs package</description>
   <maintainer email="gravina.2021526@studenti.uniroma1.it">Giovanbattista Gravina</maintainer>
   <license>TODO</license>
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>rospy</build_depend>
-  <build_export_depend>rospy</build_export_depend>
-  <exec_depend>rospy</exec_depend>
-  <depend>geometry_msgs</depend>
-  <depend>nav_msgs</depend>
-  <depend>my_tiago_msgs</depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
+  <depend>std_msgs</depend>
   <!-- The export tag contains other, unspecified, tags -->
   <export>
     <!-- Other tools can request additional information be placed here -->

@@ -1,8 +1,6 @@
 import numpy as np
 
-class Hparams:
-    target_point = np.array([2.5, 2.5]) # [m]
-    
+class Hparams:    
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
     

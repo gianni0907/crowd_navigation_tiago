@@ -9,6 +9,8 @@ from my_tiago_controller.KinematicModel import *
 from my_tiago_controller.NMPC import *
 from my_tiago_controller.Logger import *
 
+import my_tiago_msgs.srv
+
 class ControllerManager:
     def __init__(
             self,
@@ -19,28 +21,42 @@ class ControllerManager:
 
         # Setup publisher for wheel velocity commands:
         cmd_vel_topic = '/mobile_base_controller/cmd_vel'
-        self.cmd_vel_publisher = rospy.Publisher(cmd_vel_topic, geometry_msgs.msg.Twist, queue_size=1)
+        self.cmd_vel_publisher = rospy.Publisher(
+            cmd_vel_topic,
+            geometry_msgs.msg.Twist,
+            queue_size=1
+        )
 
         # Setup odometry listener
-        self.odometry_listener = rospy.Subscriber('/mobile_base_controller/odom', nav_msgs.msg.Odometry, self.odom_callback)
+        self.odom_topic = '/mobile_base_controller/odom'
+        self.odometry_listener = rospy.Subscriber(
+            self.odom_topic,
+            nav_msgs.msg.Odometry,
+            self.odom_callback
+        )
         
         # NMPC:
         self.dt = 1.0 / self.controller_frequency
         self.hparams = Hparams()
-        self.target_point = self.hparams.target_point
+        self.target_position = np.zeros((2,))
         self.nmpc_controller = NMPC(nmpc_N, nmpc_T)
 
-    def init(self, configuration):
+        self.set_desired_target_position_srv = rospy.Service(
+            'SetDesiredTargetPosition',
+            my_tiago_msgs.srv.SetDesiredTargetPosition,
+            self.set_desired_target_position_request
+        )
+
+    def init(self):
         # Init robot configuration
-        self.configuration = configuration
         self.nmpc_controller.init(self.configuration)
 
     def update(self):
         q_ref = np.zeros((self.nmpc_controller.nq, self.nmpc_controller.N+1))
         for k in range(self.nmpc_controller.N):
-            q_ref[:self.nmpc_controller.nq - 1, k] = self.target_point
+            q_ref[:self.nmpc_controller.nq - 1, k] = self.target_position
         u_ref = np.zeros((self.nmpc_controller.nu, self.nmpc_controller.N))
-        q_ref[:self.nmpc_controller.nq - 1, self.nmpc_controller.N] = self.target_point
+        q_ref[:self.nmpc_controller.nq - 1, self.nmpc_controller.N] = self.target_position
 
         try:
             self.nmpc_controller.update(
@@ -92,6 +108,13 @@ class ControllerManager:
     def get_latest_configuration(self):
         return self.configuration
     
+    def set_desired_target_position_request(self, request):
+        self.target_position[self.hparams.x_idx] = request.x
+        self.target_position[self.hparams.y_idx] = request.y
+        
+        rospy.loginfo(f"Desired target position successfully set: {self.target_position}")
+        return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(True)
+
 def main():
     # Build controller manager
     controller_frequency = 50.0 # [Hz]
@@ -105,7 +128,7 @@ def main():
     )
 
     rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
-    rospy.loginfo('Tiago control module [OK]')
+    rospy.loginfo('TIAGo control module [OK]')
     rate = rospy.Rate(controller_frequency)
 
     # Setup loggers for bagfiles
@@ -131,8 +154,10 @@ def main():
         cmd_vel_logger.start_logging()
 
     # Setup initial configuration
-    starting_configuration = np.array([0.0, 0.0, 0.0])
-    controller_manager.init(starting_configuration)
+    rospy.loginfo("Waiting for the first message on topic %s" % controller_manager.odom_topic)
+    rospy.wait_for_message(controller_manager.odom_topic, nav_msgs.msg.Odometry)
+    starting_configuration = controller_manager.get_latest_configuration()
+    controller_manager.init()
     
     print("Init configuration ------------")
     print(starting_configuration)

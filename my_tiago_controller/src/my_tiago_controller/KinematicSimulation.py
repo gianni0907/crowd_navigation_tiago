@@ -123,7 +123,7 @@ def main():
     )
 
     rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
-    rospy.loginfo('Tiago control module [OK]')
+    rospy.loginfo('TIAGo control module [OK]')
     rate = rospy.Rate(controller_frequency)
 
     # Setup kinematic simulation
