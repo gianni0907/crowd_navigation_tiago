@@ -38,7 +38,6 @@ class ControllerManager:
         # NMPC:
         self.dt = 1.0 / self.controller_frequency
         self.hparams = Hparams()
-        self.target_position = np.zeros((2,))
         self.nmpc_controller = NMPC(nmpc_N, nmpc_T)
 
         self.set_desired_target_position_srv = rospy.Service(
@@ -49,6 +48,8 @@ class ControllerManager:
 
     def init(self):
         # Init robot configuration
+        self.target_position = np.array([self.configuration[self.hparams.x_idx],
+                                         self.configuration[self.hparams.y_idx]])
         self.nmpc_controller.init(self.configuration)
 
     def update(self):
