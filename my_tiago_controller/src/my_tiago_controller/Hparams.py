@@ -1,8 +1,16 @@
 import numpy as np
 
 class Hparams:    
+    # Specify whether to use real robot or Gazebo
+    real_robot = False
+
+    # Specify whether to log /odom and /cmd_vel data in bagfiles
+    log = False
+
+    # Kinematic parameters
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
+    b = 0.0 # [m]
     
     # Driving and steering velocity limits
     driving_vel_max = 1 # [m/s]

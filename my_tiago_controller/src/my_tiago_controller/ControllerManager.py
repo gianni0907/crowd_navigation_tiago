@@ -1,6 +1,7 @@
 import rospy
 import nav_msgs.msg
 import geometry_msgs.msg
+import tf2_ros
 
 from scipy.spatial.transform import Rotation as R
 
@@ -8,6 +9,7 @@ from my_tiago_controller.Hparams import *
 from my_tiago_controller.KinematicModel import *
 from my_tiago_controller.NMPC import *
 from my_tiago_controller.Logger import *
+from my_tiago_controller.Status import *
 
 import my_tiago_msgs.srv
 
@@ -17,7 +19,17 @@ class ControllerManager:
             controller_frequency,
             nmpc_N,
             nmpc_T):
+
         self.controller_frequency = controller_frequency
+        # Set status
+        self.status = Status.WAITING
+        
+        # NMPC:
+        self.dt = 1.0 / self.controller_frequency
+        self.hparams = Hparams()
+        self.nmpc_controller = NMPC(nmpc_N, nmpc_T)
+
+        self.configuration = np.zeros((self.nmpc_controller.nq))
 
         # Setup publisher for wheel velocity commands:
         cmd_vel_topic = '/mobile_base_controller/cmd_vel'
@@ -27,19 +39,18 @@ class ControllerManager:
             queue_size=1
         )
 
-        # Setup odometry listener
-        self.odom_topic = '/mobile_base_controller/odom'
-        self.odometry_listener = rospy.Subscriber(
-            self.odom_topic,
-            nav_msgs.msg.Odometry,
-            self.odom_callback
-        )
-        
-        # NMPC:
-        self.dt = 1.0 / self.controller_frequency
-        self.hparams = Hparams()
-        self.nmpc_controller = NMPC(nmpc_N, nmpc_T)
+        # Setup reference frames:
+        if self.hparams.real_robot:
+            self.map_frame = 'map'
+        else:
+            self.map_frame = 'odom'
+        self.base_footprint_frame = 'base_footprint'
 
+        # Setup TF listener:
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)        
+
+        # Setup ROS Service to set target position:
         self.set_desired_target_position_srv = rospy.Service(
             'SetDesiredTargetPosition',
             my_tiago_msgs.srv.SetDesiredTargetPosition,
@@ -48,29 +59,12 @@ class ControllerManager:
 
     def init(self):
         # Init robot configuration
-        self.target_position = np.array([self.configuration[self.hparams.x_idx],
-                                         self.configuration[self.hparams.y_idx]])
-        self.nmpc_controller.init(self.configuration)
+        self.update_configuration()
+        if self.status == Status.READY:
+            self.target_position = np.array([self.configuration[self.hparams.x_idx],
+                                            self.configuration[self.hparams.y_idx]])
+            self.nmpc_controller.init(self.configuration)
 
-    def update(self):
-        q_ref = np.zeros((self.nmpc_controller.nq, self.nmpc_controller.N+1))
-        for k in range(self.nmpc_controller.N):
-            q_ref[:self.nmpc_controller.nq - 1, k] = self.target_position
-        u_ref = np.zeros((self.nmpc_controller.nu, self.nmpc_controller.N))
-        q_ref[:self.nmpc_controller.nq - 1, self.nmpc_controller.N] = self.target_position
-
-        try:
-            self.nmpc_controller.update(
-                self.configuration,
-                q_ref,
-                u_ref
-            )
-            self.control_input = self.nmpc_controller.get_command()
-        except Exception as e:
-            rospy.logwarn("NMPC solver failed")
-            rospy.logwarn('{}'.format(e))
-            self.control_input = np.array([0.0, 0.0])
-        
     def publish_command(self):
         # Set wheel angular velocity commands
         w_r = self.control_input[self.hparams.wr_idx]
@@ -94,29 +88,66 @@ class ControllerManager:
         # Publish wheel velocity commands
         self.cmd_vel_publisher.publish(cmd_vel_msg)
 
-    def odom_callback(self, msg):
-        self.configuration = np.zeros((self.nmpc_controller.nq))
-        self.configuration[self.hparams.x_idx] = msg.pose.pose.position.x
-        self.configuration[self.hparams.y_idx] = msg.pose.pose.position.y
+    def set_from_tf_transform(self, transform):
+        self.configuration[self.hparams.x_idx] = transform.transform.translation.x
+        self.configuration[self.hparams.y_idx] = transform.transform.translation.y
+        q = transform.transform.rotation
+        self.configuration[self.hparams.theta_idx] = math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        )
 
-        theta = R.from_quat([[msg.pose.pose.orientation.x,
-                          msg.pose.pose.orientation.y,
-                          msg.pose.pose.orientation.z,
-                          msg.pose.pose.orientation.w]]).as_rotvec()[0][2]
+    def update_configuration(self):
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.map_frame, self.base_footprint_frame, rospy.Time()
+            )
+            self.set_from_tf_transform(transform)
+            self.status = Status.READY
+        except(tf2_ros.LookupException,
+               tf2_ros.ConnectivityException,
+               tf2_ros.ExtrapolationException):
+            self.status = Status.WAITING
 
-        self.configuration[self.hparams.theta_idx] = theta
-    
-    def get_latest_configuration(self):
-        return self.configuration
-    
     def set_desired_target_position_request(self, request):
+        if self.status != Status.READY:
+            rospy.loginfo("Cannot set desired target position, robot is not READY")
+            return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)
+        
         self.target_position[self.hparams.x_idx] = request.x
         self.target_position[self.hparams.y_idx] = request.y
         
         rospy.loginfo(f"Desired target position successfully set: {self.target_position}")
         return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(True)
 
+    def update(self):
+        q_ref = np.zeros((self.nmpc_controller.nq, self.nmpc_controller.N+1))
+        for k in range(self.nmpc_controller.N):
+            q_ref[:self.nmpc_controller.nq - 1, k] = self.target_position
+        u_ref = np.zeros((self.nmpc_controller.nu, self.nmpc_controller.N))
+        q_ref[:self.nmpc_controller.nq - 1, self.nmpc_controller.N] = self.target_position
+        self.update_configuration()
+
+        if self.status == Status.READY:
+            try:
+                self.nmpc_controller.update(
+                    self.configuration,
+                    q_ref,
+                    u_ref
+                )
+                self.control_input = self.nmpc_controller.get_command()
+            except Exception as e:
+                rospy.logwarn("NMPC solver failed")
+                rospy.logwarn('{}'.format(e))
+                self.control_input = np.zeros((self.nmpc_controller.nu))
+        else:
+            self.control_input = np.zeros((self.nmpc_controller.nu))
+        
+
 def main():
+    rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
+    rospy.loginfo('TIAGo control module [OK]')
+
     # Build controller manager
     controller_frequency = 50.0 # [Hz]
     dt = 1.0 / controller_frequency
@@ -127,18 +158,14 @@ def main():
         nmpc_N=N_horizon,
         nmpc_T=T_horizon
     )
-
-    rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
-    rospy.loginfo('TIAGo control module [OK]')
     rate = rospy.Rate(controller_frequency)
 
     # Setup loggers for bagfiles
-    log = False
     bag_dir = '/tmp/crowd_navigation_tiago/bagfiles'
     if not os.path.exists(bag_dir):
         os.makedirs(bag_dir)
 
-    if log:
+    if controller_manager.hparams.log:
         odom_topic = "/mobile_base_controller/odom"
         cmd_vel_topic = "/mobile_base_controller/cmd_vel"
         odom_bagname = "odometry.bag"
@@ -154,12 +181,10 @@ def main():
         odom_logger.start_logging()
         cmd_vel_logger.start_logging()
 
-    # Setup initial configuration
-    rospy.loginfo("Waiting for the first message on topic %s" % controller_manager.odom_topic)
-    rospy.wait_for_message(controller_manager.odom_topic, nav_msgs.msg.Odometry)
-    starting_configuration = controller_manager.get_latest_configuration()
-    controller_manager.init()
-    
+    # Waiting for current configuration to initialize controller_manager
+    while controller_manager.status == Status.WAITING:
+        controller_manager.init()
+    starting_configuration = controller_manager.configuration
     print("Init configuration ------------")
     print(starting_configuration)
 
@@ -173,7 +198,7 @@ def main():
         rospy.logwarn('{}'.format(e))
     finally:
         # print(controller_manager.nmpc_controller.max_time)
-        if log:
+        if controller_manager.hparams.log:
             # Stop loggers
             odom_logger.stop_logging()
             cmd_vel_logger.stop_logging()

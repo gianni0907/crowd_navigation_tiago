@@ -43,25 +43,31 @@ class NMPC:
             self.acados_ocp_solver.constraints_set(k, 'lbx', lbx)
             self.acados_ocp_solver.constraints_set(k, 'ubx', ubx)
 
-    def __wrap_angle(self, theta):
-        return casadi.atan2(casadi.sin(theta), casadi.cos(theta))
-
     # Systems dynamics:
     def __f(self, x, u):
+        w_r = u[self.hparams.wr_idx]
+        w_l = u[self.hparams.wl_idx]
+        wheel_radius = self.hparams.wheel_radius
+        wheel_separation = self.hparams.wheel_separation
+        v = (wheel_radius/2)*(w_r+w_l)
+        omega = (wheel_radius/wheel_separation)*(w_r-w_l)
+
         xdot = casadi.SX.zeros(self.nq)
-        xdot[self.hparams.x_idx] = self.__x_dot(x,u)
-        xdot[self.hparams.y_idx] = self.__y_dot(x,u)
-        xdot[self.hparams.theta_idx] = self.__theta_dot(u)
+        xdot[self.hparams.x_idx] = self.__x_dot(x,v,omega)
+        xdot[self.hparams.y_idx] = self.__y_dot(x,v,omega)
+        xdot[self.hparams.theta_idx] = self.__theta_dot(omega)
         return xdot
 
-    def __x_dot(self, q, u):
-        return casadi.cos(q[self.hparams.theta_idx])*(self.hparams.wheel_radius/2)*(u[self.hparams.wr_idx]+u[self.hparams.wl_idx])
+    def __x_dot(self, q, v, omega):
+        b = self.hparams.b
+        return v*casadi.cos(q[self.hparams.theta_idx])-omega*b*casadi.sin(q[self.hparams.theta_idx])
 
-    def __y_dot(self, q, u):
-        return casadi.sin(q[self.hparams.theta_idx])*(self.hparams.wheel_radius/2)*(u[self.hparams.wr_idx]+u[self.hparams.wl_idx])
+    def __y_dot(self, q, v, omega):
+        b = self.hparams.b
+        return v*casadi.sin(q[self.hparams.theta_idx])+omega*b*casadi.cos(q[self.hparams.theta_idx])
     
-    def __theta_dot(self, u):
-        return (self.hparams.wheel_radius/self.hparams.wheel_separation)*(u[self.hparams.wr_idx]-u[self.hparams.wl_idx])
+    def __theta_dot(self, omega):
+        return omega
     
     def __create_acados_model(self) -> AcadosModel:
         # Setup CasADi expressions:
