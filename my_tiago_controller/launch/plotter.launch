@@ -1,0 +1,5 @@
+<launch>
+  <group ns="my_tiago_controller">
+      <node pkg="my_tiago_controller" type="plotter" name="plotter" output="screen" />
+  </group>
+</launch>

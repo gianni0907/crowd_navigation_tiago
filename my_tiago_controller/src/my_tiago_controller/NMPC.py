@@ -31,8 +31,8 @@ class NMPC:
         # self.max_time = 0.0
 
     def init(self, x0: np.array):
-        lbx = np.array([self.hparams.lower_bound, self.hparams.lower_bound])
-        ubx = np.array([self.hparams.upper_bound, self.hparams.upper_bound])
+        lbx = np.array([self.hparams.x_lower_bound, self.hparams.y_lower_bound])
+        ubx = np.array([self.hparams.x_upper_bound, self.hparams.y_upper_bound])
 
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'x', np.array(x0))

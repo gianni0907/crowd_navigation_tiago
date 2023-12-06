@@ -4,8 +4,9 @@ class Hparams:
     # Specify whether to use real robot or Gazebo
     real_robot = False
 
-    # Specify whether to log /odom and /cmd_vel data in bagfiles
-    log = False
+    # Specify whether to save data for plots and .json filename
+    log = True
+    logfile = 'test.json'
 
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
@@ -23,8 +24,10 @@ class Hparams:
     w_max_neg = -w_max
 
     # Configuration limits (only for cartesian position)
-    lower_bound = -10 # [m]
-    upper_bound = 10  # [m]
+    x_lower_bound = -5 # [m]
+    x_upper_bound = 5  # [m]
+    y_lower_bound = x_lower_bound
+    y_upper_bound = x_upper_bound
     
     # State indices:
     x_idx = 0
@@ -34,4 +37,7 @@ class Hparams:
     # Control input indices
     wr_idx = 0
     wl_idx = 1
+
+    # Tolerance on the position error
+    error_tol = 0.01
 
