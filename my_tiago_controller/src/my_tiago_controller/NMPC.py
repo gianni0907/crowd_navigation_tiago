@@ -30,14 +30,14 @@ class NMPC:
         # self.tmp_time = 0.0
         # self.max_time = 0.0
 
-    def init(self, x0: np.array):
+    def init(self, x0: Configuration):
         lbx = np.array([self.hparams.x_lower_bound, self.hparams.y_lower_bound])
         ubx = np.array([self.hparams.x_upper_bound, self.hparams.y_upper_bound])
 
         for k in range(self.N):
-            self.acados_ocp_solver.set(k, 'x', np.array(x0))
+            self.acados_ocp_solver.set(k, 'x', np.array(x0.get_q()))
             self.acados_ocp_solver.set(k, 'u', np.zeros(self.nu))
-        self.acados_ocp_solver.set(self.N, 'x', np.array(x0))
+        self.acados_ocp_solver.set(self.N, 'x', np.array(x0.get_q()))
 
         for k in range(1, self.N):
             self.acados_ocp_solver.constraints_set(k, 'lbx', lbx)
@@ -183,7 +183,7 @@ class NMPC:
 
     def update(
             self,
-            configuration: np.array,
+            configuration: Configuration,
             q_ref: np.array,
             u_ref: np.array):
         # Set parameters
@@ -192,7 +192,7 @@ class NMPC:
         self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])
 
         # Solve NLP
-        self.u0 = self.acados_ocp_solver.solve_for_x0(configuration)
+        self.u0 = self.acados_ocp_solver.solve_for_x0(configuration.get_q())
         # self.tmp_time = self.acados_ocp_solver.get_stats('time_tot')
         # if self.tmp_time > self.max_time:
         #     self.max_time = self.tmp_time

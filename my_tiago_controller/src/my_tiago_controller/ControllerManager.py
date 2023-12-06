@@ -29,7 +29,7 @@ class ControllerManager:
         self.hparams = Hparams()
         self.nmpc_controller = NMPC(nmpc_N, nmpc_T)
 
-        self.configuration = np.zeros((self.nmpc_controller.nq))
+        self.configuration = Configuration(0.0, 0.0, 0.0)
 
         # Setup publisher for wheel velocity commands:
         cmd_vel_topic = '/mobile_base_controller/cmd_vel'
@@ -68,8 +68,8 @@ class ControllerManager:
         
         if self.update_configuration():
             self.status = Status.READY
-            self.target_position = np.array([self.configuration[self.hparams.x_idx],
-                                            self.configuration[self.hparams.y_idx]])
+            self.target_position = np.array([self.configuration.x,
+                                            self.configuration.y])
             self.nmpc_controller.init(self.configuration)
 
     def publish_command(self):
@@ -96,10 +96,10 @@ class ControllerManager:
         self.cmd_vel_publisher.publish(cmd_vel_msg)
 
     def set_from_tf_transform(self, transform):
-        self.configuration[self.hparams.x_idx] = transform.transform.translation.x
-        self.configuration[self.hparams.y_idx] = transform.transform.translation.y
+        self.configuration.x = transform.transform.translation.x
+        self.configuration.y = transform.transform.translation.y
         q = transform.transform.rotation
-        self.configuration[self.hparams.theta_idx] = math.atan2(
+        self.configuration.theta = math.atan2(
             2.0 * (q.w * q.z + q.x * q.y),
             1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         )
@@ -191,8 +191,9 @@ def main():
     # Waiting for current configuration to initialize controller_manager
     while controller_manager.status == Status.WAITING:
         controller_manager.init()
-    print("Init configuration ------------")
+    print("Initial configuration ********************")
     print(controller_manager.configuration)
+    print("******************************************")
 
     try:
         while not(rospy.is_shutdown()):
@@ -204,9 +205,9 @@ def main():
             # Saving data for plots
             if controller_manager.hparams.log:
                 controller_manager.configuration_history.append([
-                    controller_manager.configuration[controller_manager.hparams.x_idx],
-                    controller_manager.configuration[controller_manager.hparams.y_idx],
-                    controller_manager.configuration[controller_manager.hparams.theta_idx],
+                    controller_manager.configuration.x,
+                    controller_manager.configuration.y,
+                    controller_manager.configuration.theta,
                     time
                 ])
                 controller_manager.control_input_history.append([
@@ -224,11 +225,14 @@ def main():
 
             # Checking the position error
             error = np.array([controller_manager.target_position[controller_manager.hparams.x_idx] - \
-                              controller_manager.configuration[controller_manager.hparams.x_idx],
+                              controller_manager.configuration.x,
                               controller_manager.target_position[controller_manager.hparams.y_idx] - \
-                              controller_manager.configuration[controller_manager.hparams.y_idx]])
-            if norm(error) < controller_manager.hparams.error_tol:
-                controller_manager.status = Status.READY
+                              controller_manager.configuration.y])
+            if norm(error) < controller_manager.hparams.error_tol and controller_manager.status == Status.MOVING:
+                    print("Stop configuration #######################")
+                    print(controller_manager.configuration)
+                    print("##########################################")
+                    controller_manager.status = Status.READY
             rate.sleep()
     except rospy.ROSInterruptException as e:
         rospy.logwarn("ROS node shutting down")

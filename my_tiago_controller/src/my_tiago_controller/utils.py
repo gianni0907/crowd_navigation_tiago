@@ -4,6 +4,19 @@ import numpy as np
 import os
 from  matplotlib.animation import FuncAnimation
 
+class Configuration:
+    def __init__(self, x, y, theta):
+        self.x = x
+        self.y = y
+        self.theta = theta
+
+    def __repr__(self):
+        return '({}, {}, {})'.format(self.x, self.y, self.theta)
+    
+    def get_q(self):
+        return np.array([self.x, self.y, self.theta])
+        
+
 def plot_results(filename=None):
     # Specify logging directory
     log_dir = '/tmp/crowd_navigation_tiago/data'
