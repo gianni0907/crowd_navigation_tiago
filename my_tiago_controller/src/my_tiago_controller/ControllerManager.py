@@ -6,7 +6,6 @@ import tf2_ros
 from numpy.linalg import *
 
 from my_tiago_controller.Hparams import *
-from my_tiago_controller.KinematicModel import *
 from my_tiago_controller.NMPC import *
 from my_tiago_controller.Status import *
 from my_tiago_controller.utils import *
