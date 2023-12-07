@@ -60,8 +60,9 @@ class ControllerManager:
         # Set variables to store data
         if self.hparams.log:
             self.configuration_history = []
-            self.prediction_history = []
             self.control_input_history = []
+            self.prediction_history = []
+            self.velocity_history = []
 
     def init(self):
         # Init robot configuration
@@ -94,6 +95,7 @@ class ControllerManager:
 
         # Publish wheel velocity commands
         self.cmd_vel_publisher.publish(cmd_vel_msg)
+        return v, omega
 
     def set_from_tf_transform(self, transform):
         self.configuration.x = transform.transform.translation.x
@@ -136,9 +138,16 @@ class ControllerManager:
         output_dict['configurations'] = self.configuration_history
         output_dict['inputs'] = self.control_input_history
         output_dict['predictions'] = self.prediction_history
+        output_dict['velocities'] = self.velocity_history
         output_dict['x_bounds'] = [self.hparams.x_lower_bound, self.hparams.x_upper_bound]
         output_dict['y_bounds'] = [self.hparams.y_lower_bound, self.hparams.y_upper_bound]
         output_dict['control_bounds'] = [self.hparams.w_max_neg, self.hparams.w_max]
+        output_dict['v_bounds'] = [self.hparams.driving_vel_min, self.hparams.driving_vel_max]
+        output_dict['omega_bounds'] = [self.hparams.steering_vel_max_neg, self.hparams.steering_vel_max]
+        output_dict['obstacles_position'] = self.hparams.obstacles_position.tolist()
+        output_dict['rho_cbf'] = self.hparams.rho_cbf
+        output_dict['ds_cbf'] = self.hparams.ds_cbf
+        
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
         if not os.path.exists(log_dir):
@@ -200,7 +209,7 @@ def main():
             time = rospy.get_time()
 
             controller_manager.update()
-            controller_manager.publish_command()
+            v, omega = controller_manager.publish_command()
 
             # Saving data for plots
             if controller_manager.hparams.log:
@@ -215,6 +224,7 @@ def main():
                     controller_manager.control_input[controller_manager.hparams.wl_idx],
                     time
                 ])
+                controller_manager.velocity_history.append([v, omega, time])
                 predicted_trajectory = np.zeros((controller_manager.nmpc_controller.nq, N_horizon+1))
                 for i in range(N_horizon):
                     predicted_trajectory[:, i] = \

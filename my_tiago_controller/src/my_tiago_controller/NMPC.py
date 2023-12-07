@@ -2,6 +2,7 @@ import numpy as np
 import scipy.linalg
 
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions, AcadosOcpSolver
+from numpy.linalg import *
 
 import casadi
 
@@ -33,10 +34,14 @@ class NMPC:
     def init(self, x0: Configuration):
         lbx = np.array([self.hparams.x_lower_bound, self.hparams.y_lower_bound])
         ubx = np.array([self.hparams.x_upper_bound, self.hparams.y_upper_bound])
+        lh = np.zeros(self.hparams.n_obstacles)
+        uh = 10000*np.ones(self.hparams.n_obstacles)
 
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'x', np.array(x0.get_q()))
             self.acados_ocp_solver.set(k, 'u', np.zeros(self.nu))
+            self.acados_ocp_solver.constraints_set(k, 'lh', lh)
+            self.acados_ocp_solver.constraints_set(k, 'uh', uh)
         self.acados_ocp_solver.set(self.N, 'x', np.array(x0.get_q()))
 
         for k in range(1, self.N):
@@ -69,6 +74,29 @@ class NMPC:
     def __theta_dot(self, omega):
         return omega
     
+    def __h_i(self, q):
+        n_obs = self.hparams.n_obstacles
+        p = casadi.SX.zeros((n_obs, 2))
+        h_i = casadi.SX.zeros(n_obs)
+        distance_vectors = casadi.SX.zeros((n_obs, 2))
+        cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
+        for i in range(n_obs):
+            p[i, :] = self.hparams.obstacles_position[i, :]
+            distance_vectors[i, self.hparams.x_idx] = q[self.hparams.x_idx] - p[i, self.hparams.x_idx]
+            distance_vectors[i, self.hparams.y_idx] = q[self.hparams.y_idx] - p[i, self.hparams.y_idx]
+            h_i[i] = distance_vectors[i, self.hparams.x_idx]**2 + \
+                     distance_vectors[i, self.hparams.y_idx]**2 - \
+                     cbf_radius**2
+        return h_i
+
+    def __h_i_dot(self, q, u):
+        x = q[self.hparams.x_idx]
+        y = q[self.hparams.y_idx]
+        v = self.hparams.wheel_radius * 0.5 * (u[self.hparams.wr_idx] + u[self.hparams.wl_idx])
+        return casadi.jacobian(self.__h_i(q), x) * v * casadi.cos(q[self.hparams.theta_idx]) + \
+               casadi.jacobian(self.__h_i(q), y) * v * casadi.sin(q[self.hparams.theta_idx])        
+
+    
     def __create_acados_model(self) -> AcadosModel:
         # Setup CasADi expressions:
         q = casadi.SX.sym('q', self.nq)
@@ -84,6 +112,10 @@ class NMPC:
         # System dynamics:
         acados_model.f_impl_expr = f_impl
         acados_model.f_expl_expr = f_expl
+
+        # CBF constraints:
+        con_h_expr = self.__h_i_dot(q, u) + self.hparams.gamma_cbf * self.__h_i(q)
+        acados_model.con_h_expr = con_h_expr
 
         # Variables and params:
         acados_model.x = q
@@ -147,6 +179,10 @@ class NMPC:
         acados_constraints.C = np.zeros((self.nu, self.nq))
         acados_constraints.lg = np.array([self.hparams.driving_vel_min, self.hparams.steering_vel_max_neg])
         acados_constraints.ug = np.array([self.hparams.driving_vel_max, self.hparams.steering_vel_max])
+
+        # Nonlinear constraints (CBF):
+        acados_constraints.lh = np.zeros(self.hparams.n_obstacles)
+        acados_constraints.uh = np.zeros(self.hparams.n_obstacles)
 
         return acados_constraints
     
