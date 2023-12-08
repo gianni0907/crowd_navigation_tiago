@@ -1,9 +1,10 @@
 import numpy as np
 import rospy
 import json
-import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
 import os
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+from matplotlib.patches import Circle
 from  matplotlib.animation import FuncAnimation
 
 def plot_results(filename=None):
@@ -14,13 +15,13 @@ def plot_results(filename=None):
            f"Specified directory not found"
         )
     # Specify saving plots directory
-    save_dir = '/tmp/crowd_navigation_tiago/plots'
+    save_dir = '/tmp/crowd_navigation_tiago/animations'
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
     log_path = os.path.join(log_dir, filename + '.json')
-    save_vel_path = os.path.join(save_dir, filename + '_velocities.png')
-    save_sim_path = os.path.join(save_dir, filename + '_simulation.png')
+    save_profiles_path = os.path.join(save_dir, filename + '_profiles.png')
+    save_sim_path = os.path.join(save_dir, filename + '_simulation.mp4')
 
     if os.path.exists(log_path):
         with open(log_path, 'r') as file:
@@ -35,140 +36,250 @@ def plot_results(filename=None):
     inputs = np.array(data['inputs'])
     predictions = np.array(data['predictions'])
     velocities = np.array(data['velocities'])
+    targets = np.array(data['targets'])
     control_bounds = np.array(data['control_bounds'])
     x_bounds = np.array(data['x_bounds'])
     y_bounds = np.array(data['y_bounds'])
     v_bounds = np.array(data['v_bounds'])
     omega_bounds = np.array(data['omega_bounds'])
     obstacles_position = np.array(data['obstacles_position'])
-    print(velocities.shape)
-    print(inputs.shape)
-    print(configurations.shape)
-    rho_cbf = np.array(data['rho_cbf'])
-    ds_cbf = np.array(data['ds_cbf'])
+    rho_cbf = data['rho_cbf']
+    ds_cbf = data['ds_cbf']
+    frequency = data['frequency']
     shooting_nodes = inputs.shape[0]
     n_obstacles = obstacles_position.shape[0]
     t = inputs[:, 2]
-    print(t[-1])    
-    # Initialize figure to plot velocities
-    vel_fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 8))
 
-    wr_line, = ax1.plot([], [], label='$\omega_r$')
-    wl_line, = ax1.plot([], [], label='$\omega_l$')
-    v_line, = ax2.plot([], [], label='$v$')
-    omega_line, = ax3.plot([], [], label='$\omega$')
+    # Figure to plot velocities
+    vel_fig, axs = plt.subplots(3, 2, figsize=(16, 8))
 
-    ax1.set_title('wheels angular velocity')
-    ax1.set_xlabel("$[t]$")
-    ax1.set_ylabel('$[rad/s]$')
-    ax1.legend(loc='upper right')
-    ax1.hlines(control_bounds[0], t[0], t[-1], color='red', linestyle='--')
-    ax1.hlines(control_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    ax1.set_ylim([1.2 * control_bounds[0], 1.2 * control_bounds[1]])
+    wr_line, = axs[0, 0].plot([], [], label='$\omega_r$')
+    wl_line, = axs[0, 0].plot([], [], label='$\omega_l$')
+    v_line, = axs[1, 0].plot([], [], label='$v$')
+    omega_line, = axs[2, 0].plot([], [], label='$\omega$')
+    x_line, = axs[0, 1].plot([], [], label='$x$')
+    xg_line, = axs[0, 1].plot([], [], label='$x_g$')
+    y_line, = axs[1, 1].plot([], [], label='$y$')
+    yg_line, = axs[1, 1].plot([], [], label='$y_g$')
+    th_line, = axs[2, 1].plot([], [], label='$\theta$')
 
-    ax2.set_title('TIAGo driving velocity')
-    ax2.set_xlabel("$t$")
-    ax2.set_ylabel('$[m/s]$')
-    ax2.hlines(v_bounds[0], t[0], t[-1], color='red', linestyle='--')
-    ax2.hlines(v_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    ax2.set_ylim([1.2 * v_bounds[0], 1.2 * v_bounds[1]])
+    axs[0, 0].set_title('wheels angular velocity')
+    axs[0, 0].set_xlabel("$t \quad [s]$")
+    axs[0, 0].set_ylabel('$[rad/s]$')
+    axs[0, 0].legend(loc='upper right')
+    axs[0, 0].hlines(control_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    axs[0, 0].hlines(control_bounds[1], t[0], t[-1], color='red', linestyle="--")
+    axs[0, 0].set_ylim([1.2 * control_bounds[0], 1.2 * control_bounds[1]])
+    axs[0, 0].set_xlim([t[0], t[-1]])
 
-    ax3.set_title('TIAGo steering velocity')
-    ax3.set_xlabel("$t$")
-    ax3.set_ylabel('$[rad/s]$')
-    ax3.hlines(omega_bounds[0], t[0], t[-1], color='red', linestyle='--')
-    ax3.hlines(omega_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    ax3.set_ylim([1.2 * omega_bounds[0], 1.2 * omega_bounds[1]])
+    axs[1, 0].set_title('TIAGo driving velocity')
+    axs[1, 0].set_xlabel("$t \quad [s]$")
+    axs[1, 0].set_ylabel('$[m/s]$')
+    axs[1, 0].hlines(v_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    axs[1, 0].hlines(v_bounds[1], t[0], t[-1], color='red', linestyle="--")
+    axs[1, 0].set_ylim([1.2 * v_bounds[0], 1.2 * v_bounds[1]])
+    axs[1, 0].set_xlim([t[0], t[-1]])
 
-    # init and update function for the animation of velocity plots
+    axs[2, 0].set_title('TIAGo steering velocity')
+    axs[2, 0].set_xlabel("$t \quad [s]$")
+    axs[2, 0].set_ylabel('$[rad/s]$')
+    axs[2, 0].hlines(omega_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    axs[2, 0].hlines(omega_bounds[1], t[0], t[-1], color='red', linestyle="--")
+    axs[2, 0].set_ylim([1.2 * omega_bounds[0], 1.2 * omega_bounds[1]])
+    axs[2, 0].set_xlim([t[0], t[-1]])
+
+    axs[0, 1].set_title('x-position')
+    axs[0, 1].set_xlabel('$t \quad [s]$')
+    axs[0, 1].set_ylabel('$[m]$')
+    axs[0, 1].legend(loc='upper right')
+    axs[0, 1].hlines(x_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    axs[0, 1].hlines(x_bounds[1], t[0], t[-1], color='red', linestyle='--')
+    axs[0, 1].set_ylim([1.2 * x_bounds[0], 1.2 * x_bounds[1]])
+    axs[0, 1].set_xlim([t[0], t[-1]])
+
+    axs[1, 1].set_title('y-position')
+    axs[1, 1].set_xlabel('$t \quad [s]$')
+    axs[1, 1].set_ylabel('$[m]$')
+    axs[1, 1].legend(loc='upper right')
+    axs[1, 1].hlines(y_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    axs[1, 1].hlines(y_bounds[1], t[0], t[-1], color='red', linestyle='--')
+    axs[1, 1].set_ylim([1.2 * y_bounds[0], 1.2 * y_bounds[1]])
+    axs[1, 1].set_xlim([t[0], t[-1]])
+
+    axs[2, 1].set_title('TIAGo orientation')
+    axs[2, 1].set_xlabel('$t \quad [s]$')
+    axs[2, 1].set_ylabel('$[rad]$')
+    axs[2, 1].set_ylim([1.2 * np.min(configurations[:, 2]), 1.2 * np.max(configurations[:, 2])])
+    axs[2, 1].set_xlim([t[0], t[-1]])
+
+    # init and update function for the animation of profiles plots
     def init_vel():
         wr_line.set_data([], [])
         wl_line.set_data([], [])
         v_line.set_data([], [])
         omega_line.set_data([], [])
-        return wr_line, wl_line, v_line, omega_line
+        x_line.set_data([], [])
+        xg_line.set_data([], [])
+        y_line.set_data([], [])
+        yg_line.set_data([], [])
+        th_line.set_data([], [])
+        return wr_line, wl_line, v_line, omega_line, x_line, xg_line, y_line, yg_line, th_line
     
     def update_vel(frame):
         current_inputs = inputs[:frame + 1, :]
         current_velocities = velocities[:frame + 1, :]
+        current_configurations = configurations[:frame + 1, :]
+        current_target = targets[frame, :]
         current_time = t[:frame + 1]
 
         wr_line.set_data(current_time, current_inputs[:, 0])
         wl_line.set_data(current_time, current_inputs[:, 1])
         v_line.set_data(current_time, current_velocities[:, 0])
         omega_line.set_data(current_time, current_velocities[:, 1])
+        x_line.set_data(current_time, current_configurations[:, 0])
+        xg_line.set_data(current_time, current_target[0])
+        y_line.set_data(current_time, current_configurations[:, 1])
+        yg_line.set_data(current_time, current_target[1])
+        th_line.set_data(current_time, current_configurations[:, 2])
 
-        if frame == shooting_nodes - 1:
+        if frame == shooting_nodes:
             vel_animation.event_source.stop()
-            plt.savefig(save_vel_path)
-        return wr_line, wl_line, v_line, omega_line
+            plt.savefig(save_profiles_path)
+        return wr_line, wl_line, v_line, omega_line, x_line, xg_line, y_line, yg_line, th_line
 
-    sim_fig = plt.figure()
-    robot = plt.scatter([], [], marker='o', label='TIAGo', facecolors='none', edgecolors='blue')
-    robot_clearance = Circle(configurations[0, :2], rho_cbf, facecolor='none', edgecolor='blue')
+    vel_animation = FuncAnimation(vel_fig, update_vel,
+                                  frames=shooting_nodes//8,
+                                  init_func=init_vel,
+                                  blit=True,
+                                  interval=1/frequency*1000,
+                                  repeat=False)
+    
+    plt.tight_layout()
+    plt.show()
+
+    # Figure to plot simulation
+    sim_fig = plt.figure(figsize=(16, 8))
+    gs = gridspec.GridSpec(3,2)
+    ax_big = plt.subplot(gs[:, 0])
+    ax1 = plt.subplot(gs[0, 1])
+    ax2 = plt.subplot(gs[1, 1])
+    ax3 = plt.subplot(gs[2, 1])
+    robot = ax_big.scatter([], [], s=100.0, marker='o',label='TIAGo', facecolors='none', edgecolors='blue')
+    robot_label = ax_big.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
+    robot_clearance = Circle(np.nan, np.nan, facecolor='none', edgecolor='blue')
+    goal = ax_big.scatter([], [], s=80.0, marker='*', label='goal', color='magenta', alpha=0.7)
+    goal_label = ax_big.text(np.nan, np.nan, goal.get_label(), fontsize=8, ha='left', va='bottom')
     obstacles = []
+    obstacles_label = []
     obstacles_clearance = []
     for i in range(n_obstacles):
-        obstacles.append(plt.scatter([], [], marker='o', label='obstacle{}'.format(i+1),color='red'))
-    traj_line, = plt.plot([], [], color='blue', label='trajectory')
-    pred_line, = plt.plot([], [], color='green', label='prediction')
+        obstacles.append(ax_big.scatter([], [], marker='o', label='obstacle{}'.format(i+1), color='red', alpha=0.7))
+        obstacles_clearance.append(Circle(np.nan, np.nan, facecolor='none', edgecolor='red'))
+        obstacles_label.append(ax_big.text(np.nan, np.nan, obstacles[i].get_label(), fontsize=8, ha='left', va='bottom'))
+    traj_line, = ax_big.plot([], [], color='blue', label='trajectory')
+    pred_line, = ax_big.plot([], [], color='green', label='prediction')
+    wr_line, = ax1.plot([], [], label='$\omega_r$')
+    wl_line, = ax1.plot([], [], label='$\omega_l$')
+    v_line, = ax2.plot([], [], label='$v$')
+    omega_line, = ax3.plot([], [], label='$\omega$')
 
-    plt.suptitle('Simulation')
-    plt.xlabel("$x \quad [m]$")
-    plt.ylabel('$y \quad [m]$')
-    plt.axhline(y_bounds[0], color='red', linestyle='--')
-    plt.axhline(y_bounds[1], color='red', linestyle="--")
-    plt.axvline(x_bounds[0], color='red', linestyle='--')
-    plt.axvline(x_bounds[1], color='red', linestyle='--')
-    plt.ylim([1.2 * y_bounds[0], 1.2 * y_bounds[1]])
-    plt.xlim([1.2 * x_bounds[0], 1.2 * x_bounds[1]])
-    plt.gca().set_aspect('equal', adjustable='box')
+    ax_big.set_title('Simulation')
+    ax_big.set_xlabel("$x \quad [m]$")
+    ax_big.set_ylabel('$y \quad [m]$')
+    ax_big.axhline(y_bounds[0], color='red', linestyle='--')
+    ax_big.axhline(y_bounds[1], color='red', linestyle="--")
+    ax_big.axvline(x_bounds[0], color='red', linestyle='--')
+    ax_big.axvline(x_bounds[1], color='red', linestyle='--')
+    ax_big.set_ylim([1.2 * y_bounds[0], 1.2 * y_bounds[1]])
+    ax_big.set_xlim([1.2 * x_bounds[0], 1.2 * x_bounds[1]])
+    ax_big.set_aspect('equal', adjustable='box')
+
+    ax1.set_title('wheels angular velocity')
+    ax1.set_xlabel("$t \quad [s]$")
+    ax1.set_ylabel('$[rad/s]$')
+    ax1.legend(loc='upper right')
+    ax1.hlines(control_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    ax1.hlines(control_bounds[1], t[0], t[-1], color='red', linestyle="--")
+    ax1.set_ylim([1.2 * control_bounds[0], 1.2 * control_bounds[1]])
+    ax1.set_xlim([t[0], t[-1]])
+
+    ax2.set_title('TIAGo driving velocity')
+    ax2.set_xlabel("$t \quad [s]$")
+    ax2.set_ylabel('$[m/s]$')
+    ax2.hlines(v_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    ax2.hlines(v_bounds[1], t[0], t[-1], color='red', linestyle="--")
+    ax2.set_ylim([1.2 * v_bounds[0], 1.2 * v_bounds[1]])
+    ax2.set_xlim([t[0], t[-1]])
+
+    ax3.set_title('TIAGo steering velocity')
+    ax3.set_xlabel("$t \quad [s]$")
+    ax3.set_ylabel('$[rad/s]$')
+    ax3.hlines(omega_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    ax3.hlines(omega_bounds[1], t[0], t[-1], color='red', linestyle="--")
+    ax3.set_ylim([1.2 * omega_bounds[0], 1.2 * omega_bounds[1]])
+    ax3.set_xlim([t[0], t[-1]])
 
     # init and update function for the animation of simulation
     def init_sim():
+        wr_line.set_data([], [])
+        wl_line.set_data([], [])
+        v_line.set_data([], [])
+        omega_line.set_data([], [])
         robot.set_offsets(configurations[0, :2])
-        plt.gca().add_patch(robot_clearance)
+        robot_clearance.set_center(configurations[0, :2])
+        robot_clearance.set_radius(rho_cbf)
+        ax_big.add_patch(robot_clearance)
+        robot_label.set_position(configurations[0])
+
+        goal.set_offsets(targets[0, :2])
+        goal_label.set_position(targets[0])
+        
         for i in range(n_obstacles):
             obs_position = obstacles_position[i, :]
             obstacles[i].set_offsets(obs_position)
-            circle = Circle(obs_position, ds_cbf, facecolor='none', edgecolor='red')
-            plt.gca().add_patch(circle)
-            obstacles_clearance.append(circle)
+            obstacles_clearance[i].set_center(obs_position)
+            obstacles_clearance[i].set_radius(ds_cbf)
+            ax_big.add_patch(obstacles_clearance[i])
+            obstacles_label[i].set_position(obs_position)
         traj_line.set_data([], [])
         pred_line.set_data([], [])
-        return robot, robot_clearance, traj_line, pred_line
+        return robot, robot_clearance, robot_label, goal, goal_label, traj_line, pred_line, wr_line, wl_line, v_line, omega_line
     
     def update_sim(frame):
+        current_inputs = inputs[:frame + 1, :]
+        current_velocities = velocities[:frame + 1, :]
         current_configurations = configurations[:frame +1, :]
         current_prediction = predictions[frame, :, :]
+        current_target = targets[frame, :]
+        current_time = t[:frame + 1]
 
+        wr_line.set_data(current_time, current_inputs[:, 0])
+        wl_line.set_data(current_time, current_inputs[:, 1])
+        v_line.set_data(current_time, current_velocities[:, 0])
+        omega_line.set_data(current_time, current_velocities[:, 1])
         robot.set_offsets(current_configurations[frame, :2])
         robot_clearance.set_center(current_configurations[frame, :2])
+        robot_label.set_position(current_configurations[frame, :2])
+        goal.set_offsets(current_target[:2])
+        goal_label.set_position(current_target)
         traj_line.set_data(current_configurations[:, 0], current_configurations[:, 1])
         pred_line.set_data(current_prediction[0, :], current_prediction[1, :])
 
         if frame == shooting_nodes - 1:
             sim_animation.event_source.stop()
-            plt.savefig(save_sim_path)
-        return robot, robot_clearance, traj_line, pred_line
-    
-    vel_animation = FuncAnimation(vel_fig, update_vel,
-                                  frames=shooting_nodes,
-                                  init_func=init_vel,
-                                  blit=True,
-                                  interval=10,
-                                  repeat=False)
-    
+
+        return robot, robot_clearance, robot_label, goal, goal_label, traj_line, pred_line, wr_line, wl_line, v_line, omega_line
+
     sim_animation = FuncAnimation(sim_fig, update_sim,
-                                  frames=shooting_nodes,
+                                  frames=shooting_nodes//8,
                                   init_func=init_sim,
                                   blit=True,
-                                  interval=10,
+                                  interval=1/frequency*1000,
                                   repeat=False)
-
-    
-    vel_fig.tight_layout()
-    plt.show()
+    sim_fig.tight_layout()
+    sim_animation.save(save_sim_path, writer='ffmpeg', fps=frequency, dpi=80)
+    print("Simulation saved")
+    return
 
 def main():
     filename = rospy.get_param('/filename')

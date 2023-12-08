@@ -63,6 +63,7 @@ class ControllerManager:
             self.control_input_history = []
             self.prediction_history = []
             self.velocity_history = []
+            self.target_history = []
 
     def init(self):
         # Init robot configuration
@@ -139,6 +140,7 @@ class ControllerManager:
         output_dict['inputs'] = self.control_input_history
         output_dict['predictions'] = self.prediction_history
         output_dict['velocities'] = self.velocity_history
+        output_dict['targets'] = self.target_history
         output_dict['x_bounds'] = [self.hparams.x_lower_bound, self.hparams.x_upper_bound]
         output_dict['y_bounds'] = [self.hparams.y_lower_bound, self.hparams.y_upper_bound]
         output_dict['control_bounds'] = [self.hparams.w_max_neg, self.hparams.w_max]
@@ -147,6 +149,7 @@ class ControllerManager:
         output_dict['obstacles_position'] = self.hparams.obstacles_position.tolist()
         output_dict['rho_cbf'] = self.hparams.rho_cbf
         output_dict['ds_cbf'] = self.hparams.ds_cbf
+        output_dict['frequency'] = self.controller_frequency
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -225,6 +228,11 @@ def main():
                     time
                 ])
                 controller_manager.velocity_history.append([v, omega, time])
+                controller_manager.target_history.append([
+                    controller_manager.target_position[controller_manager.hparams.x_idx],
+                    controller_manager.target_position[controller_manager.hparams.y_idx],
+                    time
+                ])
                 predicted_trajectory = np.zeros((controller_manager.nmpc_controller.nq, N_horizon+1))
                 for i in range(N_horizon):
                     predicted_trajectory[:, i] = \

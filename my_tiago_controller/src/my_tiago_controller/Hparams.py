@@ -42,10 +42,10 @@ class Hparams:
     error_tol = 0.01
 
     # Parameters for the CBF
-    rho_cbf = 0.8 # the radius of the circle around the robot center
+    rho_cbf = 0.5 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_cbf = 0.5 # in (0,1], hyperparameter for cbf constraint
-    n_obstacles = 2 # number of obstacles, for now static obstacles
-    obstacles_position = np.array([[2.0, 2.0], [2.0, 0.0]]) # fixed position of the obstacles
+    n_obstacles = 4 # number of obstacles, for now static obstacles
+    obstacles_position = np.array([[2.5, 2.0], [1.5, 0.0], [-1.0, 2.3], [-2.0, -1.0]]) # fixed position of the obstacles
 
 
