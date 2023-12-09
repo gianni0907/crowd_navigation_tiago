@@ -14,14 +14,20 @@ def plot_results(filename=None):
         raise Exception(
            f"Specified directory not found"
         )
+
     # Specify saving plots directory
-    save_dir = '/tmp/crowd_navigation_tiago/animations'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    save_plots_dir = '/tmp/crowd_navigation_tiago/plots'
+    if not os.path.exists(save_plots_dir):
+        os.makedirs(save_plots_dir)
+
+    # Specify saving animations directory
+    save_sim_dir = '/tmp/crowd_navigation_tiago/animations'
+    if not os.path.exists(save_sim_dir):
+        os.makedirs(save_sim_dir)
 
     log_path = os.path.join(log_dir, filename + '.json')
-    save_profiles_path = os.path.join(save_dir, filename + '_profiles.png')
-    save_sim_path = os.path.join(save_dir, filename + '_simulation.mp4')
+    save_profiles_path = os.path.join(save_plots_dir, filename + '_profiles.png')
+    save_sim_path = os.path.join(save_sim_dir, filename + '_simulation.mp4')
 
     if os.path.exists(log_path):
         with open(log_path, 'r') as file:
@@ -112,44 +118,25 @@ def plot_results(filename=None):
     axs[2, 1].set_ylim([1.2 * np.min(configurations[:, 2]), 1.2 * np.max(configurations[:, 2])])
     axs[2, 1].set_xlim([t[0], t[-1]])
 
-    # init and update function for the animation of profiles plots
-    def init_vel():
-        wr_line.set_data([], [])
-        wl_line.set_data([], [])
-        v_line.set_data([], [])
-        omega_line.set_data([], [])
-        x_line.set_data([], [])
-        xg_line.set_data([], [])
-        y_line.set_data([], [])
-        yg_line.set_data([], [])
-        th_line.set_data([], [])
-        return wr_line, wl_line, v_line, omega_line, x_line, xg_line, y_line, yg_line, th_line
-    
+    # update function for the animation of profiles plots    
     def update_vel(frame):
-        current_inputs = inputs[:frame + 1, :]
-        current_velocities = velocities[:frame + 1, :]
-        current_configurations = configurations[:frame + 1, :]
-        current_target = targets[frame, :]
-        current_time = t[:frame + 1]
+        wr_line.set_data(t[:frame + 1], inputs[:frame + 1, 0])
+        wl_line.set_data(t[:frame + 1], inputs[:frame + 1, 1])
+        v_line.set_data(t[:frame + 1], velocities[:frame + 1, 0])
+        omega_line.set_data(t[:frame + 1], velocities[:frame + 1, 1])
+        x_line.set_data(t[:frame + 1], configurations[:frame + 1, 0])
+        xg_line.set_data(t[:frame + 1], targets[:frame + 1, 0])
+        y_line.set_data(t[:frame + 1], configurations[:frame + 1, 1])
+        yg_line.set_data(t[:frame + 1], targets[:frame + 1, 1])
+        th_line.set_data(t[:frame + 1], configurations[:frame + 1, 2])
 
-        wr_line.set_data(current_time, current_inputs[:, 0])
-        wl_line.set_data(current_time, current_inputs[:, 1])
-        v_line.set_data(current_time, current_velocities[:, 0])
-        omega_line.set_data(current_time, current_velocities[:, 1])
-        x_line.set_data(current_time, current_configurations[:, 0])
-        xg_line.set_data(current_time, current_target[0])
-        y_line.set_data(current_time, current_configurations[:, 1])
-        yg_line.set_data(current_time, current_target[1])
-        th_line.set_data(current_time, current_configurations[:, 2])
-
-        if frame == shooting_nodes:
+        if frame == shooting_nodes - 1:
             vel_animation.event_source.stop()
             plt.savefig(save_profiles_path)
         return wr_line, wl_line, v_line, omega_line, x_line, xg_line, y_line, yg_line, th_line
 
     vel_animation = FuncAnimation(vel_fig, update_vel,
-                                  frames=shooting_nodes//8,
-                                  init_func=init_vel,
+                                  frames=shooting_nodes,
                                   blit=True,
                                   interval=1/frequency*1000,
                                   repeat=False)
@@ -221,10 +208,6 @@ def plot_results(filename=None):
 
     # init and update function for the animation of simulation
     def init_sim():
-        wr_line.set_data([], [])
-        wl_line.set_data([], [])
-        v_line.set_data([], [])
-        omega_line.set_data([], [])
         robot.set_offsets(configurations[0, :2])
         robot_clearance.set_center(configurations[0, :2])
         robot_clearance.set_radius(rho_cbf)
@@ -241,28 +224,22 @@ def plot_results(filename=None):
             obstacles_clearance[i].set_radius(ds_cbf)
             ax_big.add_patch(obstacles_clearance[i])
             obstacles_label[i].set_position(obs_position)
-        traj_line.set_data([], [])
-        pred_line.set_data([], [])
         return robot, robot_clearance, robot_label, goal, goal_label, traj_line, pred_line, wr_line, wl_line, v_line, omega_line
     
     def update_sim(frame):
-        current_inputs = inputs[:frame + 1, :]
-        current_velocities = velocities[:frame + 1, :]
-        current_configurations = configurations[:frame +1, :]
         current_prediction = predictions[frame, :, :]
         current_target = targets[frame, :]
-        current_time = t[:frame + 1]
 
-        wr_line.set_data(current_time, current_inputs[:, 0])
-        wl_line.set_data(current_time, current_inputs[:, 1])
-        v_line.set_data(current_time, current_velocities[:, 0])
-        omega_line.set_data(current_time, current_velocities[:, 1])
-        robot.set_offsets(current_configurations[frame, :2])
-        robot_clearance.set_center(current_configurations[frame, :2])
-        robot_label.set_position(current_configurations[frame, :2])
+        wr_line.set_data(t[:frame + 1], inputs[:frame + 1, 0])
+        wl_line.set_data(t[:frame + 1], inputs[:frame + 1, 1])
+        v_line.set_data(t[:frame + 1], velocities[:frame + 1, 0])
+        omega_line.set_data(t[:frame + 1], velocities[:frame + 1, 1])
+        robot.set_offsets(configurations[frame, :2])
+        robot_clearance.set_center(configurations[frame, :2])
+        robot_label.set_position(configurations[frame, :2])
         goal.set_offsets(current_target[:2])
         goal_label.set_position(current_target)
-        traj_line.set_data(current_configurations[:, 0], current_configurations[:, 1])
+        traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
         pred_line.set_data(current_prediction[0, :], current_prediction[1, :])
 
         if frame == shooting_nodes - 1:
@@ -271,13 +248,14 @@ def plot_results(filename=None):
         return robot, robot_clearance, robot_label, goal, goal_label, traj_line, pred_line, wr_line, wl_line, v_line, omega_line
 
     sim_animation = FuncAnimation(sim_fig, update_sim,
-                                  frames=shooting_nodes//8,
+                                  frames=shooting_nodes,
                                   init_func=init_sim,
                                   blit=True,
                                   interval=1/frequency*1000,
                                   repeat=False)
-    sim_fig.tight_layout()
+    plt.tight_layout()
     sim_animation.save(save_sim_path, writer='ffmpeg', fps=frequency, dpi=80)
+    plt.show()
     print("Simulation saved")
     return
 
