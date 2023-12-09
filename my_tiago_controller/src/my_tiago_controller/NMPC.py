@@ -10,26 +10,28 @@ from my_tiago_controller.Hparams import *
 from my_tiago_controller.utils import *
 
 class NMPC:
-    def __init__(self, N, T):
+    def __init__(self,
+                 hparams : Hparams):
         # Size of state and input:
         self.nq = 3
         self.nu = 2 # right and left wheel angular velocities
 
         # Parameters:
-        self.hparams = Hparams()
+        self.hparams = hparams
 
         # Number of control intervals:
-        self.N = N
+        self.N = hparams.N_horizon
 
         # Horizon duration:
-        self.T = T
+        dt = 1.0 / hparams.controller_frequency
+        self.T = dt * self.N # [s]
 
         # Setup solver:
         self.acados_ocp_solver = self.__create_acados_ocp_solver(self.N,self.T)
 
-        # # Variables for Analysis of required time
-        # self.tmp_time = 0.0
-        # self.max_time = 0.0
+        # Variables for Analysis of required time
+        self.tmp_time = 0.0
+        self.max_time = 0.0
 
     def init(self, x0: Configuration):
         lbx = np.array([self.hparams.x_lower_bound, self.hparams.y_lower_bound])
@@ -93,8 +95,10 @@ class NMPC:
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
         v = self.hparams.wheel_radius * 0.5 * (u[self.hparams.wr_idx] + u[self.hparams.wl_idx])
-        return casadi.jacobian(self.__h_i(q), x) * v * casadi.cos(q[self.hparams.theta_idx]) + \
-               casadi.jacobian(self.__h_i(q), y) * v * casadi.sin(q[self.hparams.theta_idx])        
+        omega = (self.hparams.wheel_radius/self.hparams.wheel_separation)*(u[self.hparams.wr_idx]- u[self.hparams.wl_idx])
+        b = self.hparams.b
+        return casadi.jacobian(self.__h_i(q), x) * (v*casadi.cos(q[self.hparams.theta_idx])-omega*b*casadi.sin(q[self.hparams.theta_idx])) + \
+               casadi.jacobian(self.__h_i(q), y) * (v*casadi.sin(q[self.hparams.theta_idx])+omega*b*casadi.cos(q[self.hparams.theta_idx]))        
 
     
     def __create_acados_model(self) -> AcadosModel:
@@ -128,8 +132,8 @@ class NMPC:
         acados_cost = AcadosOcpCost()
 
         # Set wheighting matrices
-        Q_mat = 2 * np.diag([1e1, 1e1, 0.0]) # [x, y, theta]
-        R_mat = 2 * 5 * np.diag([1e-2, 1e-2]) # [wr, wl]
+        Q_mat = 2 * np.diag([self.hparams.q, self.hparams.q, 0.0]) # [x, y, theta]
+        R_mat = 2 * 5 * np.diag([self.hparams.r, self.hparams.r]) # [wr, wl]
 
         acados_cost.cost_type   = 'LINEAR_LS'
         acados_cost.cost_type_e = 'LINEAR_LS'
@@ -137,7 +141,7 @@ class NMPC:
         ny = self.nq + self.nu
         ny_e = self.nq
 
-        acados_cost.W_e = 1e3 * Q_mat
+        acados_cost.W_e = self.hparams.q_factor * Q_mat
         acados_cost.W = scipy.linalg.block_diag(Q_mat,R_mat)
 
         Vx = np.zeros((ny, self.nq))
@@ -229,9 +233,9 @@ class NMPC:
 
         # Solve NLP
         self.u0 = self.acados_ocp_solver.solve_for_x0(configuration.get_q())
-        # self.tmp_time = self.acados_ocp_solver.get_stats('time_tot')
-        # if self.tmp_time > self.max_time:
-        #     self.max_time = self.tmp_time
+        self.tmp_time = self.acados_ocp_solver.get_stats('time_tot')
+        if self.tmp_time > self.max_time:
+            self.max_time = self.tmp_time
 
     def get_command(self):
         return self.u0

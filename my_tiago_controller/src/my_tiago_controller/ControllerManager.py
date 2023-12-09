@@ -16,18 +16,16 @@ import my_tiago_msgs.srv
 class ControllerManager:
     def __init__(
             self,
-            controller_frequency,
-            nmpc_N,
-            nmpc_T):
+            hparams : Hparams):
 
-        self.controller_frequency = controller_frequency
+        self.controller_frequency = hparams.controller_frequency
+        
         # Set status
         self.status = Status.WAITING
 
         # NMPC:
-        self.dt = 1.0 / self.controller_frequency
-        self.hparams = Hparams()
-        self.nmpc_controller = NMPC(nmpc_N, nmpc_T)
+        self.hparams = hparams
+        self.nmpc_controller = NMPC(hparams)
 
         self.configuration = Configuration(0.0, 0.0, 0.0)
 
@@ -149,7 +147,11 @@ class ControllerManager:
         output_dict['obstacles_position'] = self.hparams.obstacles_position.tolist()
         output_dict['rho_cbf'] = self.hparams.rho_cbf
         output_dict['ds_cbf'] = self.hparams.ds_cbf
+        output_dict['gamma_cbf'] = self.hparams.gamma_cbf
         output_dict['frequency'] = self.controller_frequency
+        output_dict['Q_mat_weights'] = self.hparams.q
+        output_dict['R_mat_weights'] = self.hparams.r
+        output_dict['terminal_factor'] = self.hparams.q_factor
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -160,11 +162,11 @@ class ControllerManager:
             json.dump(output_dict, file)
 
     def update(self):
-        q_ref = np.zeros((self.nmpc_controller.nq, self.nmpc_controller.N+1))
-        for k in range(self.nmpc_controller.N):
+        q_ref = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
+        for k in range(self.hparams.N_horizon):
             q_ref[:self.nmpc_controller.nq - 1, k] = self.target_position
-        u_ref = np.zeros((self.nmpc_controller.nu, self.nmpc_controller.N))
-        q_ref[:self.nmpc_controller.nq - 1, self.nmpc_controller.N] = self.target_position
+        u_ref = np.zeros((self.nmpc_controller.nu, self.hparams.N_horizon))
+        q_ref[:self.nmpc_controller.nq - 1, self.hparams.N_horizon] = self.target_position
         
         self.update_configuration()
 
@@ -189,16 +191,10 @@ def main():
     rospy.loginfo('TIAGo control module [OK]')
 
     # Build controller manager
-    controller_frequency = 50.0 # [Hz]
-    dt = 1.0 / controller_frequency
-    N_horizon = 25
-    T_horizon = dt * N_horizon # [s]
-    controller_manager = ControllerManager(
-        controller_frequency=controller_frequency,
-        nmpc_N=N_horizon,
-        nmpc_T=T_horizon
-    )
-    rate = rospy.Rate(controller_frequency)
+    hparams = Hparams()
+    controller_manager = ControllerManager(hparams)
+    rate = rospy.Rate(hparams.controller_frequency)
+    N_horizon = hparams.N_horizon
 
     # Waiting for current configuration to initialize controller_manager
     while controller_manager.status == Status.WAITING:
@@ -215,7 +211,7 @@ def main():
             v, omega = controller_manager.publish_command()
 
             # Saving data for plots
-            if controller_manager.hparams.log:
+            if hparams.log:
                 controller_manager.configuration_history.append([
                     controller_manager.configuration.x,
                     controller_manager.configuration.y,
@@ -223,14 +219,14 @@ def main():
                     time
                 ])
                 controller_manager.control_input_history.append([
-                    controller_manager.control_input[controller_manager.hparams.wr_idx],
-                    controller_manager.control_input[controller_manager.hparams.wl_idx],
+                    controller_manager.control_input[hparams.wr_idx],
+                    controller_manager.control_input[hparams.wl_idx],
                     time
                 ])
                 controller_manager.velocity_history.append([v, omega, time])
                 controller_manager.target_history.append([
-                    controller_manager.target_position[controller_manager.hparams.x_idx],
-                    controller_manager.target_position[controller_manager.hparams.y_idx],
+                    controller_manager.target_position[hparams.x_idx],
+                    controller_manager.target_position[hparams.y_idx],
                     time
                 ])
                 predicted_trajectory = np.zeros((controller_manager.nmpc_controller.nq, N_horizon+1))
@@ -242,11 +238,11 @@ def main():
                 controller_manager.prediction_history.append(predicted_trajectory.tolist())
 
             # Checking the position error
-            error = np.array([controller_manager.target_position[controller_manager.hparams.x_idx] - \
+            error = np.array([controller_manager.target_position[hparams.x_idx] - \
                               controller_manager.configuration.x,
-                              controller_manager.target_position[controller_manager.hparams.y_idx] - \
+                              controller_manager.target_position[hparams.y_idx] - \
                               controller_manager.configuration.y])
-            if norm(error) < controller_manager.hparams.error_tol and controller_manager.status == Status.MOVING:
+            if norm(error) < hparams.error_tol and controller_manager.status == Status.MOVING:
                     print("Stop configuration #######################")
                     print(controller_manager.configuration)
                     print("##########################################")
@@ -256,5 +252,5 @@ def main():
         rospy.logwarn("ROS node shutting down")
         rospy.logwarn('{}'.format(e))
     finally:
-        # print(controller_manager.nmpc_controller.max_time)
-        controller_manager.log_values(controller_manager.hparams.logfile)
+        print(controller_manager.nmpc_controller.max_time)
+        controller_manager.log_values(hparams.logfile)

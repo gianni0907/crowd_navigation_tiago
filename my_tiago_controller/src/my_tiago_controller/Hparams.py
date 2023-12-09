@@ -6,12 +6,16 @@ class Hparams:
 
     # Specify whether to save data for plots and .json filename
     log = True
-    logfile = 'test.json'
+    logfile = 'data1.json'
 
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
     b = 0.0 # [m]
+
+    # NMPC parameters
+    controller_frequency = 50.0 # [Hz]
+    N_horizon = 100
     
     # Driving and steering velocity limits
     driving_vel_max = 1 # [m/s]
@@ -41,11 +45,16 @@ class Hparams:
     # Tolerance on the position error
     error_tol = 0.01
 
+    # Cost function weights
+    q = 1e0 # position weights
+    r = 1e-2 # control input weights
+    q_factor = 1e3 # factor for the terminal position weights
+
     # Parameters for the CBF
-    rho_cbf = 0.5 # the radius of the circle around the robot center
+    rho_cbf = 0.7 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_cbf = 0.5 # in (0,1], hyperparameter for cbf constraint
     n_obstacles = 4 # number of obstacles, for now static obstacles
-    obstacles_position = np.array([[2.5, 2.0], [1.5, 0.0], [-1.0, 2.3], [-2.0, -1.0]]) # fixed position of the obstacles
+    obstacles_position = np.array([[2.5, 1.0], [1.5, 0.0], [-1.0, 2.3], [-2.0, -1.0]]) # fixed position of the obstacles
 
 
