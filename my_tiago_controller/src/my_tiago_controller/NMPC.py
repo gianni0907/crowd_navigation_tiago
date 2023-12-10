@@ -1,4 +1,5 @@
 import numpy as np
+import rospy
 import scipy.linalg
 
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions, AcadosOcpSolver
@@ -32,6 +33,7 @@ class NMPC:
         # Variables for Analysis of required time
         self.tmp_time = 0.0
         self.max_time = 0.0
+        self.idx_time = 0.0
 
     def init(self, x0: Configuration):
         lbx = np.array([self.hparams.x_lower_bound, self.hparams.y_lower_bound])
@@ -236,6 +238,7 @@ class NMPC:
         self.tmp_time = self.acados_ocp_solver.get_stats('time_tot')
         if self.tmp_time > self.max_time:
             self.max_time = self.tmp_time
+            self.idx_time = rospy.get_time()
 
     def get_command(self):
         return self.u0

@@ -149,6 +149,7 @@ class ControllerManager:
         output_dict['ds_cbf'] = self.hparams.ds_cbf
         output_dict['gamma_cbf'] = self.hparams.gamma_cbf
         output_dict['frequency'] = self.controller_frequency
+        output_dict['N_horizon'] = self.hparams.N_horizon
         output_dict['Q_mat_weights'] = self.hparams.q
         output_dict['R_mat_weights'] = self.hparams.r
         output_dict['terminal_factor'] = self.hparams.q_factor
@@ -252,5 +253,6 @@ def main():
         rospy.logwarn("ROS node shutting down")
         rospy.logwarn('{}'.format(e))
     finally:
-        print(controller_manager.nmpc_controller.max_time)
+        print(f"Maximum required time to find NMPC solution is {controller_manager.nmpc_controller.max_time} " \
+              f"at instant {controller_manager.nmpc_controller.idx_time}")
         controller_manager.log_values(hparams.logfile)

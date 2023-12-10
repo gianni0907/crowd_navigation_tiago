@@ -160,7 +160,7 @@ def plot_results(filename=None):
     obstacles_label = []
     obstacles_clearance = []
     for i in range(n_obstacles):
-        obstacles.append(ax_big.scatter([], [], marker='o', label='obstacle{}'.format(i+1), color='red', alpha=0.7))
+        obstacles.append(ax_big.scatter([], [], marker='o', label='human{}'.format(i+1), color='red', alpha=0.7))
         obstacles_clearance.append(Circle(np.nan, np.nan, facecolor='none', edgecolor='red'))
         obstacles_label.append(ax_big.text(np.nan, np.nan, obstacles[i].get_label(), fontsize=8, ha='left', va='bottom'))
     traj_line, = ax_big.plot([], [], color='blue', label='trajectory')
@@ -262,3 +262,4 @@ def plot_results(filename=None):
 def main():
     filename = rospy.get_param('/filename')
     plot_results(filename)
+    return
