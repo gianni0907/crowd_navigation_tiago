@@ -21,7 +21,7 @@ def plot_results(filename=None):
         os.makedirs(save_plots_dir)
 
     # Specify saving animations directory
-    save_sim_dir = '/tmp/crowd_navigation_tiago/animations'
+    save_sim_dir = '/tmp/crowd_navigation_tiago/simulations'
     if not os.path.exists(save_sim_dir):
         os.makedirs(save_sim_dir)
 
