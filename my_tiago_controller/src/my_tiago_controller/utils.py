@@ -1,5 +1,4 @@
 import numpy as np
-import os
 
 class Configuration:
     def __init__(self, x, y, theta):
@@ -29,3 +28,29 @@ def integrate(f, x0, u, dt, integration_method='RK4'):
         return RK4(f, x0, u, dt)
     else:
         return Euler(f, x0, u, dt)
+    
+def linear_trajectory(xi, xf, n_steps):
+    """
+    Generate a linear trajectory between two 2D points.
+
+    Parameters:
+    - xi: Initial point (tuple or array-like)
+    - xf: Final point (tuple or array-like)
+    - n_steps: Number of steps for the trajectory (integer)
+
+    Returns:
+    - trajectory: 2D array containing the trajectory points
+    """
+
+    # Check if the dimensions of xi and xf match
+    assert xi.shape == xf.shape == (2,), "Initial and final points must be 2D."
+
+    # Initialize the trajectory array
+    trajectory = np.zeros((n_steps, 2))
+
+    # Generate linear trajectory
+    for i in range(n_steps):
+        alpha = i / (n_steps - 1)  # Interpolation parameter
+        trajectory[i] = (1 - alpha) * xi + alpha * xf
+
+    return trajectory

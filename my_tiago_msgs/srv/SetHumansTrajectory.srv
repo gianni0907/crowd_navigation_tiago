@@ -1,0 +1,24 @@
+# Trajectory of human 1:
+float64[] x_1
+float64[] y_1
+
+# Trajectory of human 2:
+float64[] x_2
+float64[] y_2
+
+# Trajectory of human 3:
+float64[] x_3
+float64[] y_3
+
+# Trajectory of human 4:
+float64[] x_4
+float64[] y_4
+
+# Trajectory of human 5:
+float64[] x_5
+float64[] y_5
+
+---
+
+# Whether the service request has been executed successfully or not:
+bool success

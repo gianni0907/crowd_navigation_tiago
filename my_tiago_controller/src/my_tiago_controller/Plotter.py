@@ -48,12 +48,12 @@ def plot_results(filename=None):
     y_bounds = np.array(data['y_bounds'])
     v_bounds = np.array(data['v_bounds'])
     omega_bounds = np.array(data['omega_bounds'])
-    obstacles_position = np.array(data['obstacles_position'])
+    obstacles_position = np.array(data['humans_position'])
     rho_cbf = data['rho_cbf']
     ds_cbf = data['ds_cbf']
     frequency = data['frequency']
     shooting_nodes = inputs.shape[0]
-    n_obstacles = obstacles_position.shape[0]
+    n_obstacles = obstacles_position.shape[1]
     t = inputs[:, 2]
 
     # Figure to plot velocities
@@ -218,7 +218,7 @@ def plot_results(filename=None):
         goal_label.set_position(targets[0])
         
         for i in range(n_obstacles):
-            obs_position = obstacles_position[i, :]
+            obs_position = obstacles_position[0, i, :]
             obstacles[i].set_offsets(obs_position)
             obstacles_clearance[i].set_center(obs_position)
             obstacles_clearance[i].set_radius(ds_cbf)
@@ -234,13 +234,19 @@ def plot_results(filename=None):
         wl_line.set_data(t[:frame + 1], inputs[:frame + 1, 1])
         v_line.set_data(t[:frame + 1], velocities[:frame + 1, 0])
         omega_line.set_data(t[:frame + 1], velocities[:frame + 1, 1])
+        traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
+        pred_line.set_data(current_prediction[0, :], current_prediction[1, :])
+
         robot.set_offsets(configurations[frame, :2])
         robot_clearance.set_center(configurations[frame, :2])
         robot_label.set_position(configurations[frame, :2])
         goal.set_offsets(current_target[:2])
         goal_label.set_position(current_target)
-        traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
-        pred_line.set_data(current_prediction[0, :], current_prediction[1, :])
+        for i in range(n_obstacles):
+            obs_position = obstacles_position[frame, i , :]
+            obstacles[i].set_offsets(obs_position)
+            obstacles_clearance[i].set_center(obs_position)
+            obstacles_label[i].set_position(obs_position)
 
         if frame == shooting_nodes - 1:
             sim_animation.event_source.stop()

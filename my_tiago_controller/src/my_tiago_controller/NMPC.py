@@ -85,7 +85,7 @@ class NMPC:
         distance_vectors = casadi.SX.zeros((n_obs, 2))
         cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
         for i in range(n_obs):
-            p[i, :] = self.hparams.obstacles_position[i, :]
+            p[i, :] = self.hparams.obstacles_initial_pos[i, :]
             distance_vectors[i, self.hparams.x_idx] = q[self.hparams.x_idx] - p[i, self.hparams.x_idx]
             distance_vectors[i, self.hparams.y_idx] = q[self.hparams.y_idx] - p[i, self.hparams.y_idx]
             h_i[i] = distance_vectors[i, self.hparams.x_idx]**2 + \
