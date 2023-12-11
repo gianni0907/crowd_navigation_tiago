@@ -22,7 +22,7 @@ class ControllerManager:
         self.controller_frequency = hparams.controller_frequency
         
         # Set status
-        self.status = Status.WAITING
+        self.status = Status.WAITING # WAITING for the initial robot configuration
 
         # NMPC:
         self.hparams = hparams
@@ -54,13 +54,6 @@ class ControllerManager:
             'SetDesiredTargetPosition',
             my_tiago_msgs.srv.SetDesiredTargetPosition,
             self.set_desired_target_position_request
-        )
-
-        # Setup ROS Service to set humans trajectories:
-        self.set_humans_trajectory_srv = rospy.Service(
-            'SetHumansTrajectory',
-            my_tiago_msgs.srv.SetHumansTrajectory,
-            self.set_humans_trajectory_request
         )
 
         # Set variables to store data
@@ -141,25 +134,6 @@ class ControllerManager:
                 rospy.loginfo(f"Desired target position successfully changed: {self.target_position}")
             return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(True)
         
-    def set_humans_trajectory_request(self, request):
-        if self.hparams.dynamic:
-            rospy.loginfo("Cannot set humans trajectory, humans are already moving")
-            return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)
-        else:
-            self.hparams.trajectories[0, :, 0] = request.x_1
-            self.hparams.trajectories[0, :, 1] = request.y_1
-            self.hparams.trajectories[1, :, 0] = request.x_2
-            self.hparams.trajectories[1, :, 1] = request.y_2
-            self.hparams.trajectories[2, :, 0] = request.x_3
-            self.hparams.trajectories[2, :, 1] = request.y_3
-            self.hparams.trajectories[3, :, 0] = request.x_4
-            self.hparams.trajectories[3, :, 1] = request.y_4
-            self.hparams.trajectories[4, :, 0] = request.x_5
-            self.hparams.trajectories[4, :, 1] = request.y_5
-            self.hparams.dynamic = True
-            rospy.loginfo("Humans trajectory successfully set")
-            return my_tiago_msgs.srv.SetHumansTrajectoryResponse(True)
-
     def log_values(self, filename):
         output_dict = {}
         output_dict['configurations'] = self.configuration_history
@@ -232,7 +206,7 @@ def main():
     print("******************************************")
 
     try:
-        while not(rospy.is_shutdown()):
+        while not rospy.is_shutdown():
             time = rospy.get_time()
 
             controller_manager.update()
@@ -265,7 +239,7 @@ def main():
                     controller_manager.nmpc_controller.acados_ocp_solver.get(N_horizon, 'x')
                 controller_manager.prediction_history.append(predicted_trajectory.tolist())
 
-                controller_manager.humans_history.append(hparams.trajectories[:, hparams.traj_iter, :].tolist())
+                controller_manager.humans_history.append(hparams.trajectories[:, hparams.traj_iter, :2].tolist())
 
             if hparams.dynamic:
                 hparams.traj_iter = hparams.traj_iter + 1

@@ -17,14 +17,24 @@ def send_humans_trajectory(trajectories):
         response = set_humans_trajectory_service(
             trajectories[0, :, 0],
             trajectories[0, :, 1],
+            trajectories[0, :, 2],
+            trajectories[0, :, 3],
             trajectories[1, :, 0],
             trajectories[1, :, 1],
+            trajectories[1, :, 2],
+            trajectories[1, :, 3],
             trajectories[2, :, 0],
             trajectories[2, :, 1],
+            trajectories[2, :, 2],
+            trajectories[2, :, 3],
             trajectories[3, :, 0],
             trajectories[3, :, 1],
+            trajectories[3, :, 2],
+            trajectories[3, :, 3],
             trajectories[4, :, 0],
-            trajectories[4, :, 1]
+            trajectories[4, :, 1],
+            trajectories[4, :, 2],
+            trajectories[4, :, 3]
         )
 
         if response.success:
@@ -39,17 +49,23 @@ def main():
     rospy.init_node('send_humans_trajectory', log_level=rospy.INFO)
     rospy.loginfo('send humans trajectory module [OK]')
 
-    # Set the parameters required to create humans trajectory
+    # Create the humans trajectory (this will be deleted and substituted with laser scan readings)
     n_humans = Hparams.n_obstacles
-    n_steps = Hparams.n_traj_steps
-    initial_pos = Hparams.obstacles_initial_pos
-    final_pos = Hparams.obstacles_final_pos
-    trajectories = np.ndarray((n_humans, n_steps * 2, 2))
-    
-    # Create n_humans humans trajectory from init to final position and back
+    positions_i = np.array([[2.0, 2.0],
+                            [2.0, -0.5],
+                            [-1.0, 2.3],
+                            [-2.0, -1.0],
+                            [4.5, 1.0]]) # initial position of the obstacles
+    positions_f = np.array([[1.0, -1.0],
+                            [3.0, 3.0],
+                            [-1.5, -2.0],
+                            [2.0, -2.0],
+                            [3.0, -2.0]]) # final position of the obstacles
+    n_steps = 400 # number of steps to go from init to final positions (and vice-versa)
+    trajectories = np.ndarray((n_humans, n_steps * 2, 4))
     for i in range(n_humans):
-        trajectories[i, :n_steps, :] = linear_trajectory(initial_pos[i, :], final_pos[i, :], n_steps)
-        trajectories[i, n_steps:, :] = linear_trajectory(final_pos[i, :], initial_pos[i, :], n_steps)
+        trajectories[i, :n_steps, :] = linear_trajectory(positions_i[i, :], positions_f[i, :], n_steps)
+        trajectories[i, n_steps:, :] = linear_trajectory(positions_f[i, :], positions_i[i, :], n_steps)
     
     # Service request:
     rospy.loginfo("Sending humans trajectories")

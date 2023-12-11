@@ -39,18 +39,24 @@ def linear_trajectory(xi, xf, n_steps):
     - n_steps: Number of steps for the trajectory (integer)
 
     Returns:
-    - trajectory: 2D array containing the trajectory points
+    - trajectory: 2D array containing position and velocity
+                  for each step(shape: (n_steps, 4))
     """
 
     # Check if the dimensions of xi and xf match
     assert xi.shape == xf.shape == (2,), "Initial and final points must be 2D."
 
+    # Calculate velocity
+    velocity = (xf - xi) / (n_steps - 1)
+
     # Initialize the trajectory array
-    trajectory = np.zeros((n_steps, 2))
+    trajectory = np.zeros((n_steps, 4))
 
     # Generate linear trajectory
     for i in range(n_steps):
         alpha = i / (n_steps - 1)  # Interpolation parameter
-        trajectory[i] = (1 - alpha) * xi + alpha * xf
+        trajectory[i, :2] = (1 - alpha) * xi + alpha * xf
+        trajectory[i, 2:] = velocity
+    trajectory[n_steps - 1, 2:] = np.zeros((2))
 
     return trajectory

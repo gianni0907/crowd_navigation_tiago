@@ -224,8 +224,9 @@ def plot_results(filename=None):
             obstacles_clearance[i].set_radius(ds_cbf)
             ax_big.add_patch(obstacles_clearance[i])
             obstacles_label[i].set_position(obs_position)
-        return robot, robot_clearance, robot_label, goal, goal_label, traj_line, pred_line, wr_line, wl_line, v_line, omega_line
-    
+        return robot, robot_clearance, robot_label, goal, goal_label, \
+                obstacles, obstacles_clearance, obstacles_label 
+
     def update_sim(frame):
         current_prediction = predictions[frame, :, :]
         current_target = targets[frame, :]
@@ -251,12 +252,14 @@ def plot_results(filename=None):
         if frame == shooting_nodes - 1:
             sim_animation.event_source.stop()
 
-        return robot, robot_clearance, robot_label, goal, goal_label, traj_line, pred_line, wr_line, wl_line, v_line, omega_line
+        return robot, robot_clearance, robot_label, goal, goal_label, \
+                traj_line, pred_line, wr_line, wl_line, v_line, omega_line, \
+                obstacles, obstacles_clearance, obstacles_label
 
     sim_animation = FuncAnimation(sim_fig, update_sim,
                                   frames=shooting_nodes,
                                   init_func=init_sim,
-                                  blit=True,
+                                  blit=False,
                                   interval=1/frequency*1000,
                                   repeat=False)
     plt.tight_layout()

@@ -55,22 +55,4 @@ class Hparams:
     ds_cbf = 0.5 # safety clearance
     gamma_cbf = 0.8 # in (0,1], hyperparameter for cbf constraint
 
-    # Data to create humans trajectories
-    n_obstacles = 5 # number of obstacles, for now static obstacles
-    n_traj_steps = 800 # number of steps to go from init to final positions (and vice-versa)
-    obstacles_initial_pos = np.array([[2.0, 2.0],
-                                      [2.0, -0.5],
-                                      [-1.0, 2.3],
-                                      [-2.0, -1.0],
-                                      [4.5, 1.0]]) # initial position of the obstacles
-
-    obstacles_final_pos = np.array([[-1.0, -1.0],
-                                    [3.0, 3.0],
-                                    [-1.5, -2.0],
-                                    [2.0, -2.0],
-                                    [3.0, -2.0]]) # final position of the obstacles
-
-    # Setup variables for handling the humans trajectories
-    dynamic = False # False=humans not moving, True=humans moving
-    trajectories = np.ndarray((n_obstacles, n_traj_steps * 2, 2))
-    traj_iter = 0 # a counter to keep track of the obstacles position during simulation
+    n_obstacles = 5 # number of obstacles
