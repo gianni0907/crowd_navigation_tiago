@@ -1,9 +1,6 @@
 import numpy as np
 
-class Hparams:    
-    # Specify whether to use real robot or Gazebo
-    real_robot = False
-
+class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
     logfile = 'test.json'
@@ -54,7 +51,7 @@ class Hparams:
     rho_cbf = 0.6 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_cbf = 0.8 # in (0,1], hyperparameter for cbf constraint
-    n_obstacles = 5 # number of obstacles, for now static obstacles
+    n_obstacles = 0 # number of obstacles, for now static obstacles
     obstacles_position = np.array([[2.0, 2.0],
                                    [2.0, -0.5],
                                    [-1.0, 2.3],

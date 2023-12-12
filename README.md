@@ -13,10 +13,10 @@ Implement a TIAGo navigation within a dynamic environment:
 ## Usage
 To run the Gazebo simulation:
 ```bash
-roslaunch my_tiago_controller tiago_gazebo.launch public_sim:=true world:=5_humans
+roslaunch my_tiago_gazebo tiago_gazebo.launch public_sim:=true end_effector:=pal-gripper world:=WORLD
 ```
+where `WORLD` is one of the worlds in `my_tiago_gazebo/worlds` or `pal_gazebo_worlds` package.
 
-Note that the position of the humans is specified in the file `my_tiago_controller/worlds/5_humans.world`
 
 To run the NMPC controller module:
 ```bash
