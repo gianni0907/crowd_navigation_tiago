@@ -15,18 +15,15 @@ from my_tiago_controller.utils import *
 import my_tiago_msgs.srv
 
 class ControllerManager:
-    def __init__(
-            self,
-            hparams : Hparams):
-
-        self.controller_frequency = hparams.controller_frequency
+    def __init__(self):
+        # Set the Hyperparameters
+        self.hparams = Hparams()
         
         # Set status
         self.status = Status.WAITING # WAITING for the initial robot configuration
 
         # NMPC:
-        self.hparams = hparams
-        self.nmpc_controller = NMPC(hparams)
+        self.nmpc_controller = NMPC(self.hparams)
 
         self.configuration = Configuration(0.0, 0.0, 0.0)
 
@@ -39,10 +36,7 @@ class ControllerManager:
         )
 
         # Setup reference frames:
-        if self.hparams.real_robot:
-            self.map_frame = 'map'
-        else:
-            self.map_frame = 'odom'
+        self.map_frame = 'map'
         self.base_footprint_frame = 'base_footprint'
 
         # Setup TF listener:
@@ -146,11 +140,13 @@ class ControllerManager:
         output_dict['control_bounds'] = [self.hparams.w_max_neg, self.hparams.w_max]
         output_dict['v_bounds'] = [self.hparams.driving_vel_min, self.hparams.driving_vel_max]
         output_dict['omega_bounds'] = [self.hparams.steering_vel_max_neg, self.hparams.steering_vel_max]
-        output_dict['humans_position'] = self.humans_history
+        output_dict['n_obstacles'] = self.hparams.n_obstacles
+        if self.hparams.n_obstacles > 0:        
+            output_dict['humans_position'] = self.humans_history
         output_dict['rho_cbf'] = self.hparams.rho_cbf
         output_dict['ds_cbf'] = self.hparams.ds_cbf
         output_dict['gamma_cbf'] = self.hparams.gamma_cbf
-        output_dict['frequency'] = self.controller_frequency
+        output_dict['frequency'] = self.hparams.controller_frequency
         output_dict['N_horizon'] = self.hparams.N_horizon
         output_dict['Q_mat_weights'] = self.hparams.q
         output_dict['R_mat_weights'] = self.hparams.r
@@ -170,10 +166,8 @@ class ControllerManager:
             q_ref[:self.nmpc_controller.nq - 1, k] = self.target_position
         u_ref = np.zeros((self.nmpc_controller.nu, self.hparams.N_horizon))
         q_ref[:self.nmpc_controller.nq - 1, self.hparams.N_horizon] = self.target_position
-        
-        self.update_configuration()
 
-        if self.status == Status.MOVING:
+        if self.update_configuration() and self.status == Status.MOVING:
             try:
                 self.nmpc_controller.update(
                     self.configuration,
@@ -187,81 +181,75 @@ class ControllerManager:
                 self.control_input = np.zeros((self.nmpc_controller.nu))
         else:
             self.control_input = np.zeros((self.nmpc_controller.nu))
+        
+    def run(self):
+        rate = rospy.Rate(self.hparams.controller_frequency)
+        # Waiting for initial configuration from tf
+        while self.status == Status.WAITING:
+            self.init()
+        print("Initial configuration ********************")
+        print(self.configuration)
+        print("******************************************")
+
+        try:
+            while not(rospy.is_shutdown()):
+                time = rospy.get_time()
+
+                self.update()
+                v, omega = self.publish_command()
+
+                # Saving data for plots
+                if self.hparams.log:
+                    self.configuration_history.append([
+                        self.configuration.x,
+                        self.configuration.y,
+                        self.configuration.theta,
+                        time
+                    ])
+                    self.control_input_history.append([
+                        self.control_input[self.hparams.wr_idx],
+                        self.control_input[self.hparams.wl_idx],
+                        time
+                    ])
+                    self.velocity_history.append([v, omega, time])
+                    self.target_history.append([
+                        self.target_position[self.hparams.x_idx],
+                        self.target_position[self.hparams.y_idx],
+                        time
+                    ])
+                    predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
+                    for i in range(self.hparams.N_horizon):
+                        predicted_trajectory[:, i] = \
+                            self.nmpc_controller.acados_ocp_solver.get(i,'x')
+                    predicted_trajectory[:, self.hparams.N_horizon] = \
+                        self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
+                    self.prediction_history.append(predicted_trajectory.tolist())
+
+                # Checking the position error
+                error = np.array([self.target_position[self.hparams.x_idx] - \
+                                self.configuration.x,
+                                self.target_position[self.hparams.y_idx] - \
+                                self.configuration.y])
+                if norm(error) < self.hparams.error_tol and self.status == Status.MOVING:
+                        print("Stop configuration #######################")
+                        print(self.configuration)
+                        print("##########################################")
+                        self.status = Status.READY
+                rate.sleep()
+        except rospy.ROSInterruptException as e:
+            rospy.logwarn("ROS node shutting down")
+            rospy.logwarn('{}'.format(e))
+        finally:
+            print(f"Maximum required time to find NMPC solution is {self.nmpc_controller.max_time} " \
+                f"at instant {self.nmpc_controller.idx_time}")
+            if self.hparams.log:
+                self.log_values(self.hparams.logfile)
+
 
 def main():
     rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
     rospy.loginfo('TIAGo control module [OK]')
 
-    # Build controller manager
-    hparams = Hparams()
-    controller_manager = ControllerManager(hparams)
-    rate = rospy.Rate(hparams.controller_frequency)
-    N_horizon = hparams.N_horizon
-
-    # Waiting for current configuration to initialize controller_manager
-    while controller_manager.status == Status.WAITING:
-        controller_manager.init()
-    print("Initial configuration ********************")
-    print(controller_manager.configuration)
-    print("******************************************")
-
-    try:
-        while not rospy.is_shutdown():
-            time = rospy.get_time()
-
-            controller_manager.update()
-            v, omega = controller_manager.publish_command()
-
-            # Saving data for plots
-            if hparams.log:
-                controller_manager.configuration_history.append([
-                    controller_manager.configuration.x,
-                    controller_manager.configuration.y,
-                    controller_manager.configuration.theta,
-                    time
-                ])
-                controller_manager.control_input_history.append([
-                    controller_manager.control_input[hparams.wr_idx],
-                    controller_manager.control_input[hparams.wl_idx],
-                    time
-                ])
-                controller_manager.velocity_history.append([v, omega, time])
-                controller_manager.target_history.append([
-                    controller_manager.target_position[hparams.x_idx],
-                    controller_manager.target_position[hparams.y_idx],
-                    time
-                ])
-                predicted_trajectory = np.zeros((controller_manager.nmpc_controller.nq, N_horizon+1))
-                for i in range(N_horizon):
-                    predicted_trajectory[:, i] = \
-                        controller_manager.nmpc_controller.acados_ocp_solver.get(i,'x')
-                predicted_trajectory[:, N_horizon] = \
-                    controller_manager.nmpc_controller.acados_ocp_solver.get(N_horizon, 'x')
-                controller_manager.prediction_history.append(predicted_trajectory.tolist())
-
-                controller_manager.humans_history.append(hparams.trajectories[:, hparams.traj_iter, :2].tolist())
-
-            if hparams.dynamic:
-                hparams.traj_iter = hparams.traj_iter + 1
-                if hparams.traj_iter == hparams.n_traj_steps * 2:
-                    hparams.traj_iter = 0
-                    hparams.dynamic = False
-        
-            # Checking the position error
-            error = np.array([controller_manager.target_position[hparams.x_idx] - \
-                              controller_manager.configuration.x,
-                              controller_manager.target_position[hparams.y_idx] - \
-                              controller_manager.configuration.y])
-            if norm(error) < hparams.error_tol and controller_manager.status == Status.MOVING:
-                    print("Stop configuration #######################")
-                    print(controller_manager.configuration)
-                    print("##########################################")
-                    controller_manager.status = Status.READY
-            rate.sleep()
-    except rospy.ROSInterruptException as e:
-        rospy.logwarn("ROS node shutting down")
-        rospy.logwarn('{}'.format(e))
-    finally:
-        print(f"Maximum required time to find NMPC solution is {controller_manager.nmpc_controller.max_time} " \
-              f"at instant {controller_manager.nmpc_controller.idx_time}")
-        controller_manager.log_values(hparams.logfile)
+    # Build and run controller manager
+    controller_manager = ControllerManager()
+    controller_manager.run()

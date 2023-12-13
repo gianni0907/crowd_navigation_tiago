@@ -1,9 +1,6 @@
 import numpy as np
 
-class Hparams:    
-    # Specify whether to use real robot or Gazebo
-    real_robot = False
-
+class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
     logfile = 'test_dyn.json'
@@ -17,10 +14,13 @@ class Hparams:
     controller_frequency = 50.0 # [Hz]
     N_horizon = 50
     
+    # Velocity bounds reduction in case of real_robot
+    bound_factor = 1
+
     # Driving and steering velocity limits
-    driving_vel_max = 1 # [m/s]
+    driving_vel_max = 1 * bound_factor # [m/s]
     driving_vel_min = -0.2 # [m/s]
-    steering_vel_max = 1.05 # [rad/s]
+    steering_vel_max = 1.05 * bound_factor # [rad/s]
     steering_vel_max_neg = -steering_vel_max
     
     # Input velocity limit for both left and right wheel
@@ -43,7 +43,7 @@ class Hparams:
     wl_idx = 1
 
     # Tolerance on the position error
-    error_tol = 0.01
+    error_tol = 0.05
 
     # Cost function weights
     q = 1e1 # position weights

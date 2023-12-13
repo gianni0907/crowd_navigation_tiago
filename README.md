@@ -13,17 +13,17 @@ Implement a TIAGo navigation within a dynamic environment:
 ## Usage
 To run the Gazebo simulation:
 ```bash
-roslaunch my_tiago_controller tiago_gazebo.launch public_sim:=true world:=5_humans
+oslaunch labrob_tiago_gazebo tiago_gazebo.launch public_sim:=true end_effector:=pal-gripper world:=WORLD
 ```
+where `WORLD` is one of the worlds in `labrob_gazebo_worlds/worlds` or `pal_gazebo_worlds` packages.
 
-Note that the position of the humans is specified in the file `my_tiago_controller/worlds/5_humans.world`
 
 To run the NMPC controller module:
 ```bash
 roslaunch my_tiago_controller nmpc_controller.launch
 ```
 
-Note that the position of the obstacles for this module is independent from the humans position specified in the file `my_tiago_controller/worlds/5_humans.world`. Thus, if you modify the humans position, you need to properly update also the corresponding variable in `my_tiago_controller/src/my_tiago_controller/Hparams.py`.
+Note that the position of the obstacles for this module is independent from the humans position specified in the file `.world` file. Thus, if you modify the humans position, you need to properly update also the corresponding variable in `my_tiago_controller/src/my_tiago_controller/Hparams.py`.
 When the node is shutdown, relevant data are logged in a `.json` file located in `/tmp/crowd_navigation_tiago/data` folder, with the name specified in `my_tiago_controller/src/my_tiago_controller/Hparams.py`
 
 To set a desired TIAGo target position:
