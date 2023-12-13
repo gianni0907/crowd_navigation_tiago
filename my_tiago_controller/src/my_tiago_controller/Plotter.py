@@ -56,7 +56,6 @@ def plot_results(filename=None):
     frequency = data['frequency']
     shooting_nodes = inputs.shape[0]
     t = inputs[:, 2]
-    print(t.shape)
 
     # Figure to plot velocities
     vel_fig, axs = plt.subplots(3, 2, figsize=(16, 8))
@@ -158,9 +157,10 @@ def plot_results(filename=None):
     robot_clearance = Circle(np.nan, np.nan, facecolor='none', edgecolor='blue')
     goal = ax_big.scatter([], [], s=80.0, marker='*', label='goal', color='magenta', alpha=0.7)
     goal_label = ax_big.text(np.nan, np.nan, goal.get_label(), fontsize=8, ha='left', va='bottom')
-    obstacles = []
-    obstacles_label = []
-    obstacles_clearance = []
+    if n_obstacles > 0:
+        obstacles = []
+        obstacles_label = []
+        obstacles_clearance = []
     for i in range(n_obstacles):
         obstacles.append(ax_big.scatter([], [], marker='o', label='human{}'.format(i+1), color='red', alpha=0.7))
         obstacles_clearance.append(Circle(np.nan, np.nan, facecolor='none', edgecolor='red'))
