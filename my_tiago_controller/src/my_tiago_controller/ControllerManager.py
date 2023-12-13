@@ -164,10 +164,8 @@ class ControllerManager:
             q_ref[:self.nmpc_controller.nq - 1, k] = self.target_position
         u_ref = np.zeros((self.nmpc_controller.nu, self.hparams.N_horizon))
         q_ref[:self.nmpc_controller.nq - 1, self.hparams.N_horizon] = self.target_position
-        
-        self.update_configuration()
 
-        if self.status == Status.MOVING:
+        if self.update_configuration() and self.status == Status.MOVING:
             try:
                 self.nmpc_controller.update(
                     self.configuration,
@@ -242,7 +240,8 @@ class ControllerManager:
         finally:
             print(f"Maximum required time to find NMPC solution is {self.nmpc_controller.max_time} " \
                 f"at instant {self.nmpc_controller.idx_time}")
-            self.log_values(self.hparams.logfile)
+            if self.hparams.log:
+                self.log_values(self.hparams.logfile)
 
 
 def main():
