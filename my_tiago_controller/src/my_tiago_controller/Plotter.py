@@ -77,7 +77,7 @@ def plot_results(filename=None):
     axs[0, 0].legend(loc='upper right')
     axs[0, 0].hlines(control_bounds[0], t[0], t[-1], color='red', linestyle='--')
     axs[0, 0].hlines(control_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    axs[0, 0].set_ylim([1.2 * control_bounds[0], 1.2 * control_bounds[1]])
+    axs[0, 0].set_ylim([-1 + control_bounds[0], 1 + control_bounds[1]])
     axs[0, 0].set_xlim([t[0], t[-1]])
 
     axs[1, 0].set_title('TIAGo driving velocity')
@@ -85,7 +85,7 @@ def plot_results(filename=None):
     axs[1, 0].set_ylabel('$[m/s]$')
     axs[1, 0].hlines(v_bounds[0], t[0], t[-1], color='red', linestyle='--')
     axs[1, 0].hlines(v_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    axs[1, 0].set_ylim([1.2 * v_bounds[0], 1.2 * v_bounds[1]])
+    axs[1, 0].set_ylim([-1 + v_bounds[0], 1 + v_bounds[1]])
     axs[1, 0].set_xlim([t[0], t[-1]])
 
     axs[2, 0].set_title('TIAGo steering velocity')
@@ -93,7 +93,7 @@ def plot_results(filename=None):
     axs[2, 0].set_ylabel('$[rad/s]$')
     axs[2, 0].hlines(omega_bounds[0], t[0], t[-1], color='red', linestyle='--')
     axs[2, 0].hlines(omega_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    axs[2, 0].set_ylim([1.2 * omega_bounds[0], 1.2 * omega_bounds[1]])
+    axs[2, 0].set_ylim([-1 + omega_bounds[0], 1 + omega_bounds[1]])
     axs[2, 0].set_xlim([t[0], t[-1]])
 
     axs[0, 1].set_title('x-position')
@@ -102,7 +102,7 @@ def plot_results(filename=None):
     axs[0, 1].legend(loc='upper right')
     axs[0, 1].hlines(x_bounds[0], t[0], t[-1], color='red', linestyle='--')
     axs[0, 1].hlines(x_bounds[1], t[0], t[-1], color='red', linestyle='--')
-    axs[0, 1].set_ylim([1.2 * x_bounds[0], 1.2 * x_bounds[1]])
+    axs[0, 1].set_ylim([-1 + x_bounds[0], 1 + x_bounds[1]])
     axs[0, 1].set_xlim([t[0], t[-1]])
 
     axs[1, 1].set_title('y-position')
@@ -111,13 +111,13 @@ def plot_results(filename=None):
     axs[1, 1].legend(loc='upper right')
     axs[1, 1].hlines(y_bounds[0], t[0], t[-1], color='red', linestyle='--')
     axs[1, 1].hlines(y_bounds[1], t[0], t[-1], color='red', linestyle='--')
-    axs[1, 1].set_ylim([1.2 * y_bounds[0], 1.2 * y_bounds[1]])
+    axs[1, 1].set_ylim([-1 + y_bounds[0], 1 + y_bounds[1]])
     axs[1, 1].set_xlim([t[0], t[-1]])
 
     axs[2, 1].set_title('TIAGo orientation')
     axs[2, 1].set_xlabel('$t \quad [s]$')
     axs[2, 1].set_ylabel('$[rad]$')
-    axs[2, 1].set_ylim([1.2 * np.min(configurations[:, 2]), 1.2 * np.max(configurations[:, 2])])
+    axs[2, 1].set_ylim([-1 + np.min(configurations[:, 2]), 1 + np.max(configurations[:, 2])])
     axs[2, 1].set_xlim([t[0], t[-1]])
 
     # update function for the animation of profiles plots    
@@ -179,8 +179,8 @@ def plot_results(filename=None):
     ax_big.axhline(y_bounds[1], color='red', linestyle="--")
     ax_big.axvline(x_bounds[0], color='red', linestyle='--')
     ax_big.axvline(x_bounds[1], color='red', linestyle='--')
-    ax_big.set_ylim([1.2 * y_bounds[0], 1.2 * y_bounds[1]])
-    ax_big.set_xlim([1.2 * x_bounds[0], 1.2 * x_bounds[1]])
+    ax_big.set_ylim([-1 + y_bounds[0], 1 + y_bounds[1]])
+    ax_big.set_xlim([-1 + x_bounds[0], 1 + x_bounds[1]])
     ax_big.set_aspect('equal', adjustable='box')
 
     ax1.set_title('wheels angular velocity')
@@ -189,7 +189,7 @@ def plot_results(filename=None):
     ax1.legend(loc='upper right')
     ax1.hlines(control_bounds[0], t[0], t[-1], color='red', linestyle='--')
     ax1.hlines(control_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    ax1.set_ylim([1.2 * control_bounds[0], 1.2 * control_bounds[1]])
+    ax1.set_ylim([-1 + control_bounds[0], 1 + control_bounds[1]])
     ax1.set_xlim([t[0], t[-1]])
 
     ax2.set_title('TIAGo driving velocity')
@@ -197,7 +197,7 @@ def plot_results(filename=None):
     ax2.set_ylabel('$[m/s]$')
     ax2.hlines(v_bounds[0], t[0], t[-1], color='red', linestyle='--')
     ax2.hlines(v_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    ax2.set_ylim([1.2 * v_bounds[0], 1.2 * v_bounds[1]])
+    ax2.set_ylim([-1 + v_bounds[0], 1 + v_bounds[1]])
     ax2.set_xlim([t[0], t[-1]])
 
     ax3.set_title('TIAGo steering velocity')
@@ -205,7 +205,7 @@ def plot_results(filename=None):
     ax3.set_ylabel('$[rad/s]$')
     ax3.hlines(omega_bounds[0], t[0], t[-1], color='red', linestyle='--')
     ax3.hlines(omega_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    ax3.set_ylim([1.2 * omega_bounds[0], 1.2 * omega_bounds[1]])
+    ax3.set_ylim([-1 + omega_bounds[0], 1 + omega_bounds[1]])
     ax3.set_xlim([t[0], t[-1]])
 
     # init and update function for the animation of simulation
