@@ -12,7 +12,7 @@ class CrowdPredictionManager:
     '''
     From the laser scans input predict the motion of the humans
     Simplified case: assume to know the actual humans trajectory, 
-                     only extract the positions within the control horizon
+                     only extract positions and velocities within the control horizon
                      and send them to the ControllerManager
     '''
     def __init__(self):
@@ -40,11 +40,12 @@ class CrowdPredictionManager:
         )
 
     def set_humans_trajectory_request(self, request):
-        if self.dynamic:
+        if self.status == Status.MOVING:
             rospy.loginfo("Cannot set humans trajectory, humans are already moving")
             return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)
         else:
-            self.trajectories = np.ndarray((self.n_humans, len(request.x_1), 4))
+            self.trajectory_length = len(request.x_1)
+            self.trajectories = np.ndarray((self.n_humans, self.trajectory_length, 4))
             self.trajectories[0, :, 0] = request.x_1
             self.trajectories[0, :, 1] = request.y_1
             self.trajectories[0, :, 2] = request.xdot_1
@@ -65,7 +66,7 @@ class CrowdPredictionManager:
             self.trajectories[4, :, 1] = request.y_5
             self.trajectories[4, :, 2] = request.xdot_5
             self.trajectories[4, :, 3] = request.ydot_5
-            self.dynamic = True
+            self.status = Status.MOVING
             rospy.loginfo("Humans trajectory successfully set")
             return my_tiago_msgs.srv.SetHumansTrajectoryResponse(True)
         
@@ -74,12 +75,42 @@ class CrowdPredictionManager:
 
         while not rospy.is_shutdown():
             time = rospy.get_time()
-            if not self.dynamic:
+            if self.status == Status.WAITING:
                 rospy.logwarn("Missing humans info")
                 rate.sleep()
                 continue
-
             
+            # Reset crowd_motion_prediction message
+            crowd_motion_prediction = CrowdMotionPrediction()
+
+            # Create the prediction within the horizon
+            predictions = np.ndarray((self.n_humans, self.N_horizon, 4))
+            if self.current + self.N_horizon <= self.trajectory_length:
+                predictions = self.trajectories[:, self.current:self.current + self.N_horizon, :]
+            else:
+                predictions[:, :self.trajectory_length - self.current, :] = self.trajectories[:, self.current: self.current + self.trajectory_length, :] 
+                predictions[:, self.trajectory_length - self.current:, :] = self.trajectories[:, -1, :]
+
+            for i in range(self.n_humans):
+                crowd_motion_prediction.append(
+                    MotionPrediction(
+                        predictions[i, : , :2],
+                        predictions[i, :, 2:]
+                    )
+                )
+
+            crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(time),
+                                                                           'map',
+                                                                           crowd_motion_prediction)
+            crowd_motion_prediction_stamped_msg = CrowdMotionPredictionStamped.to_message(crowd_motion_prediction_stamped)
+            self.crowd_motion_prediction_publisher.publish(crowd_motion_prediction_stamped_msg)
+            self.current = self.current + 1
+
+            if self.current == self.trajectory_length:
+                self.status = Status.WAITING
+                self.current = 0
+
+            rate.sleep()
 
 def main():
     rospy.init_node('tiago_crowd_prediction', log_level=rospy.INFO)
