@@ -15,16 +15,17 @@ class Hparams:
     N_horizon = 50
     
     # Velocity bounds reduction in case of real_robot
-    bound_factor = 1
+    driving_bound_factor = 0.4
+    steering_bound_factor = 1.0
 
     # Driving and steering velocity limits
-    driving_vel_max = 1 * bound_factor # [m/s]
+    driving_vel_max = 1 * driving_bound_factor # [m/s]
     driving_vel_min = -0.2 # [m/s]
-    steering_vel_max = 1.05 * bound_factor # [rad/s]
+    steering_vel_max = 1.05 * steering_bound_factor # [rad/s]
     steering_vel_max_neg = -steering_vel_max
     
     # Input velocity limit for both left and right wheel
-    w_max = driving_vel_max/wheel_radius # [rad/s]
+    w_max = driving_vel_max / wheel_radius # [rad/s]
     w_max_neg = -w_max
 
     # Configuration limits (only for cartesian position)

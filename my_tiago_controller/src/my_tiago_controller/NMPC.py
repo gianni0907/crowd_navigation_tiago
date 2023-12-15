@@ -36,8 +36,8 @@ class NMPC:
         self.idx_time = 0.0
 
     def init(self, x0: Configuration):
-        lbx = np.array([self.hparams.x_lower_bound, self.hparams.y_lower_bound])
-        ubx = np.array([self.hparams.x_upper_bound, self.hparams.y_upper_bound])   
+        # lbx = np.array([self.hparams.x_lower_bound, self.hparams.y_lower_bound])
+        # ubx = np.array([self.hparams.x_upper_bound, self.hparams.y_upper_bound])   
         if self.hparams.n_obstacles > 0:
             lh = np.zeros(self.hparams.n_obstacles + 4)
             uh = 10000*np.ones(self.hparams.n_obstacles + 4)
@@ -52,9 +52,9 @@ class NMPC:
             self.acados_ocp_solver.constraints_set(k, 'uh', uh)
         self.acados_ocp_solver.set(self.N, 'x', np.array(x0.get_q()))
 
-        for k in range(1, self.N):
-            self.acados_ocp_solver.constraints_set(k, 'lbx', lbx)
-            self.acados_ocp_solver.constraints_set(k, 'ubx', ubx)
+        # for k in range(1, self.N):
+        #     self.acados_ocp_solver.constraints_set(k, 'lbx', lbx)
+        #     self.acados_ocp_solver.constraints_set(k, 'ubx', ubx)
 
     # Systems dynamics:
     def __f(self, x, u):
@@ -92,14 +92,14 @@ class NMPC:
 
         # Consider the robot distance from the bounds [ubx, lbx, uby, lby]
         distance_bounds = casadi.SX.zeros((4,1))
-        distance_bounds[0] = q[self.hparams.x_idx] - self.hparams.x_upper_bound
+        distance_bounds[0] = self.hparams.x_upper_bound - q[self.hparams.x_idx]
         distance_bounds[1] = q[self.hparams.x_idx] - self.hparams.x_lower_bound
-        distance_bounds[2] = q[self.hparams.y_idx] - self.hparams.y_upper_bound
+        distance_bounds[2] = self.hparams.y_upper_bound - q[self.hparams.y_idx] 
         distance_bounds[3] = q[self.hparams.y_idx] - self.hparams.y_lower_bound
         for i in range(4):
-            h_i[i] = distance_bounds[i]**2
+            h_i[i] = distance_bounds[i]
 
-        # Consider the robot distance from obstacels, if obstacles are present
+        # Consider the robot distance from obstacles, if obstacles are present
         if n_obs > 0:
             distance_vectors = casadi.SX.zeros((n_obs, 2))
             cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
@@ -107,7 +107,7 @@ class NMPC:
                 p[i, :] = self.hparams.obstacles_position[i, :]
                 distance_vectors[i, self.hparams.x_idx] = q[self.hparams.x_idx] - p[i, self.hparams.x_idx]
                 distance_vectors[i, self.hparams.y_idx] = q[self.hparams.y_idx] - p[i, self.hparams.y_idx]
-                h_i[i] = distance_vectors[i, self.hparams.x_idx]**2 + \
+                h_i[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
                         distance_vectors[i, self.hparams.y_idx]**2 - \
                         cbf_radius**2
         return h_i
@@ -190,9 +190,9 @@ class NMPC:
         
 
         # Linear inequality constraints on the state:
-        acados_constraints.idxbx = np.array([self.hparams.x_idx, self.hparams.y_idx])
-        acados_constraints.lbx = np.zeros(len(acados_constraints.idxbx))
-        acados_constraints.ubx = np.zeros(len(acados_constraints.idxbx))
+        # acados_constraints.idxbx = np.array([self.hparams.x_idx, self.hparams.y_idx])
+        # acados_constraints.lbx = np.zeros(len(acados_constraints.idxbx))
+        # acados_constraints.ubx = np.zeros(len(acados_constraints.idxbx))
         acados_constraints.x0 = np.zeros(self.nq)
 
         # Linear constraints on driving and steering velocity expressed in term of wheel angular velocities
