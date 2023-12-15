@@ -2,6 +2,7 @@ import json
 import rospy
 import math
 import geometry_msgs.msg
+import sensor_msgs.msg
 import tf2_ros
 
 from numpy.linalg import *
@@ -49,6 +50,14 @@ class ControllerManager:
             self.set_desired_target_position_request
         )
 
+        # Setup subscriber for joint_states topic
+        state_topic = '/joint_states'
+        rospy.Subscriber(
+            state_topic,
+            sensor_msgs.msg.JointState,
+            self.joint_states_callback
+        )
+
         # Set variables to store data
         if self.hparams.log:
             self.configuration_history = []
@@ -56,6 +65,7 @@ class ControllerManager:
             self.prediction_history = []
             self.velocity_history = []
             self.target_history = []
+            self.robot_velocity_history = []
 
     def init(self):
         # Init robot configuration
@@ -89,6 +99,11 @@ class ControllerManager:
         # Publish wheel velocity commands
         self.cmd_vel_publisher.publish(cmd_vel_msg)
         return v, omega
+    
+    def joint_states_callback(self, msg):
+        w_l = msg.velocity[12]
+        w_r = msg.velocity[13]
+        self.robot_velocity_history.append([w_r, w_l, rospy.get_time()])
 
     def set_from_tf_transform(self, transform):
         self.configuration.x = transform.transform.translation.x
@@ -132,6 +147,7 @@ class ControllerManager:
         output_dict['inputs'] = self.control_input_history
         output_dict['predictions'] = self.prediction_history
         output_dict['velocities'] = self.velocity_history
+        output_dict['robot_velocities'] = self.robot_velocity_history
         output_dict['targets'] = self.target_history
         output_dict['x_bounds'] = [self.hparams.x_lower_bound, self.hparams.x_upper_bound]
         output_dict['y_bounds'] = [self.hparams.y_lower_bound, self.hparams.y_upper_bound]
