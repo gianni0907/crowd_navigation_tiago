@@ -15,7 +15,7 @@ class Hparams:
     N_horizon = 50
     
     # Velocity bounds reduction in case of real_robot
-    driving_bound_factor = 0.4
+    driving_bound_factor = 1.0
     steering_bound_factor = 1.0
 
     # Driving and steering velocity limits
@@ -55,7 +55,7 @@ class Hparams:
     rho_cbf = 0.6 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_cbf = 0.5 # in (0,1], hyperparameter for cbf constraint
-    n_obstacles = 0 # number of obstacles, for now static obstacles
+    n_obstacles = 5 # number of obstacles, for now static obstacles
     obstacles_position = np.array([[2.0, 2.0],
                                    [2.0, -0.5],
                                    [-1.0, 2.3],

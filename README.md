@@ -13,7 +13,7 @@ Implement a TIAGo navigation within a dynamic environment:
 ## Usage
 To run the Gazebo simulation:
 ```bash
-oslaunch labrob_tiago_gazebo tiago_gazebo.launch public_sim:=true end_effector:=pal-gripper world:=WORLD
+roslaunch labrob_tiago_gazebo tiago_gazebo.launch public_sim:=true end_effector:=pal-gripper world:=WORLD
 ```
 where `WORLD` is one of the worlds in `labrob_gazebo_worlds/worlds` or `pal_gazebo_worlds` packages.
 
