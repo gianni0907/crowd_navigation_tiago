@@ -49,7 +49,7 @@ def plot_results(filename=None):
     v_bounds = np.array(data['v_bounds'])
     omega_bounds = np.array(data['omega_bounds'])
     n_obstacles = data['n_obstacles']
-    if n_obstacles != 0:
+    if n_obstacles > 0:
         obstacles_position = np.array(data['humans_position'])
     rho_cbf = data['rho_cbf']
     ds_cbf = data['ds_cbf']
@@ -220,14 +220,17 @@ def plot_results(filename=None):
         goal_label.set_position(targets[0])
         
         for i in range(n_obstacles):
-            obs_position = obstacles_position[0, i, :]
+            obs_position = obstacles_position[0, i, :2]
             obstacles[i].set_offsets(obs_position)
             obstacles_clearance[i].set_center(obs_position)
             obstacles_clearance[i].set_radius(ds_cbf)
             ax_big.add_patch(obstacles_clearance[i])
             obstacles_label[i].set_position(obs_position)
-        return robot, robot_clearance, robot_label, goal, goal_label, \
-                obstacles, obstacles_clearance, obstacles_label 
+        if n_obstacles > 0:
+            return robot, robot_clearance, robot_label, goal, goal_label, \
+                    obstacles, obstacles_clearance, obstacles_label
+        else:
+            return robot, robot_clearance, robot_label, goal, goal_label,
 
     def update_sim(frame):
         current_prediction = predictions[frame, :, :]
@@ -246,7 +249,7 @@ def plot_results(filename=None):
         goal.set_offsets(current_target[:2])
         goal_label.set_position(current_target)
         for i in range(n_obstacles):
-            obs_position = obstacles_position[frame, i , :]
+            obs_position = obstacles_position[frame, i , :2]
             obstacles[i].set_offsets(obs_position)
             obstacles_clearance[i].set_center(obs_position)
             obstacles_label[i].set_position(obs_position)
@@ -254,9 +257,13 @@ def plot_results(filename=None):
         if frame == shooting_nodes - 1:
             sim_animation.event_source.stop()
 
-        return robot, robot_clearance, robot_label, goal, goal_label, \
-                traj_line, pred_line, wr_line, wl_line, v_line, omega_line, \
-                obstacles, obstacles_clearance, obstacles_label
+        if n_obstacles > 0:
+            return robot, robot_clearance, robot_label, goal, goal_label, \
+                    traj_line, pred_line, wr_line, wl_line, v_line, omega_line, \
+                    obstacles, obstacles_clearance, obstacles_label
+        else:
+            return robot, robot_clearance, robot_label, goal, goal_label, \
+                    traj_line, pred_line, wr_line, wl_line, v_line, omega_line,
 
     sim_animation = FuncAnimation(sim_fig, update_sim,
                                   frames=shooting_nodes,
