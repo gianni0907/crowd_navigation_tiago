@@ -1,0 +1,7 @@
+# Set of trajectories
+CrowdMotionPrediction trajectories
+
+---
+
+# Whether the service request has been executed successfully or not:
+bool success

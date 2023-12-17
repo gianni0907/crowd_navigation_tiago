@@ -1,0 +1,3 @@
+# A CrowdMotionPrediction with reference coordinate frame and timestamp
+Header header
+CrowdMotionPrediction crowd_motion_prediction

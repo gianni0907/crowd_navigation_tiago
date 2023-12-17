@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+
+import my_tiago_controller.SendHumansTrajectory as SendHumansTrajectory
+if __name__ == '__main__':
+    SendHumansTrajectory.main()

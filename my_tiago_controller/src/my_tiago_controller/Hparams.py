@@ -60,6 +60,4 @@ class Hparams:
                                    [2.0, -0.5],
                                    [-1.0, 2.3],
                                    [-2.0, -1.0],
-                                   [4.5, 1.0]]) # fixed position of the obstacles
-
-
+                                   [4.5, 1.0]]) # fixed position of the obstacles (for NMPC, to be deleted)

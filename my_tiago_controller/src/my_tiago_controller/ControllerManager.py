@@ -1,6 +1,8 @@
 import json
 import rospy
+import threading
 import math
+import os
 import geometry_msgs.msg
 import sensor_msgs.msg
 import tf2_ros
@@ -20,12 +22,19 @@ class ControllerManager:
         self.hparams = Hparams()
         
         # Set status
-        self.status = Status.WAITING
+        self.status = Status.WAITING # WAITING for the initial robot configuration
+        self.sensing = False
 
         # NMPC:
         self.nmpc_controller = NMPC(self.hparams)
 
         self.configuration = Configuration(0.0, 0.0, 0.0)
+        self.data_lock = threading.Lock()
+        self.crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.now(),
+                                                                            'map',
+                                                                            CrowdMotionPrediction())
+        # Set real-time prediction:
+        self.crowd_motion_prediction_stamped_rt = self.crowd_motion_prediction_stamped
 
         # Setup publisher for wheel velocity commands:
         cmd_vel_topic = '/mobile_base_controller/cmd_vel'
@@ -57,6 +66,14 @@ class ControllerManager:
             sensor_msgs.msg.JointState,
             self.joint_states_callback
         )
+        
+        # Setup subscriber for crowd motion prediction:
+        crowd_prediction_topic = 'crowd_motion_prediction'
+        rospy.Subscriber(
+            crowd_prediction_topic,
+            my_tiago_msgs.msg.CrowdMotionPredictionStamped,
+            self.crowd_motion_prediction_stamped_callback
+        )
 
         # Set variables to store data
         if self.hparams.log:
@@ -65,11 +82,10 @@ class ControllerManager:
             self.prediction_history = []
             self.velocity_history = []
             self.target_history = []
-            self.robot_velocity_history = []
+            self.humans_history = []
 
     def init(self):
         # Init robot configuration
-        
         if self.update_configuration():
             self.status = Status.READY
             self.target_position = np.array([self.configuration.x,
@@ -104,6 +120,14 @@ class ControllerManager:
         w_l = msg.velocity[12]
         w_r = msg.velocity[13]
         self.robot_velocity_history.append([w_r, w_l, rospy.get_time()])
+        
+    def crowd_motion_prediction_stamped_callback(self, msg):
+        if not self.sensing:
+            self.sensing = True
+        crowd_motion_prediction_stamped = CrowdMotionPredictionStamped.from_message(msg)
+        self.data_lock.acquire()
+        self.crowd_motion_prediction_stamped = crowd_motion_prediction_stamped
+        self.data_lock.release()
 
     def set_from_tf_transform(self, transform):
         self.configuration.x = transform.transform.translation.x
@@ -140,7 +164,7 @@ class ControllerManager:
             elif self.status == Status.MOVING:
                 rospy.loginfo(f"Desired target position successfully changed: {self.target_position}")
             return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(True)
-
+        
     def log_values(self, filename):
         output_dict = {}
         output_dict['configurations'] = self.configuration_history
@@ -155,8 +179,8 @@ class ControllerManager:
         output_dict['v_bounds'] = [self.hparams.driving_vel_min, self.hparams.driving_vel_max]
         output_dict['omega_bounds'] = [self.hparams.steering_vel_max_neg, self.hparams.steering_vel_max]
         output_dict['n_obstacles'] = self.hparams.n_obstacles
-        if self.hparams.n_obstacles > 0:
-            output_dict['obstacles_position'] = self.hparams.obstacles_position.tolist()
+        if self.hparams.n_obstacles > 0:        
+            output_dict['humans_position'] = self.humans_history
         output_dict['rho_cbf'] = self.hparams.rho_cbf
         output_dict['ds_cbf'] = self.hparams.ds_cbf
         output_dict['gamma_cbf'] = self.hparams.gamma_cbf
@@ -180,22 +204,43 @@ class ControllerManager:
             q_ref[:self.nmpc_controller.nq - 1, k] = self.target_position
         u_ref = np.zeros((self.nmpc_controller.nu, self.hparams.N_horizon))
         q_ref[:self.nmpc_controller.nq - 1, self.hparams.N_horizon] = self.target_position
-
-        if self.update_configuration() and self.status == Status.MOVING:
-            try:
-                self.nmpc_controller.update(
-                    self.configuration,
-                    q_ref,
-                    u_ref
-                )
-                self.control_input = self.nmpc_controller.get_command()
-            except Exception as e:
-                rospy.logwarn("NMPC solver failed")
-                rospy.logwarn('{}'.format(e))
-                self.control_input = np.zeros((self.nmpc_controller.nu))
-        else:
-            self.control_input = np.zeros((self.nmpc_controller.nu))
         
+        if self.hparams.n_obstacles > 0:
+            if self.data_lock.acquire(False):
+                self.crowd_motion_prediction_stamped_rt = self.crowd_motion_prediction_stamped
+                self.data_lock.release()
+
+        if self.update_configuration() and (self.sensing or self.hparams.n_obstacles == 0):
+            # Compute the position error
+            error = np.array([self.target_position[self.hparams.x_idx] - \
+                            self.configuration.x,
+                            self.target_position[self.hparams.y_idx] - \
+                            self.configuration.y])
+            
+            if norm(error) < self.hparams.error_tol:
+                self.control_input = np.zeros((self.nmpc_controller.nu))
+                if self.status == Status.MOVING:
+                    print("Stop configuration #######################")
+                    print(self.configuration)
+                    print("##########################################")
+                    self.status = Status.READY
+            else:
+                try:
+                    self.nmpc_controller.update(
+                        self.configuration,
+                        q_ref,
+                        u_ref
+                    )
+                    self.control_input = self.nmpc_controller.get_command()
+                except Exception as e:
+                    rospy.logwarn("NMPC solver failed")
+                    rospy.logwarn('{}'.format(e))
+                    self.control_input = np.zeros((self.nmpc_controller.nu))
+        else:
+            if not(self.sensing) and self.hparams.n_obstacles > 0:
+                rospy.logwarn("Missing sensing info")
+            self.control_input = np.zeros((self.nmpc_controller.nu))        
+            
     def run(self):
         rate = rospy.Rate(self.hparams.controller_frequency)
         # Waiting for initial configuration from tf
@@ -213,7 +258,7 @@ class ControllerManager:
                 v, omega = self.publish_command()
 
                 # Saving data for plots
-                if self.hparams.log:
+                if self.hparams.log and (self.sensing or self.hparams.n_obstacles == 0):
                     self.configuration_history.append([
                         self.configuration.x,
                         self.configuration.y,
@@ -233,22 +278,22 @@ class ControllerManager:
                     ])
                     predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
                     for i in range(self.hparams.N_horizon):
-                        predicted_trajectory[:, i] = \
-                            self.nmpc_controller.acados_ocp_solver.get(i,'x')
+                        predicted_trajectory[:, i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')
                     predicted_trajectory[:, self.hparams.N_horizon] = \
                         self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
-                    self.prediction_history.append(predicted_trajectory.tolist())
 
-                # Checking the position error
-                error = np.array([self.target_position[self.hparams.x_idx] - \
-                                self.configuration.x,
-                                self.target_position[self.hparams.y_idx] - \
-                                self.configuration.y])
-                if norm(error) < self.hparams.error_tol and self.status == Status.MOVING:
-                        print("Stop configuration #######################")
-                        print(self.configuration)
-                        print("##########################################")
-                        self.status = Status.READY
+                    self.prediction_history.append(predicted_trajectory.tolist())
+                    
+                    if self.hparams.n_obstacles > 0:
+                        first_predictions = []
+                        for i in range(self.hparams.n_obstacles):
+                            first_predictions.append([
+                                self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i].positions[0].x,
+                                self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i].positions[0].y,
+                                time
+                            ])
+                        self.humans_history.append(first_predictions)
+
                 rate.sleep()
         except rospy.ROSInterruptException as e:
             rospy.logwarn("ROS node shutting down")

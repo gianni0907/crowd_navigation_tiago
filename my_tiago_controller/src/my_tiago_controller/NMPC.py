@@ -204,7 +204,7 @@ class NMPC:
         acados_constraints.lg = np.array([self.hparams.driving_vel_min, self.hparams.steering_vel_max_neg])
         acados_constraints.ug = np.array([self.hparams.driving_vel_max, self.hparams.steering_vel_max])
 
-        # Nonlinear constraints (CBFs)(for both obstacles and configuration bounds):
+        # Nonlinear constraints (CBFs) (for both obstacles and configuration bounds):
         if self.hparams.n_obstacles > 0:
             acados_constraints.lh = np.zeros(self.hparams.n_obstacles + 4)
             acados_constraints.uh = np.zeros(self.hparams.n_obstacles + 4)
