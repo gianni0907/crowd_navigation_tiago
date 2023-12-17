@@ -11,8 +11,8 @@ class Hparams:
     b = 0.0 # [m]
 
     # NMPC parameters
-    controller_frequency = 50.0 # [Hz]
-    N_horizon = 50
+    controller_frequency = 40.0 # [Hz]
+    N_horizon = 20
     
     # Velocity bounds reduction in case of real_robot
     driving_bound_factor = 1.0
@@ -55,7 +55,7 @@ class Hparams:
     rho_cbf = 0.6 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_cbf = 0.5 # in (0,1], hyperparameter for cbf constraint
-    n_obstacles = 5 # number of obstacles, for now static obstacles
+    n_obstacles = 0 # number of obstacles, for now static obstacles
     obstacles_position = np.array([[2.0, 2.0],
                                    [2.0, -0.5],
                                    [-1.0, 2.3],

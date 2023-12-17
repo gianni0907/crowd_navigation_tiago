@@ -246,8 +246,6 @@ class ControllerManager:
         rate = rospy.Rate(self.hparams.controller_frequency)
         # Variables for Analysis of required time
         self.previous_time = rospy.get_time()
-        self.max_deltat = 0.0
-        self.max_instant = 0.0
 
         # Waiting for initial configuration from tf
         while self.status == Status.WAITING:
@@ -259,12 +257,7 @@ class ControllerManager:
         try:
             while not(rospy.is_shutdown()):
                 time = rospy.get_time()
-                print(time)
-                deltat = time - self.previous_time
-                if deltat > self.max_deltat:
-                    self.max_deltat = deltat
-                    self.max_instant = time
-                self.previous_time = time
+                init_time = time
  
                 self.update()
                 v, omega = self.publish_command()
@@ -306,13 +299,16 @@ class ControllerManager:
                             ])
                         self.humans_history.append(first_predictions)
 
+                final_time = rospy.get_time()        
+                deltat = final_time - init_time
+                if deltat > 1/(2*self.hparams.controller_frequency):
+                    print(f"Iteration time {deltat} at instant {time}")
+
                 rate.sleep()
         except rospy.ROSInterruptException as e:
             rospy.logwarn("ROS node shutting down")
             rospy.logwarn('{}'.format(e))
         finally:
-            print(f"Maximum cycle time is {self.max_deltat} " \
-                f"at instant {self.max_instant}")
             if self.hparams.log:
                 self.log_values(self.hparams.logfile)
 
