@@ -59,13 +59,13 @@ class ControllerManager:
             self.set_desired_target_position_request
         )
 
-        # Setup subscriber for joint_states topic
-        state_topic = '/joint_states'
-        rospy.Subscriber(
-            state_topic,
-            sensor_msgs.msg.JointState,
-            self.joint_states_callback
-        )
+        # # Setup subscriber for joint_states topic
+        # state_topic = '/joint_states'
+        # rospy.Subscriber(
+        #     state_topic,
+        #     sensor_msgs.msg.JointState,
+        #     self.joint_states_callback
+        # )
         
         # Setup subscriber for crowd motion prediction:
         crowd_prediction_topic = 'crowd_motion_prediction'
@@ -83,6 +83,7 @@ class ControllerManager:
             self.velocity_history = []
             self.target_history = []
             self.humans_history = []
+            # self.robot_velocity_history = []
 
     def init(self):
         # Init robot configuration
@@ -116,11 +117,11 @@ class ControllerManager:
         self.cmd_vel_publisher.publish(cmd_vel_msg)
         return v, omega
     
-    def joint_states_callback(self, msg):
-        w_l = msg.velocity[12]
-        w_r = msg.velocity[13]
-        self.robot_velocity_history.append([w_r, w_l, rospy.get_time()])
-        
+    # def joint_states_callback(self, msg):
+    #     w_l = msg.velocity[12]
+    #     w_r = msg.velocity[13]
+    #     self.robot_velocity_history.append([w_r, w_l, rospy.get_time()])
+
     def crowd_motion_prediction_stamped_callback(self, msg):
         if not self.sensing:
             self.sensing = True
@@ -171,7 +172,7 @@ class ControllerManager:
         output_dict['inputs'] = self.control_input_history
         output_dict['predictions'] = self.prediction_history
         output_dict['velocities'] = self.velocity_history
-        output_dict['robot_velocities'] = self.robot_velocity_history
+        # output_dict['robot_velocities'] = self.robot_velocity_history
         output_dict['targets'] = self.target_history
         output_dict['x_bounds'] = [self.hparams.x_lower_bound, self.hparams.x_upper_bound]
         output_dict['y_bounds'] = [self.hparams.y_lower_bound, self.hparams.y_upper_bound]
@@ -243,6 +244,11 @@ class ControllerManager:
             
     def run(self):
         rate = rospy.Rate(self.hparams.controller_frequency)
+        # Variables for Analysis of required time
+        self.previous_time = rospy.get_time()
+        self.max_deltat = 0.0
+        self.max_instant = 0.0
+
         # Waiting for initial configuration from tf
         while self.status == Status.WAITING:
             self.init()
@@ -253,7 +259,13 @@ class ControllerManager:
         try:
             while not(rospy.is_shutdown()):
                 time = rospy.get_time()
-
+                print(time)
+                deltat = time - self.previous_time
+                if deltat > self.max_deltat:
+                    self.max_deltat = deltat
+                    self.max_instant = time
+                self.previous_time = time
+ 
                 self.update()
                 v, omega = self.publish_command()
 
@@ -299,8 +311,8 @@ class ControllerManager:
             rospy.logwarn("ROS node shutting down")
             rospy.logwarn('{}'.format(e))
         finally:
-            print(f"Maximum required time to find NMPC solution is {self.nmpc_controller.max_time} " \
-                f"at instant {self.nmpc_controller.idx_time}")
+            print(f"Maximum cycle time is {self.max_deltat} " \
+                f"at instant {self.max_instant}")
             if self.hparams.log:
                 self.log_values(self.hparams.logfile)
 
