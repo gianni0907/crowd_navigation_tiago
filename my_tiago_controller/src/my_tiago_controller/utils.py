@@ -55,7 +55,7 @@ class MotionPrediction:
     def to_message(motion_prediction):
         positions_msg = []
         velocities_msg = []
-        for i in range(motion_prediction.positions.shape[1]):
+        for i in range(len(motion_prediction.positions)):
             positions_msg.append(Position.to_message(motion_prediction.positions[i]))
             velocities_msg.append(Velocity.to_message(motion_prediction.velocities[i]))
 
@@ -70,7 +70,7 @@ class MotionPrediction:
         velocities = []
         for i in range(len(motion_prediction_msg.positions)):
             positions.append(Position.from_message(motion_prediction_msg.positions[i]))
-            velocities.append(Velocity.from_message(motion_prediction_msg.velocieties[i]))
+            velocities.append(Velocity.from_message(motion_prediction_msg.velocities[i]))
 
         return MotionPrediction(
             positions,
@@ -154,34 +154,33 @@ def integrate(f, x0, u, dt, integration_method='RK4'):
     else:
         return Euler(f, x0, u, dt)
     
-def linear_trajectory(xi, xf, n_steps):
+def linear_trajectory(p_i : Position, p_f : Position, n_steps):
     """
     Generate a linear trajectory between two 2D points.
 
     Parameters:
-    - xi: Initial point (tuple or array-like)
-    - xf: Final point (tuple or array-like)
+    - xi: Initial point of type Position
+    - xf: Final point of type Position
     - n_steps: Number of steps for the trajectory (integer)
 
     Returns:
-    - trajectory: 2D array containing position and velocity
-                  for each step(shape: (n_steps, 4))
+    - trajectory: 2D array containing positions (array of Position)
+                  and velocities (array of Velocity)
     """
 
-    # Check if the dimensions of xi and xf match
-    assert xi.shape == xf.shape == (2,), "Initial and final points must be 2D."
-
     # Calculate velocity
-    velocity = (xf - xi) / (n_steps - 1)
+    x_vel = (p_f.x - p_i.x) / (n_steps - 1)
+    y_vel = (p_f.y - p_i.y) / (n_steps - 1)
 
-    # Initialize the trajectory array
-    trajectory = np.zeros((n_steps, 4))
+    # Initialize the positions and velocities array
+    positions = np.empty(n_steps, dtype=Position)
+    velocities = np.empty(n_steps, dtype=Position)
 
     # Generate linear trajectory
     for i in range(n_steps):
         alpha = i / (n_steps - 1)  # Interpolation parameter
-        trajectory[i, :2] = (1 - alpha) * xi + alpha * xf
-        trajectory[i, 2:] = velocity
-    trajectory[n_steps - 1, 2:] = np.zeros((2))
+        positions[i] = Position((1 - alpha) * p_i.x + alpha * p_f.x, (1 - alpha) * p_i.y + alpha * p_f.y)
+        velocities[i] = Velocity(x_vel, y_vel)
+    velocities[n_steps - 1] = Velocity(0.0, 0.0)
 
-    return trajectory
+    return positions, velocities
