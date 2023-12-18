@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import my_tiago_msgs.msg
 import geometry_msgs.msg
 
@@ -153,6 +154,10 @@ def integrate(f, x0, u, dt, integration_method='RK4'):
         return RK4(f, x0, u, dt)
     else:
         return Euler(f, x0, u, dt)
+    
+# Wrap angle to [-pi, pi):
+def wrap_angle(theta):
+    return math.atan2(math.sin(theta), math.cos(theta))
     
 def linear_trajectory(p_i : Position, p_f : Position, n_steps):
     """

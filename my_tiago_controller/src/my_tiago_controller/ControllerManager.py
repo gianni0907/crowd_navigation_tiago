@@ -131,13 +131,15 @@ class ControllerManager:
         self.data_lock.release()
 
     def set_from_tf_transform(self, transform):
-        self.configuration.x = transform.transform.translation.x
-        self.configuration.y = transform.transform.translation.y
         q = transform.transform.rotation
         self.configuration.theta = math.atan2(
             2.0 * (q.w * q.z + q.x * q.y),
             1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         )
+        # if self.configuration.theta > 0:
+        #     self.configuration.theta -= 2*math.pi
+        self.configuration.x = transform.transform.translation.x + self.hparams.b * math.cos(self.configuration.theta)
+        self.configuration.y = transform.transform.translation.y + self.hparams.b * math.sin(self.configuration.theta)
 
     def update_configuration(self):
         try:
@@ -208,10 +210,16 @@ class ControllerManager:
         
         if self.hparams.n_obstacles > 0:
             if self.data_lock.acquire(False):
+                
                 self.crowd_motion_prediction_stamped_rt = self.crowd_motion_prediction_stamped
                 self.data_lock.release()
 
-        if self.update_configuration() and (self.sensing or self.hparams.n_obstacles == 0):
+        self.data_lock.acquire()
+        flag = self.update_configuration()
+        print(self.configuration)
+        self.data_lock.release()
+        
+        if flag and (self.sensing or self.hparams.n_obstacles == 0):
             # Compute the position error
             error = np.array([self.target_position[self.hparams.x_idx] - \
                             self.configuration.x,

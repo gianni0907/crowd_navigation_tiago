@@ -68,11 +68,11 @@ class NMPC:
 
     def __x_dot(self, q, v, omega):
         b = self.hparams.b
-        return v*casadi.cos(q[self.hparams.theta_idx])-omega*b*casadi.sin(q[self.hparams.theta_idx])
+        return v * casadi.cos(q[self.hparams.theta_idx]) - omega * b * casadi.sin(q[self.hparams.theta_idx])
 
     def __y_dot(self, q, v, omega):
         b = self.hparams.b
-        return v*casadi.sin(q[self.hparams.theta_idx])+omega*b*casadi.cos(q[self.hparams.theta_idx])
+        return v * casadi.sin(q[self.hparams.theta_idx]) + omega * b * casadi.cos(q[self.hparams.theta_idx])
     
     def __theta_dot(self, omega):
         return omega
