@@ -40,11 +40,20 @@ class NMPC:
             lh = np.zeros(4)
             uh = 10000*np.ones(4)
 
+        lg = np.array([self.hparams.driving_vel_min,
+                       self.hparams.steering_vel_max_neg])
+        
+        ug = np.array([self.hparams.driving_vel_max,
+                       self.hparams.steering_vel_max])
+        
+
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'x', np.array(x0.get_q()))
             self.acados_ocp_solver.set(k, 'u', np.zeros(self.nu))
             self.acados_ocp_solver.constraints_set(k, 'lh', lh)
             self.acados_ocp_solver.constraints_set(k, 'uh', uh)
+            self.acados_ocp_solver.constraints_set(k, 'lg', lg)
+            self.acados_ocp_solver.constraints_set(k, 'ug', ug)
         self.acados_ocp_solver.set(self.N, 'x', np.array(x0.get_q()))
 
         # for k in range(1, self.N):
@@ -86,11 +95,14 @@ class NMPC:
             h_i = casadi.SX.zeros(4)
 
         # Consider the robot distance from the bounds [ubx, lbx, uby, lby]
-        distance_bounds = casadi.SX.zeros((4,1))
-        distance_bounds[0] = self.hparams.x_upper_bound - q[self.hparams.x_idx]
-        distance_bounds[1] = q[self.hparams.x_idx] - self.hparams.x_lower_bound
-        distance_bounds[2] = self.hparams.y_upper_bound - q[self.hparams.y_idx] 
-        distance_bounds[3] = q[self.hparams.y_idx] - self.hparams.y_lower_bound
+        b = self.hparams.b
+        x = q[self.hparams.x_idx]
+        y = q[self.hparams.y_idx]
+        distance_bounds = casadi.SX.zeros(4)
+        distance_bounds[0] = self.hparams.x_upper_bound - x
+        distance_bounds[1] = x - self.hparams.x_lower_bound
+        distance_bounds[2] = self.hparams.y_upper_bound - y 
+        distance_bounds[3] = y - self.hparams.y_lower_bound
         for i in range(4):
             h_i[i] = distance_bounds[i]
 
@@ -105,15 +117,18 @@ class NMPC:
                 h_i[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
                         distance_vectors[i, self.hparams.y_idx]**2 - \
                         cbf_radius**2
+                
         return h_i
 
     def __h_i_dot(self, q, u):
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
+        theta = q[self.hparams.theta_idx]
         v = self.hparams.wheel_radius * 0.5 * (u[self.hparams.wr_idx] + u[self.hparams.wl_idx])
-        omega = (self.hparams.wheel_radius/self.hparams.wheel_separation)*(u[self.hparams.wr_idx]- u[self.hparams.wl_idx])
+        omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * (u[self.hparams.wr_idx] - u[self.hparams.wl_idx])
         return casadi.jacobian(self.__h_i(q), x) * self.__x_dot(q, v, omega) + \
-               casadi.jacobian(self.__h_i(q), y) * self.__y_dot(q, v, omega)        
+               casadi.jacobian(self.__h_i(q), y) * self.__y_dot(q, v, omega) + \
+               casadi.jacobian(self.__h_i(q), theta) * self.__theta_dot(omega) 
 
     
     def __create_acados_model(self) -> AcadosModel:
@@ -192,12 +207,12 @@ class NMPC:
 
         # Linear constraints on driving and steering velocity expressed in term of wheel angular velocities
         D_mat = np.zeros((self.nu, self.nu))
-        D_mat[0 , :self.nu] = self.hparams.wheel_radius * 0.5 * np.ones((1,2))
+        D_mat[0, :self.nu] = self.hparams.wheel_radius * 0.5
         D_mat[1, :self.nu] = (self.hparams.wheel_radius/self.hparams.wheel_separation) * np.array([1, -1])
         acados_constraints.D = D_mat
         acados_constraints.C = np.zeros((self.nu, self.nq))
-        acados_constraints.lg = np.array([self.hparams.driving_vel_min, self.hparams.steering_vel_max_neg])
-        acados_constraints.ug = np.array([self.hparams.driving_vel_max, self.hparams.steering_vel_max])
+        acados_constraints.lg = np.zeros(2)
+        acados_constraints.ug = np.zeros(2)
 
         # Nonlinear constraints (CBFs) (for both obstacles and configuration bounds):
         if self.hparams.n_obstacles > 0:

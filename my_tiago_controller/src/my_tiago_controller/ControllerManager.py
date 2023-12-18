@@ -216,7 +216,7 @@ class ControllerManager:
 
         self.data_lock.acquire()
         flag = self.update_configuration()
-        print(self.configuration)
+        # print(self.configuration)
         self.data_lock.release()
         
         if flag and (self.sensing or self.hparams.n_obstacles == 0):
@@ -245,6 +245,7 @@ class ControllerManager:
                     rospy.logwarn("NMPC solver failed")
                     rospy.logwarn('{}'.format(e))
                     self.control_input = np.zeros((self.nmpc_controller.nu))
+                
         else:
             if not(self.sensing) and self.hparams.n_obstacles > 0:
                 rospy.logwarn("Missing sensing info")
@@ -270,6 +271,19 @@ class ControllerManager:
                 self.update()
                 v, omega = self.publish_command()
 
+                h = np.zeros(4)
+                hdot = np.zeros(4)
+                h[0] = self.hparams.x_upper_bound - self.configuration.x
+                h[1] = self.configuration.x - self.hparams.x_lower_bound
+                h[2] = self.hparams.y_upper_bound - self.configuration.y 
+                h[3] = self.configuration.y - self.hparams.y_lower_bound
+                hdot[0] = - v * math.cos(self.configuration.theta) + omega * self.hparams.b * math.sin(self.configuration.theta)
+                hdot[1] = v * math.cos(self.configuration.theta) - omega * self.hparams.b * math.sin(self.configuration.theta)
+                hdot[2] = - v * math.sin(self.configuration.theta) - omega * self.hparams.b * math.cos(self.configuration.theta)
+                hdot[3] = v * math.cos(self.configuration.theta) + omega * self.hparams.b * math.sin(self.configuration.theta)
+                
+                print(hdot + self.hparams.gamma_cbf * h)
+                
                 # Saving data for plots
                 if self.hparams.log and (self.sensing or self.hparams.n_obstacles == 0):
                     self.configuration_history.append([
