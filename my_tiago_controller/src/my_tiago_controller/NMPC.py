@@ -86,25 +86,22 @@ class NMPC:
     def __theta_dot(self, omega):
         return omega
     
-    def __h_i(self, q):
+    def __h(self, q):
         n_obs = self.hparams.n_obstacles
         if n_obs > 0:
             p = casadi.SX.zeros((n_obs, 2))
-            h_i = casadi.SX.zeros(4 + n_obs)
+            h = casadi.SX.zeros(4 + n_obs)
         else:
-            h_i = casadi.SX.zeros(4)
+            h = casadi.SX.zeros(4)
 
         # Consider the robot distance from the bounds [ubx, lbx, uby, lby]
         b = self.hparams.b
-        x = q[self.hparams.x_idx]
-        y = q[self.hparams.y_idx]
-        distance_bounds = casadi.SX.zeros(4)
-        distance_bounds[0] = self.hparams.x_upper_bound - x
-        distance_bounds[1] = x - self.hparams.x_lower_bound
-        distance_bounds[2] = self.hparams.y_upper_bound - y 
-        distance_bounds[3] = y - self.hparams.y_lower_bound
-        for i in range(4):
-            h_i[i] = distance_bounds[i]
+        x_c = q[self.hparams.x_idx] - b * casadi.cos(q[self.hparams.theta_idx])
+        y_c = q[self.hparams.y_idx] - b * casadi.sin(q[self.hparams.theta_idx])
+        h[0] = self.hparams.x_upper_bound - x_c
+        h[1] = x_c - self.hparams.x_lower_bound
+        h[2] = self.hparams.y_upper_bound - y_c 
+        h[3] = y_c - self.hparams.y_lower_bound
 
         # Consider the robot distance from obstacles, if obstacles are present
         if n_obs > 0:
@@ -112,23 +109,24 @@ class NMPC:
             cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
             for i in range(n_obs):
                 p[i, :] = self.hparams.obstacles_position[i, :]
-                distance_vectors[i, self.hparams.x_idx] = q[self.hparams.x_idx] - p[i, self.hparams.x_idx]
-                distance_vectors[i, self.hparams.y_idx] = q[self.hparams.y_idx] - p[i, self.hparams.y_idx]
-                h_i[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
+                distance_vectors[i, self.hparams.x_idx] = x_c - p[i, self.hparams.x_idx]
+                distance_vectors[i, self.hparams.y_idx] = y_c - p[i, self.hparams.y_idx]
+                h[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
                         distance_vectors[i, self.hparams.y_idx]**2 - \
                         cbf_radius**2
                 
-        return h_i
+        return h
 
-    def __h_i_dot(self, q, u):
+    def __h_dot(self, q, u):
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
         theta = q[self.hparams.theta_idx]
         v = self.hparams.wheel_radius * 0.5 * (u[self.hparams.wr_idx] + u[self.hparams.wl_idx])
         omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * (u[self.hparams.wr_idx] - u[self.hparams.wl_idx])
-        return casadi.jacobian(self.__h_i(q), x) * self.__x_dot(q, v, omega) + \
-               casadi.jacobian(self.__h_i(q), y) * self.__y_dot(q, v, omega) + \
-               casadi.jacobian(self.__h_i(q), theta) * self.__theta_dot(omega) 
+
+        return casadi.jacobian(self.__h(q), x) * self.__x_dot(q, v, omega) + \
+               casadi.jacobian(self.__h(q), y) * self.__y_dot(q, v, omega) + \
+               casadi.jacobian(self.__h(q), theta) * self.__theta_dot(omega) 
 
     
     def __create_acados_model(self) -> AcadosModel:
@@ -148,7 +146,7 @@ class NMPC:
         acados_model.f_expl_expr = f_expl
 
         # CBF constraints:
-        con_h_expr = self.__h_i_dot(q, u) + self.hparams.gamma_cbf * self.__h_i(q)
+        con_h_expr = self.__h_dot(q, u) + self.hparams.gamma_cbf * self.__h(q)
         acados_model.con_h_expr = con_h_expr
 
         # Variables and params:

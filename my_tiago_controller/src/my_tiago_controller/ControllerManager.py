@@ -192,6 +192,7 @@ class ControllerManager:
         output_dict['Q_mat_weights'] = self.hparams.q
         output_dict['R_mat_weights'] = self.hparams.r
         output_dict['terminal_factor'] = self.hparams.q_factor
+        output_dict['offset_b'] = self.hparams.b
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -270,19 +271,6 @@ class ControllerManager:
  
                 self.update()
                 v, omega = self.publish_command()
-
-                h = np.zeros(4)
-                hdot = np.zeros(4)
-                h[0] = self.hparams.x_upper_bound - self.configuration.x
-                h[1] = self.configuration.x - self.hparams.x_lower_bound
-                h[2] = self.hparams.y_upper_bound - self.configuration.y 
-                h[3] = self.configuration.y - self.hparams.y_lower_bound
-                hdot[0] = - v * math.cos(self.configuration.theta) + omega * self.hparams.b * math.sin(self.configuration.theta)
-                hdot[1] = v * math.cos(self.configuration.theta) - omega * self.hparams.b * math.sin(self.configuration.theta)
-                hdot[2] = - v * math.sin(self.configuration.theta) - omega * self.hparams.b * math.cos(self.configuration.theta)
-                hdot[3] = v * math.cos(self.configuration.theta) + omega * self.hparams.b * math.sin(self.configuration.theta)
-                
-                print(hdot + self.hparams.gamma_cbf * h)
                 
                 # Saving data for plots
                 if self.hparams.log and (self.sensing or self.hparams.n_obstacles == 0):
