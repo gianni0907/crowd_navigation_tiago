@@ -89,9 +89,10 @@ class ControllerManager:
         # Init robot configuration
         if self.update_configuration():
             self.status = Status.READY
+            # Initialize target position to the current position
             self.target_position = np.array([self.configuration.x,
                                             self.configuration.y])
-            self.nmpc_controller.init(self.configuration)
+            self.nmpc_controller.init(self.configuration)      
 
     def publish_command(self):
         # Set wheel angular velocity commands
@@ -211,7 +212,6 @@ class ControllerManager:
         
         if self.hparams.n_obstacles > 0:
             if self.data_lock.acquire(False):
-                
                 self.crowd_motion_prediction_stamped_rt = self.crowd_motion_prediction_stamped
                 self.data_lock.release()
 

@@ -28,37 +28,13 @@ class NMPC:
         self.T = dt * self.N # [s]
 
         # Setup solver:
-        self.acados_ocp_solver = self.__create_acados_ocp_solver(self.N,self.T)
+        self.acados_ocp_solver = self.__create_acados_ocp_solver(self.N, self.T)
 
-    def init(self, x0: Configuration):
-        # lbx = np.array([self.hparams.x_lower_bound, self.hparams.y_lower_bound])
-        # ubx = np.array([self.hparams.x_upper_bound, self.hparams.y_upper_bound])   
-        if self.hparams.n_obstacles > 0:
-            lh = np.zeros(self.hparams.n_obstacles + 4)
-            uh = 10000*np.ones(self.hparams.n_obstacles + 4)
-        else:
-            lh = np.zeros(4)
-            uh = 10000*np.ones(4)
-
-        lg = np.array([self.hparams.driving_vel_min,
-                       self.hparams.steering_vel_max_neg])
-        
-        ug = np.array([self.hparams.driving_vel_max,
-                       self.hparams.steering_vel_max])
-        
-
+    def init(self, x0: Configuration): 
         for k in range(self.N):
-            self.acados_ocp_solver.set(k, 'x', np.array(x0.get_q()))
+            self.acados_ocp_solver.set(k, 'x', x0.get_q())
             self.acados_ocp_solver.set(k, 'u', np.zeros(self.nu))
-            self.acados_ocp_solver.constraints_set(k, 'lh', lh)
-            self.acados_ocp_solver.constraints_set(k, 'uh', uh)
-            self.acados_ocp_solver.constraints_set(k, 'lg', lg)
-            self.acados_ocp_solver.constraints_set(k, 'ug', ug)
-        self.acados_ocp_solver.set(self.N, 'x', np.array(x0.get_q()))
-
-        # for k in range(1, self.N):
-        #     self.acados_ocp_solver.constraints_set(k, 'lbx', lbx)
-        #     self.acados_ocp_solver.constraints_set(k, 'ubx', ubx)
+        self.acados_ocp_solver.set(self.N, 'x', x0.get_q())
 
     # Systems dynamics:
     def __f(self, x, u):
@@ -196,11 +172,6 @@ class NMPC:
         acados_constraints.lbu = np.array([self.hparams.w_max_neg, self.hparams.w_max_neg])
         acados_constraints.ubu = np.array([self.hparams.w_max, self.hparams.w_max])
         
-
-        # Linear inequality constraints on the state:
-        # acados_constraints.idxbx = np.array([self.hparams.x_idx, self.hparams.y_idx])
-        # acados_constraints.lbx = np.zeros(len(acados_constraints.idxbx))
-        # acados_constraints.ubx = np.zeros(len(acados_constraints.idxbx))
         acados_constraints.x0 = np.zeros(self.nq)
 
         # Linear constraints on driving and steering velocity expressed in term of wheel angular velocities
@@ -209,16 +180,18 @@ class NMPC:
         D_mat[1, :self.nu] = (self.hparams.wheel_radius/self.hparams.wheel_separation) * np.array([1, -1])
         acados_constraints.D = D_mat
         acados_constraints.C = np.zeros((self.nu, self.nq))
-        acados_constraints.lg = np.zeros(2)
-        acados_constraints.ug = np.zeros(2)
+        acados_constraints.lg = np.array([self.hparams.driving_vel_min,
+                                          self.hparams.steering_vel_max_neg])
+        acados_constraints.ug = np.array([self.hparams.driving_vel_max, 
+                                          self.hparams.steering_vel_max])
 
         # Nonlinear constraints (CBFs) (for both obstacles and configuration bounds):
         if self.hparams.n_obstacles > 0:
             acados_constraints.lh = np.zeros(self.hparams.n_obstacles + 4)
-            acados_constraints.uh = np.zeros(self.hparams.n_obstacles + 4)
+            acados_constraints.uh = 10000 * np.ones(self.hparams.n_obstacles + 4)
         else:
             acados_constraints.lh = np.zeros(4)
-            acados_constraints.uh = np.zeros(4)
+            acados_constraints.uh = 10000 * np.ones(4)
 
         return acados_constraints
     
