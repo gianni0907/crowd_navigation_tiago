@@ -13,20 +13,26 @@ class Hparams:
     # NMPC parameters
     controller_frequency = 40.0 # [Hz]
     N_horizon = 20
-    
-    # Velocity bounds reduction in case of real_robot
-    driving_bound_factor = 1.0
-    steering_bound_factor = 1.0
+
+    # Driving and steering acceleration limits
+    driving_acc_max = 0.5 # [m/s^2]
+    driving_acc_min = - driving_acc_max
+    steering_acc_max = 1.05 # [rad/s^2]
+    steering_acc_max_neg = - steering_acc_max
+
+    # Wheels acceleration limits
+    alpha_max = driving_acc_max / wheel_radius # [rad/s^2], 5,0761
+    alpha_min = - alpha_max
 
     # Driving and steering velocity limits
-    driving_vel_max = 1 * driving_bound_factor # [m/s]
+    driving_vel_max = 1 # [m/s]
     driving_vel_min = -0.2 # [m/s]
-    steering_vel_max = 1.05 * steering_bound_factor # [rad/s]
-    steering_vel_max_neg = -steering_vel_max
+    steering_vel_max = 1.05 # [rad/s]
+    steering_vel_max_neg = - steering_vel_max
     
-    # Input velocity limit for both left and right wheel
-    w_max = driving_vel_max / wheel_radius # [rad/s]
-    w_max_neg = -w_max
+    # Wheels velocity limits
+    w_max = driving_vel_max / wheel_radius # [rad/s], 10.1523
+    w_max_neg = - w_max
 
     # Configuration limits (only for cartesian position)
     x_lower_bound = -5 # [m]
@@ -38,18 +44,22 @@ class Hparams:
     x_idx = 0
     y_idx = 1
     theta_idx = 2
+    v_idx = 3
+    omega_idx = 4
     
     # Control input indices
-    wr_idx = 0
-    wl_idx = 1
+    alphar_idx = 0
+    alphal_idx = 1
 
     # Tolerance on the position error
     error_tol = 0.05
 
     # Cost function weights
-    q = 1e1 # position weights
-    r = 1e-2 # control input weights
-    q_factor = 1e1 # factor for the terminal position weights
+    p_weight = 1e1 # position weights
+    v_weight = 1e-2 # driving velocity weight
+    omega_weight = 1e-2 # steering velocity weight
+    u_weight = 1e-2 # input weights
+    terminal_factor = 1e1 # factor for the terminal state
 
     # Parameters for the CBF
     rho_cbf = 0.6 # the radius of the circle around the robot center

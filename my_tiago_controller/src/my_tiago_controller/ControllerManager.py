@@ -205,9 +205,9 @@ class ControllerManager:
     def update(self):
         q_ref = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
         for k in range(self.hparams.N_horizon):
-            q_ref[:self.nmpc_controller.nq - 1, k] = self.target_position
+            q_ref[:self.hparams.y_idx, k] = self.target_position
         u_ref = np.zeros((self.nmpc_controller.nu, self.hparams.N_horizon))
-        q_ref[:self.nmpc_controller.nq - 1, self.hparams.N_horizon] = self.target_position
+        q_ref[:self.hparams.y_idx, self.hparams.N_horizon] = self.target_position
         
         if self.hparams.n_obstacles > 0:
             if self.data_lock.acquire(False):
