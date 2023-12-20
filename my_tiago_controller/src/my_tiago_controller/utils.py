@@ -3,17 +3,19 @@ import math
 import my_tiago_msgs.msg
 import geometry_msgs.msg
 
-class Configuration:
-    def __init__(self, x, y, theta):
+class State:
+    def __init__(self, x, y, theta, v, omega):
         self.x = x
         self.y = y
         self.theta = theta
+        self.v = v
+        self.omega = omega
 
     def __repr__(self):
-        return '({}, {}, {})'.format(self.x, self.y, self.theta)
+        return '({}, {}, {}, {}, {})'.format(self.x, self.y, self.theta, self.v, self.omega)
     
-    def get_q(self):
-        return np.array([self.x, self.y, self.theta])
+    def get_state(self):
+        return np.array([self.x, self.y, self.theta, self.v, self.omega])
 
 class Position:
     def __init__(self, x, y):

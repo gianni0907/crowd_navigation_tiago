@@ -39,48 +39,59 @@ def plot_results(filename=None):
         )
 
     # Setup all the data
-    configurations = np.array(data['configurations'])
-    robot_center = np.empty((configurations.shape[0], 2))
-    inputs = np.array(data['inputs'])
-    predictions = np.array(data['predictions'])
-    velocities = np.array(data['velocities'])
-    targets = np.array(data['targets'])
-    control_bounds = np.array(data['control_bounds'])
-    x_bounds = np.array(data['x_bounds'])
-    y_bounds = np.array(data['y_bounds'])
-    v_bounds = np.array(data['v_bounds'])
-    omega_bounds = np.array(data['omega_bounds'])
-    n_obstacles = data['n_obstacles']
-    if n_obstacles > 0:
-        obstacles_position = np.array(data['humans_position'])
-    rho_cbf = data['rho_cbf']
-    ds_cbf = data['ds_cbf']
-    frequency = data['frequency']
+    states = np.array(data['states'])
     b = data['offset_b']
+    configurations = states[:, :3]
+    driving_velocities = states[:, 3]
+    steering_velocities = states[:, 4]
+    robot_center = np.empty((configurations.shape[0], 2))
     for i in range(configurations.shape[0]):
         robot_center[i, 0] = configurations[i, 0] - b * math.cos(configurations[i, 2])
         robot_center[i, 1] = configurations[i, 1] - b * math.sin(configurations[i, 2])
+    
+    predictions = np.array(data['predictions'])
+    inputs = np.array(data['wheels_accelerations'])
+    wheels_velocities = np.array(data['wheels_velocities'])
+    targets = np.array(data['targets'])
+
+    x_bounds = np.array(data['x_bounds'])
+    y_bounds = np.array(data['y_bounds'])
+    input_bounds = np.array(data['input_bounds'])
+    v_bounds = np.array(data['v_bounds'])
+    omega_bounds = np.array(data['omega_bounds'])
+    wheels_vel_bounds = np.array(data['wheels_vel_bounds'])
+
+    n_obstacles = data['n_obstacles']
+    if n_obstacles > 0:
+        obstacles_position = np.array(data['obstacles_position'])
+
+    rho_cbf = data['rho_cbf']
+    ds_cbf = data['ds_cbf']
+    frequency = data['frequency']
+
     shooting_nodes = inputs.shape[0]
     t = inputs[:, 2]
 
     # Figure to plot velocities
     vel_fig, axs = plt.subplots(3, 2, figsize=(16, 8))
 
-    axs[0, 0].plot(t, inputs[:, 0], label='$\omega_r$')
-    axs[0, 0].plot(t, inputs[:, 1], label='$\omega_l$')
-    axs[1, 0].plot(t, velocities[:, 0], label='$v$')
-    axs[2, 0].plot(t, velocities[:, 1], label='$\omega$')
-    axs[0, 1].plot(t, targets[:, 0] - configurations[:, 0], label='$x$')
-    axs[1, 1].plot(t, targets[:, 1] - configurations[:, 1], label='$y$')
+    axs[0, 0].plot(t, wheels_velocities[:, 0], label='$\omega_r$')
+    axs[0, 0].plot(t, wheels_velocities[:, 1], label='$\omega_l$')
+    axs[1, 0].plot(t, driving_velocities[:], label='$v$')
+    axs[2, 0].plot(t, steering_velocities[:], label='$\omega$')
+    axs[0, 1].plot(t, configurations[:, 0], label='$x$')
+    axs[0, 1].plot(t, targets[:, 0], label='$x_g$')
+    axs[1, 1].plot(t, configurations[:, 1], label='$y$')
+    axs[1, 1].plot(t, targets[:, 1], label="$y_g$")
     axs[2, 1].plot(t, configurations[:, 2], label='$\theta$')
 
     axs[0, 0].set_title('wheels angular velocity')
     axs[0, 0].set_xlabel("$t \quad [s]$")
     axs[0, 0].set_ylabel('$[rad/s]$')
-    axs[0, 0].legend(loc='upper right')
-    axs[0, 0].hlines(control_bounds[0], t[0], t[-1], color='red', linestyle='--')
-    axs[0, 0].hlines(control_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    axs[0, 0].set_ylim([-1 + control_bounds[0], 1 + control_bounds[1]])
+    axs[0, 0].legend(loc='upper left')
+    axs[0, 0].hlines(wheels_vel_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    axs[0, 0].hlines(wheels_vel_bounds[1], t[0], t[-1], color='red', linestyle="--")
+    axs[0, 0].set_ylim([-1 + wheels_vel_bounds[0], 1 + wheels_vel_bounds[1]])
     axs[0, 0].set_xlim([t[0], t[-1]])
     axs[0, 0].grid(True)
 
@@ -102,18 +113,20 @@ def plot_results(filename=None):
     axs[2, 0].set_xlim([t[0], t[-1]])
     axs[2, 0].grid(True)
 
-    axs[0, 1].set_title('$e_x = x_g - x$')
+    axs[0, 1].set_title('$x-position$')
     axs[0, 1].set_xlabel('$t \quad [s]$')
     axs[0, 1].set_ylabel('$[m]$')
+    axs[0, 1].legend(loc='upper left')
     axs[0, 1].hlines(x_bounds[0], t[0], t[-1], color='red', linestyle='--')
     axs[0, 1].hlines(x_bounds[1], t[0], t[-1], color='red', linestyle='--')
     axs[0, 1].set_ylim([-1 + x_bounds[0], 1 + x_bounds[1]])
     axs[0, 1].set_xlim([t[0], t[-1]])
     axs[0, 1].grid(True)
 
-    axs[1, 1].set_title('$e_y = y_g - y$')
+    axs[1, 1].set_title('$y-position$')
     axs[1, 1].set_xlabel('$t \quad [s]$')
     axs[1, 1].set_ylabel('$[m]$')
+    axs[1, 1].legend(loc='upper left')
     axs[1, 1].hlines(y_bounds[0], t[0], t[-1], color='red', linestyle='--')
     axs[1, 1].hlines(y_bounds[1], t[0], t[-1], color='red', linestyle='--')
     axs[1, 1].set_ylim([-1 + y_bounds[0], 1 + y_bounds[1]])
@@ -138,6 +151,7 @@ def plot_results(filename=None):
     ax1 = plt.subplot(gs[0, 1])
     ax2 = plt.subplot(gs[1, 1])
     ax3 = plt.subplot(gs[2, 1])
+
     robot = ax_big.scatter([], [], s=100.0, marker='o',label='TIAGo', facecolors='none', edgecolors='blue')
     controlled_pt = ax_big.scatter([], [], marker='.', color='blue')
     robot_label = ax_big.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
@@ -154,10 +168,12 @@ def plot_results(filename=None):
         obstacles_label.append(ax_big.text(np.nan, np.nan, obstacles[i].get_label(), fontsize=8, ha='left', va='bottom'))
     traj_line, = ax_big.plot([], [], color='blue', label='trajectory')
     pred_line, = ax_big.plot([], [], color='green', label='prediction')
-    wr_line, = ax1.plot([], [], label='$\omega_r$')
-    wl_line, = ax1.plot([], [], label='$\omega_l$')
-    v_line, = ax2.plot([], [], label='$v$')
-    omega_line, = ax3.plot([], [], label='$\omega$')
+    ex_line, = ax1.plot([], [], label='$e_x$')
+    ey_line, = ax1.plot([], [], label='$e_y$')
+    wr_line, = ax2.plot([], [], label='$\omega_r$')
+    wl_line, = ax2.plot([], [], label='$\omega_l$')
+    alphar_line, = ax3.plot([], [], label='$\\alpha_r$')
+    alphal_line, = ax3.plot([], [], label='$\\alpha_l$')
 
     ax_big.set_title('Simulation')
     ax_big.set_xlabel("$x \quad [m]$")
@@ -171,31 +187,31 @@ def plot_results(filename=None):
     ax_big.set_aspect('equal', adjustable='box')
     ax_big.grid(True)
 
-    ax1.set_title('wheels angular velocity')
+    ax1.set_title('position errors')
     ax1.set_xlabel("$t \quad [s]$")
-    ax1.set_ylabel('$[rad/s]$')
-    ax1.legend(loc='upper right')
-    ax1.hlines(control_bounds[0], t[0], t[-1], color='red', linestyle='--')
-    ax1.hlines(control_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    ax1.set_ylim([-1 + control_bounds[0], 1 + control_bounds[1]])
+    ax1.set_ylabel('$[m]$')
+    ax1.legend(loc='upper left')
+    ax1.set_ylim([-1 + np.min([x_bounds[0], y_bounds[0]]), 1 + np.max([x_bounds[1], y_bounds[1]])])
     ax1.set_xlim([t[0], t[-1]])
     ax1.grid(True)
 
-    ax2.set_title('TIAGo driving velocity')
+    ax2.set_title('wheels velocities')
     ax2.set_xlabel("$t \quad [s]$")
-    ax2.set_ylabel('$[m/s]$')
-    ax2.hlines(v_bounds[0], t[0], t[-1], color='red', linestyle='--')
-    ax2.hlines(v_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    ax2.set_ylim([-1 + v_bounds[0], 1 + v_bounds[1]])
+    ax2.set_ylabel('$[rad/s]$')
+    ax2.legend(loc='upper left')
+    ax2.hlines(wheels_vel_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    ax2.hlines(wheels_vel_bounds[1], t[0], t[-1], color='red', linestyle="--")
+    ax2.set_ylim([-1 + wheels_vel_bounds[0], 1 + wheels_vel_bounds[1]])
     ax2.set_xlim([t[0], t[-1]])
     ax2.grid(True)
 
-    ax3.set_title('TIAGo steering velocity')
+    ax3.set_title('wheels accelerations')
     ax3.set_xlabel("$t \quad [s]$")
-    ax3.set_ylabel('$[rad/s]$')
-    ax3.hlines(omega_bounds[0], t[0], t[-1], color='red', linestyle='--')
-    ax3.hlines(omega_bounds[1], t[0], t[-1], color='red', linestyle="--")
-    ax3.set_ylim([-1 + omega_bounds[0], 1 + omega_bounds[1]])
+    ax3.set_ylabel('$[rad/s^2]$')
+    ax3.legend(loc='upper left')
+    ax3.hlines(input_bounds[0], t[0], t[-1], color='red', linestyle='--')
+    ax3.hlines(input_bounds[1], t[0], t[-1], color='red', linestyle="--")
+    ax3.set_ylim([-1 + input_bounds[0], 1 + input_bounds[1]])
     ax3.set_xlim([t[0], t[-1]])
     ax3.grid(True)
 
@@ -228,10 +244,12 @@ def plot_results(filename=None):
         current_prediction = predictions[frame, :, :]
         current_target = targets[frame, :]
 
-        wr_line.set_data(t[:frame + 1], inputs[:frame + 1, 0])
-        wl_line.set_data(t[:frame + 1], inputs[:frame + 1, 1])
-        v_line.set_data(t[:frame + 1], velocities[:frame + 1, 0])
-        omega_line.set_data(t[:frame + 1], velocities[:frame + 1, 1])
+        ex_line.set_data(t[:frame + 1], targets[:frame + 1, 0] - configurations[:frame + 1, 0])
+        ey_line.set_data(t[:frame + 1], targets[:frame + 1, 1] - configurations[:frame + 1, 1])
+        wr_line.set_data(t[:frame + 1], wheels_velocities[:frame + 1, 0])
+        wl_line.set_data(t[:frame + 1], wheels_velocities[:frame + 1, 1])
+        alphar_line.set_data(t[:frame + 1], inputs[:frame + 1, 0])
+        alphal_line.set_data(t[:frame + 1], inputs[:frame + 1, 1])
         traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
         pred_line.set_data(current_prediction[0, :], current_prediction[1, :])
 
@@ -252,11 +270,11 @@ def plot_results(filename=None):
 
         if n_obstacles > 0:
             return robot, robot_clearance, robot_label, goal, goal_label, \
-                    traj_line, pred_line, wr_line, wl_line, v_line, omega_line, \
+                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, pred_line, \
                     obstacles, obstacles_clearance, obstacles_label
         else:
             return robot, robot_clearance, robot_label, goal, goal_label, \
-                    traj_line, pred_line, wr_line, wl_line, v_line, omega_line,
+                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, pred_line
 
     sim_animation = FuncAnimation(sim_fig, update_sim,
                                   frames=shooting_nodes,
@@ -265,8 +283,8 @@ def plot_results(filename=None):
                                   interval=1/frequency*1000,
                                   repeat=False)
     plt.tight_layout()
-    sim_animation.save(save_sim_path, writer='ffmpeg', fps=frequency, dpi=80)
-    print("Simulation saved")
+    # sim_animation.save(save_sim_path, writer='ffmpeg', fps=frequency, dpi=80)
+    # print("Simulation saved")
     plt.show()
     return
 

@@ -12,6 +12,7 @@ class Hparams:
 
     # NMPC parameters
     controller_frequency = 40.0 # [Hz]
+    dt = 1 / controller_frequency # [s]
     N_horizon = 20
 
     # Driving and steering acceleration limits
@@ -21,7 +22,7 @@ class Hparams:
     steering_acc_max_neg = - steering_acc_max
 
     # Wheels acceleration limits
-    alpha_max = driving_acc_max / wheel_radius # [rad/s^2], 5,0761
+    alpha_max = 20 # driving_acc_max / wheel_radius # [rad/s^2], 5,0761
     alpha_min = - alpha_max
 
     # Driving and steering velocity limits
@@ -48,8 +49,8 @@ class Hparams:
     omega_idx = 4
     
     # Control input indices
-    alphar_idx = 0
-    alphal_idx = 1
+    r_wheel_idx = 0
+    l_wheel_idx = 1
 
     # Tolerance on the position error
     error_tol = 0.05
@@ -59,7 +60,7 @@ class Hparams:
     v_weight = 1e-2 # driving velocity weight
     omega_weight = 1e-2 # steering velocity weight
     u_weight = 1e-2 # input weights
-    terminal_factor = 1e1 # factor for the terminal state
+    terminal_factor = 1e3 # factor for the terminal state
 
     # Parameters for the CBF
     rho_cbf = 0.6 # the radius of the circle around the robot center
