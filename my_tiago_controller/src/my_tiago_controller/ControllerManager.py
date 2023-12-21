@@ -84,6 +84,7 @@ class ControllerManager:
             self.wheels_acc_history = []
             self.target_history = []
             self.obstacles_history = []
+            self.residuals = []
 
     def init(self):
         # Init robot state
@@ -212,6 +213,7 @@ class ControllerManager:
         output_dict['input_weight'] = self.hparams.u_weight
         output_dict['terminal_factor'] = self.hparams.terminal_factor
         output_dict['offset_b'] = self.hparams.b
+        output_dict['residuals'] = self.residuals
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -328,6 +330,7 @@ class ControllerManager:
                         self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
 
                     self.prediction_history.append(predicted_trajectory.tolist())
+                    self.residuals.append(self.nmpc_controller.acados_ocp_solver.get_stats('residuals').tolist())
                     
                     if self.hparams.n_obstacles > 0:
                         first_predictions = []
@@ -341,7 +344,7 @@ class ControllerManager:
 
                 final_time = rospy.get_time()        
                 deltat = final_time - init_time
-                if deltat > 1/(2*self.hparams.controller_frequency):
+                if deltat > 1 / (2 * self.hparams.controller_frequency):
                     print(f"Iteration time {deltat} at instant {time}")
 
                 rate.sleep()
