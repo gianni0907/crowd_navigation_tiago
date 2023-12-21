@@ -22,7 +22,7 @@ class Hparams:
     steering_acc_max_neg = - steering_acc_max
 
     # Wheels acceleration limits
-    alpha_max = driving_acc_max / wheel_radius # [rad/s^2], 5,0761
+    alpha_max = 20 # driving_acc_max / wheel_radius # [rad/s^2], 5,0761
     alpha_min = - alpha_max
 
     # Driving and steering velocity limits
