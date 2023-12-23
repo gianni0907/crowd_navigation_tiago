@@ -8,7 +8,7 @@ class Hparams:
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
-    b = 0.0 # [m]
+    b = 0.1 # [m]
 
     # NMPC parameters
     controller_frequency = 40.0 # [Hz]
@@ -20,7 +20,7 @@ class Hparams:
 
     # Driving and steering velocity limits
     driving_vel_max = 1 * driving_bound_factor # [m/s]
-    driving_vel_min = -0.2 # [m/s]
+    driving_vel_min = - 0.2 # [m/s]
     steering_vel_max = 1.05 * steering_bound_factor # [rad/s]
     steering_vel_max_neg = -steering_vel_max
     

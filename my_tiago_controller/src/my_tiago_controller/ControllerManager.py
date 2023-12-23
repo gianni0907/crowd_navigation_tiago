@@ -25,6 +25,10 @@ class ControllerManager:
         self.status = Status.WAITING # WAITING for the initial robot configuration
         self.sensing = False
 
+        # counter for the angle unwrapping
+        self.k = 0
+        self.previous_theta = 0.0
+        
         # NMPC:
         self.nmpc_controller = NMPC(self.hparams)
 
@@ -133,14 +137,24 @@ class ControllerManager:
 
     def set_from_tf_transform(self, transform):
         q = transform.transform.rotation
-        self.configuration.theta = math.atan2(
+        theta = math.atan2(
             2.0 * (q.w * q.z + q.x * q.y),
             1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         )
-        # if self.configuration.theta > 0:
-        #     self.configuration.theta -= 2*math.pi
-        self.configuration.x = transform.transform.translation.x + self.hparams.b * math.cos(self.configuration.theta)
-        self.configuration.y = transform.transform.translation.y + self.hparams.b * math.sin(self.configuration.theta)
+
+        product = self.previous_theta * theta
+        if product < - 8:
+            # passing through pi [rad]
+            if theta > 0.0:
+                # from negative angle to positive angle
+                self.k -= 1
+            elif theta < 0.0:
+                # from positive angle to negative angle
+                self.k += 1
+        self.previous_theta = theta
+        self.configuration.theta = theta + self.k * 2 * math.pi
+        self.configuration.x = transform.transform.translation.x + self.hparams.b * casadi.cos(self.configuration.theta)
+        self.configuration.y = transform.transform.translation.y + self.hparams.b * casadi.sin(self.configuration.theta)
 
     def update_configuration(self):
         try:
