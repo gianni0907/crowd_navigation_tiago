@@ -65,6 +65,7 @@ def plot_results(filename=None):
     if n_obstacles > 0:
         obstacles_position = np.array(data['obstacles_position'])
 
+    N_horizon = data['N_horizon']
     rho_cbf = data['rho_cbf']
     ds_cbf = data['ds_cbf']
     frequency = data['frequency']
@@ -241,7 +242,7 @@ def plot_results(filename=None):
             return robot, robot_clearance, robot_label, goal, goal_label,
 
     def update_sim(frame):
-        current_prediction = predictions[frame, :, :]
+        current_prediction = predictions[frame, :, :N_horizon]
         current_target = targets[frame, :]
 
         ex_line.set_data(t[:frame + 1], targets[:frame + 1, 0] - configurations[:frame + 1, 0])

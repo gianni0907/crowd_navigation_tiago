@@ -25,6 +25,10 @@ class ControllerManager:
         self.status = Status.WAITING # WAITING for the initial robot configuration
         self.sensing = False
 
+        # counter for the angle unwrapping
+        self.k = 0
+        self.previous_theta = 0.0
+
         # NMPC:
         self.nmpc_controller = NMPC(self.hparams)
 
@@ -142,10 +146,22 @@ class ControllerManager:
 
     def set_from_tf_transform(self, transform):
         q = transform.transform.rotation
-        self.state.theta = math.atan2(
+        theta = math.atan2(
             2.0 * (q.w * q.z + q.x * q.y),
             1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         )
+        
+        product = self.previous_theta * theta
+        if product < - 8:
+            # passing through pi [rad]
+            if theta > 0.0:
+                # from negative angle to positive angle
+                self.k -= 1
+            elif theta < 0.0:
+                # from positive angle to negative angle
+                self.k += 1
+        self.previous_theta = theta
+        self.state.theta = theta + self.k * 2 * math.pi
         self.state.x = transform.transform.translation.x + self.hparams.b * math.cos(self.state.theta)
         self.state.y = transform.transform.translation.y + self.hparams.b * math.sin(self.state.theta)
 
@@ -237,7 +253,6 @@ class ControllerManager:
 
         self.data_lock.acquire()
         flag = self.update_state()
-        # print(self.state)
         self.data_lock.release()
         
         if flag and (self.sensing or self.hparams.n_obstacles == 0) and self.status == Status.MOVING:
@@ -323,11 +338,12 @@ class ControllerManager:
                         self.target_position[self.hparams.y_idx],
                         time
                     ])
-                    predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
+                    predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+2))
                     for i in range(self.hparams.N_horizon):
                         predicted_trajectory[:, i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')
                     predicted_trajectory[:, self.hparams.N_horizon] = \
                         self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
+                    predicted_trajectory[:, self.hparams.N_horizon + 1] = time
 
                     self.prediction_history.append(predicted_trajectory.tolist())
                     self.residuals.append(self.nmpc_controller.acados_ocp_solver.get_stats('residuals').tolist())

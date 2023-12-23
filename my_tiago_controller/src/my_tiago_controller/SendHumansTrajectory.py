@@ -35,11 +35,11 @@ def main():
                             Position(-1.0, 2.3),
                             Position(-2.0, -1.0),
                             Position(4.5, 1.0)]) # initial position of the obstacles
-    positions_f = np.array([Position(1.0, -1.0),
-                            Position(3.0, 3.0),
-                            Position(-1.5, -2.0),
-                            Position(2.0, -2.0),
-                            Position(3.0, -2.0)]) # final position of the obstacles
+    positions_f = np.array([Position(2.0, 2.0),
+                            Position(2.0, -0.5),
+                            Position(-1.0, 2.3),
+                            Position(-2.0, -1.0),
+                            Position(4.5, 1.0)]) # final position of the obstacles
     n_steps = 150 # number of steps to go from init to final positions (and vice-versa)
     trajectories = CrowdMotionPrediction()
 

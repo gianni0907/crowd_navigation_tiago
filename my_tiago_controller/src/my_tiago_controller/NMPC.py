@@ -134,8 +134,8 @@ class NMPC:
         acados_model.f_expl_expr = f_expl
 
         # CBF constraints:
-        # con_h_expr = self.__h_dot(q) + self.hparams.gamma_cbf * self.__h(q)
-        # acados_model.con_h_expr = con_h_expr
+        con_h_expr = self.__h_dot(q) + self.hparams.gamma_cbf * self.__h(q)
+        acados_model.con_h_expr = con_h_expr
 
         # Variables and params:
         acados_model.x = q
@@ -211,12 +211,12 @@ class NMPC:
                                           self.hparams.steering_acc_max])
 
         # Nonlinear constraints (CBFs) (for both obstacles and configuration bounds):
-        # if self.hparams.n_obstacles > 0:
-        #     acados_constraints.lh = np.zeros(self.hparams.n_obstacles + 4)
-        #     acados_constraints.uh = 10000 * np.ones(self.hparams.n_obstacles + 4)
-        # else:
-        #     acados_constraints.lh = np.zeros(4)
-        #     acados_constraints.uh = 10000 * np.ones(4) 
+        if self.hparams.n_obstacles > 0:
+            acados_constraints.lh = np.zeros(self.hparams.n_obstacles + 4)
+            acados_constraints.uh = 10000 * np.ones(self.hparams.n_obstacles + 4)
+        else:
+            acados_constraints.lh = np.zeros(4)
+            acados_constraints.uh = 10000 * np.ones(4) 
 
         return acados_constraints
     
