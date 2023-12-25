@@ -98,6 +98,19 @@ class ControllerManager:
                                             self.state.y])
             self.nmpc_controller.init(self.state)
 
+    def saturate_velocities(self, v, omega):
+        if v > 0.95 * self.hparams.driving_vel_max:
+            v = 0.95 * self.hparams.driving_vel_max
+        elif v < 0.95 * self.hparams.driving_vel_min:
+            v = 0.95 * self.hparams.driving_vel_min
+
+        if omega > 0.95 * self.hparams.steering_vel_max:
+            omega = 0.95 * self.hparams.steering_vel_max
+        elif omega < 0.95 * self.hparams.steering_vel_max_neg:
+            omega = 0.95 * self.hparams.steering_vel_max_neg
+
+        return v, omega
+
     def publish_command(self):
         """
         The NMPC solver returns wheels accelerations as control input
@@ -117,6 +130,7 @@ class ControllerManager:
             # Integrate to get the new wheels velocity
             v = self.state.v + v_dot * dt
             omega = self.state.omega + omega_dot * dt
+            # v, omega = self.saturate_velocities(v, omega)
         else:
             v = 0.0
             omega = 0.0
