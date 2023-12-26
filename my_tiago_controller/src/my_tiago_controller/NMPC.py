@@ -104,17 +104,21 @@ class NMPC:
                 h[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
                         distance_vectors[i, self.hparams.y_idx]**2 - \
                         cbf_radius**2
-                
+
         return h
 
-    def __h_dot(self, q):
+    def __h_dot(self, q, u):
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
         theta = q[self.hparams.theta_idx]
+        v = q[self.hparams.v_idx]
+        omega = q[self.hparams.omega_idx]
 
         return casadi.jacobian(self.__h(q), x) * self.__x_dot(q) + \
                casadi.jacobian(self.__h(q), y) * self.__y_dot(q) + \
-               casadi.jacobian(self.__h(q), theta) * self.__theta_dot(q) 
+               casadi.jacobian(self.__h(q), theta) * self.__theta_dot(q) + \
+               casadi.jacobian(self.__h(q), v) * self.__v_dot(u) + \
+               casadi.jacobian(self.__h(q), omega) * self.__omega_dot(u)
 
     
     def __create_acados_model(self) -> AcadosModel:
@@ -134,7 +138,7 @@ class NMPC:
         acados_model.f_expl_expr = f_expl
 
         # CBF constraints:
-        con_h_expr = self.__h_dot(q) + self.hparams.gamma_cbf * self.__h(q)
+        con_h_expr = self.__h_dot(q, u) + self.hparams.gamma_cbf * self.__h(q)
         acados_model.con_h_expr = con_h_expr
 
         # Variables and params:
@@ -198,7 +202,7 @@ class NMPC:
         C_mat[:2, 4] = self.hparams.wheel_separation / (2 * self.hparams.wheel_radius) * np.array([1, -1])
         D_mat = np.zeros((4, self.nu))
         D_mat[2, :] = self.hparams.wheel_radius * 0.5
-        D_mat[3, :] = (self.hparams.wheel_radius/self.hparams.wheel_separation) * np.array([1, -1])
+        D_mat[3, :] = (self.hparams.wheel_radius / self.hparams.wheel_separation) * np.array([1, -1])
         acados_constraints.D = D_mat
         acados_constraints.C = C_mat
         acados_constraints.lg = np.array([self.hparams.w_max_neg,
