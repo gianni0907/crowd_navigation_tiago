@@ -268,7 +268,7 @@ class ControllerManager:
         self.data_lock.acquire()
         flag = self.update_state()
         self.data_lock.release()
-        
+
         if flag and (self.sensing or self.hparams.n_obstacles == 0) and self.status == Status.MOVING:
             # Compute the position error
             error = np.array([self.target_position[self.hparams.x_idx] - self.state.x, 

@@ -32,7 +32,7 @@ class Hparams:
     steering_vel_max_neg = - steering_vel_max
     
     # Wheels velocity limits
-    w_max = driving_vel_max / wheel_radius # [rad/s], 10.1523
+    w_max = 1.05 * driving_vel_max / wheel_radius # [rad/s], 10.1523
     w_max_neg = - w_max
 
     # Configuration limits (only for cartesian position)
@@ -65,7 +65,7 @@ class Hparams:
     # Parameters for the CBF
     rho_cbf = 0.6 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
-    gamma_cbf = 0.5 # in (0,1], hyperparameter for cbf constraint
+    gamma_cbf = 1.0 # in (0,1], hyperparameter for cbf constraint
     n_obstacles = 0 # number of obstacles, for now static obstacles
     obstacles_position = np.array([[2.0, 2.0],
                                    [2.0, -0.5],
