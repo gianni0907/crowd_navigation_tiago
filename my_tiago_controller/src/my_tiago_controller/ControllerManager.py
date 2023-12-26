@@ -210,13 +210,12 @@ class ControllerManager:
         
         if self.hparams.n_obstacles > 0:
             if self.data_lock.acquire(False):
-                
                 self.crowd_motion_prediction_stamped_rt = self.crowd_motion_prediction_stamped
                 self.data_lock.release()
 
         self.data_lock.acquire()
         flag = self.update_configuration()
-        print(self.configuration)
+        # print(self.configuration)
         self.data_lock.release()
         
         if flag and (self.sensing or self.hparams.n_obstacles == 0):
@@ -238,7 +237,8 @@ class ControllerManager:
                     self.nmpc_controller.update(
                         self.configuration,
                         q_ref,
-                        u_ref
+                        u_ref,
+                        self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction
                     )
                     self.control_input = self.nmpc_controller.get_command()
                 except Exception as e:

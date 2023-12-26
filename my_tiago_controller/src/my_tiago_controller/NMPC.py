@@ -244,10 +244,19 @@ class NMPC:
             self,
             configuration: Configuration,
             q_ref: np.array,
-            u_ref: np.array):
+            u_ref: np.array,
+            crowd_motion_prediction : CrowdMotionPrediction
+            ):
         # Set parameters
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
+            positions = [Position(0.0, 0.0) for _ in range(self.hparams.n_obstacles)]
+            velocities = [Velocity(0.0, 0.0) for _ in range(self.hparams.n_obstacles)]
+            for j in range(self.hparams.n_obstacles):
+                positions[j] = crowd_motion_prediction.motion_predictions[j].positions[k]
+                velocities[j] = crowd_motion_prediction.motion_predictions[j].velocities[k]    
+            self.acados_ocp_solver.set(k, 'p', np.concatenate((positions, velocities)))
+            print(self.acados_ocp_solver.get(k, 'p'))
         self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])
 
         # Solve NLP
