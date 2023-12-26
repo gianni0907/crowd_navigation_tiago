@@ -253,7 +253,8 @@ class ControllerManager:
                     self.nmpc_controller.update(
                         self.configuration,
                         q_ref,
-                        u_ref
+                        u_ref,
+                        self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction
                     )
                     self.control_input = self.nmpc_controller.get_command()
                 except Exception as e:
