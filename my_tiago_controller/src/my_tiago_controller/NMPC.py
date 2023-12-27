@@ -36,14 +36,15 @@ class NMPC:
             self.acados_ocp_solver.set(k, 'u', np.zeros(self.nu))
         self.acados_ocp_solver.set(self.N, 'x', x0.get_q())
 
+
     # Systems dynamics:
     def __f(self, x, u):
         w_r = u[self.hparams.wr_idx]
         w_l = u[self.hparams.wl_idx]
         wheel_radius = self.hparams.wheel_radius
         wheel_separation = self.hparams.wheel_separation
-        v = (wheel_radius/2)*(w_r+w_l)
-        omega = (wheel_radius/wheel_separation)*(w_r-w_l)
+        v = (wheel_radius / 2) * (w_r + w_l)
+        omega = (wheel_radius / wheel_separation) * (w_r - w_l)
 
         xdot = casadi.SX.zeros(self.nq)
         xdot[self.hparams.x_idx] = self.__x_dot(x,v,omega)
@@ -62,10 +63,9 @@ class NMPC:
     def __theta_dot(self, omega):
         return omega
     
-    def __h(self, q):
+    def __h(self, q, p):
         n_obs = self.hparams.n_obstacles
         if n_obs > 0:
-            p = casadi.SX.zeros((n_obs, 2))
             h = casadi.SX.zeros(4 + n_obs)
         else:
             h = casadi.SX.zeros(4)
@@ -74,35 +74,34 @@ class NMPC:
         b = self.hparams.b
         x_c = q[self.hparams.x_idx] - b * casadi.cos(q[self.hparams.theta_idx])
         y_c = q[self.hparams.y_idx] - b * casadi.sin(q[self.hparams.theta_idx])
-        h[0] = self.hparams.x_upper_bound - x_c
-        h[1] = x_c - self.hparams.x_lower_bound
-        h[2] = self.hparams.y_upper_bound - y_c 
-        h[3] = y_c - self.hparams.y_lower_bound
+        h[0] = self.hparams.x_upper_bound - x_c - self.hparams.rho_cbf
+        h[1] = x_c - self.hparams.x_lower_bound - self.hparams.rho_cbf
+        h[2] = self.hparams.y_upper_bound - y_c - self.hparams.rho_cbf
+        h[3] = y_c - self.hparams.y_lower_bound - self.hparams.rho_cbf
 
         # Consider the robot distance from obstacles, if obstacles are present
         if n_obs > 0:
             distance_vectors = casadi.SX.zeros((n_obs, 2))
             cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
             for i in range(n_obs):
-                p[i, :] = self.hparams.obstacles_position[i, :]
-                distance_vectors[i, self.hparams.x_idx] = x_c - p[i, self.hparams.x_idx]
-                distance_vectors[i, self.hparams.y_idx] = y_c - p[i, self.hparams.y_idx]
+                distance_vectors[i, self.hparams.x_idx] = x_c - p[i*4 + self.hparams.x_idx]
+                distance_vectors[i, self.hparams.y_idx] = y_c - p[i*4 + self.hparams.y_idx]
                 h[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
                         distance_vectors[i, self.hparams.y_idx]**2 - \
                         cbf_radius**2
                 
         return h
 
-    def __h_dot(self, q, u):
+    def __h_dot(self, q, u, p):
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
         theta = q[self.hparams.theta_idx]
         v = self.hparams.wheel_radius * 0.5 * (u[self.hparams.wr_idx] + u[self.hparams.wl_idx])
         omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * (u[self.hparams.wr_idx] - u[self.hparams.wl_idx])
 
-        return casadi.jacobian(self.__h(q), x) * self.__x_dot(q, v, omega) + \
-               casadi.jacobian(self.__h(q), y) * self.__y_dot(q, v, omega) + \
-               casadi.jacobian(self.__h(q), theta) * self.__theta_dot(omega) 
+        return casadi.jacobian(self.__h(q, p), x) * self.__x_dot(q, v, omega) + \
+               casadi.jacobian(self.__h(q, p), y) * self.__y_dot(q, v, omega) + \
+               casadi.jacobian(self.__h(q, p), theta) * self.__theta_dot(omega)
 
     
     def __create_acados_model(self) -> AcadosModel:
@@ -110,6 +109,7 @@ class NMPC:
         q = casadi.SX.sym('q', self.nq)
         qdot = casadi.SX.sym('qdot', self.nq)
         u = casadi.SX.sym('u', self.nu)
+        p = casadi.SX.sym('p', self.hparams.n_obstacles * 4)
         f_expl = self.__f(q, u)
         f_impl = qdot - f_expl
 
@@ -122,13 +122,14 @@ class NMPC:
         acados_model.f_expl_expr = f_expl
 
         # CBF constraints:
-        con_h_expr = self.__h_dot(q, u) + self.hparams.gamma_cbf * self.__h(q)
+        con_h_expr = self.__h_dot(q, u, p) + self.hparams.gamma_cbf * self.__h(q, p)
         acados_model.con_h_expr = con_h_expr
 
         # Variables and params:
         acados_model.x = q
         acados_model.xdot = qdot
         acados_model.u = u
+        acados_model.p = p
 
         return acados_model
     
@@ -211,6 +212,7 @@ class NMPC:
         acados_ocp = AcadosOcp()
         acados_ocp.model = self.__create_acados_model()
         acados_ocp.dims.N = N
+        acados_ocp.parameter_values = np.zeros((self.hparams.n_obstacles * 4,))
         acados_ocp.cost = self.__create_acados_cost()
         acados_ocp.constraints = self.__create_acados_constraints()
         acados_ocp.solver_options = self.__create_acados_solver_options(T)
@@ -236,13 +238,13 @@ class NMPC:
         # Set parameters
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
-            positions = [Position(0.0, 0.0) for _ in range(self.hparams.n_obstacles)]
-            velocities = [Velocity(0.0, 0.0) for _ in range(self.hparams.n_obstacles)]
+            humans_state = np.zeros((self.hparams.n_obstacles * 4))
             for j in range(self.hparams.n_obstacles):
-                positions[j] = crowd_motion_prediction.motion_predictions[j].positions[k]
-                velocities[j] = crowd_motion_prediction.motion_predictions[j].velocities[k]    
-            self.acados_ocp_solver.set(k, 'p', np.concatenate((positions, velocities)))
-            print(self.acados_ocp_solver.get(k, 'p'))
+                humans_state[j*4 + 0] = crowd_motion_prediction.motion_predictions[j].positions[k].x
+                humans_state[j*4 + 1] = crowd_motion_prediction.motion_predictions[j].positions[k].y
+                humans_state[j*4 + 2] = crowd_motion_prediction.motion_predictions[j].velocities[k].x
+                humans_state[j*4 + 3] = crowd_motion_prediction.motion_predictions[j].velocities[k].y
+            self.acados_ocp_solver.set(k, 'p', humans_state)
         self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])
 
         # Solve NLP

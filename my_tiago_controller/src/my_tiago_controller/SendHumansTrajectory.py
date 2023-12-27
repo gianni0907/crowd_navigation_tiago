@@ -50,6 +50,9 @@ def main():
         positions[n_steps:], velocities[n_steps:] = linear_trajectory(positions_f[i], positions_i[i], n_steps)
         trajectories.append(MotionPrediction(positions, velocities))
     
+    if n_humans == 0:
+        rospy.logwarn("No humans")
+        return
     # Service request:
     rospy.loginfo("Sending humans trajectories")
     send_humans_trajectory(CrowdMotionPrediction.to_message(trajectories))

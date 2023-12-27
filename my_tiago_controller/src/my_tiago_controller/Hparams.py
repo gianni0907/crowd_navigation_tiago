@@ -52,12 +52,7 @@ class Hparams:
     q_factor = 1e1 # factor for the terminal position weights
 
     # Parameters for the CBF
-    rho_cbf = 0.6 # the radius of the circle around the robot center
+    rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
-    gamma_cbf = 0.5 # in (0,1], hyperparameter for cbf constraint
-    n_obstacles = 0 # number of obstacles, for now static obstacles
-    obstacles_position = np.array([[2.0, 2.0],
-                                   [2.0, -0.5],
-                                   [-1.0, 2.3],
-                                   [-2.0, -1.0],
-                                   [4.5, 1.0]]) # fixed position of the obstacles (for NMPC, to be deleted)
+    gamma_cbf = 0.4 # in (0,1], hyperparameter for cbf constraint
+    n_obstacles = 5 # number of obstacles, for now static obstacles

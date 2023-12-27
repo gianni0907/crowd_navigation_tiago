@@ -223,7 +223,7 @@ class ControllerManager:
             q_ref[:self.nmpc_controller.nq - 1, k] = self.target_position
         u_ref = np.zeros((self.nmpc_controller.nu, self.hparams.N_horizon))
         q_ref[:self.nmpc_controller.nq - 1, self.hparams.N_horizon] = self.target_position
-        
+
         if self.hparams.n_obstacles > 0:
             if self.data_lock.acquire(False):
                 self.crowd_motion_prediction_stamped_rt = self.crowd_motion_prediction_stamped
@@ -231,7 +231,6 @@ class ControllerManager:
 
         self.data_lock.acquire()
         flag = self.update_configuration()
-        # print(self.configuration)
         self.data_lock.release()
         
         if flag and (self.sensing or self.hparams.n_obstacles == 0):
