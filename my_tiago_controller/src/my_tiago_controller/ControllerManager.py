@@ -18,11 +18,18 @@ import my_tiago_msgs.srv
 
 class ControllerManager:
     def __init__(self):
+        self.data_lock = threading.Lock()
+
         # Set the Hyperparameters
         self.hparams = Hparams()
         
         # Set status
+        # 3 possibilities:
+        #   WAITING for the initial robot configuration
+        #   READY to get the target position while the robot is at rest
+        #   MOVING towards the desired target position (the target position can be changed while moving)
         self.status = Status.WAITING # WAITING for the initial robot configuration
+        
         self.sensing = False
 
         # counter for the angle unwrapping
@@ -33,7 +40,7 @@ class ControllerManager:
         self.nmpc_controller = NMPC(self.hparams)
 
         self.configuration = Configuration(0.0, 0.0, 0.0)
-        self.data_lock = threading.Lock()
+        self.previous_time = 0.0
         self.crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.now(),
                                                                             'map',
                                                                             CrowdMotionPrediction())
@@ -153,8 +160,8 @@ class ControllerManager:
                 self.k += 1
         self.previous_theta = theta
         self.configuration.theta = theta + self.k * 2 * math.pi
-        self.configuration.x = transform.transform.translation.x + self.hparams.b * casadi.cos(self.configuration.theta)
-        self.configuration.y = transform.transform.translation.y + self.hparams.b * casadi.sin(self.configuration.theta)
+        self.configuration.x = transform.transform.translation.x + self.hparams.b * math.cos(self.configuration.theta)
+        self.configuration.y = transform.transform.translation.y + self.hparams.b * math.sin(self.configuration.theta)
 
     def update_configuration(self):
         try:
@@ -233,20 +240,17 @@ class ControllerManager:
         flag = self.update_configuration()
         self.data_lock.release()
         
-        if flag and (self.sensing or self.hparams.n_obstacles == 0):
+        if flag and (self.sensing or self.hparams.n_obstacles == 0) and self.status == Status.MOVING:
             # Compute the position error
-            error = np.array([self.target_position[self.hparams.x_idx] - \
-                            self.configuration.x,
-                            self.target_position[self.hparams.y_idx] - \
-                            self.configuration.y])
+            error = np.array([self.target_position[self.hparams.x_idx] - self.configuration.x,
+                              self.target_position[self.hparams.y_idx] - self.configuration.y])
             
             if norm(error) < self.hparams.error_tol:
                 self.control_input = np.zeros((self.nmpc_controller.nu))
-                if self.status == Status.MOVING:
-                    print("Stop configuration #######################")
-                    print(self.configuration)
-                    print("##########################################")
-                    self.status = Status.READY
+                print("Stop configuration #######################")
+                print(self.configuration)
+                print("##########################################")
+                self.status = Status.READY
             else:
                 try:
                     self.nmpc_controller.update(
@@ -260,11 +264,20 @@ class ControllerManager:
                     rospy.logwarn("NMPC solver failed")
                     rospy.logwarn('{}'.format(e))
                     self.control_input = np.zeros((self.nmpc_controller.nu))
+                    print("Stop configuration #######################")
+                    print(self.configuration)
+                    print("##########################################")
+                    self.status = Status.READY
                 
         else:
             if not(self.sensing) and self.hparams.n_obstacles > 0:
                 rospy.logwarn("Missing sensing info")
-            self.control_input = np.zeros((self.nmpc_controller.nu))        
+            self.control_input = np.zeros((self.nmpc_controller.nu))
+            if self.status == Status.MOVING:
+                print("Stop configuration #######################")
+                print(self.configuration)
+                print("##########################################")
+                self.status = Status.READY      
             
     def run(self):
         rate = rospy.Rate(self.hparams.controller_frequency)
