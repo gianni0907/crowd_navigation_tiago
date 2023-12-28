@@ -265,8 +265,8 @@ def plot_results(filename=None):
                                   interval=1/frequency*1000,
                                   repeat=False)
     plt.tight_layout()
-    sim_animation.save(save_sim_path, writer='ffmpeg', fps=frequency, dpi=80)
-    print("Simulation saved")
+    # sim_animation.save(save_sim_path, writer='ffmpeg', fps=frequency, dpi=80)
+    # print("Simulation saved")
     plt.show()
     return
 

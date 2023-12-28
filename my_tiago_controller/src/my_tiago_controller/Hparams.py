@@ -55,4 +55,9 @@ class Hparams:
     rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_cbf = 0.4 # in (0,1], hyperparameter for cbf constraint
-    n_obstacles = 5 # number of obstacles
+    n_obstacles = 3 # number of obstacles
+
+    # Parameters for the crowd prediction
+    innovation_threshold = 1
+    matching_threshold = 0.1
+    max_pred_time = 1
