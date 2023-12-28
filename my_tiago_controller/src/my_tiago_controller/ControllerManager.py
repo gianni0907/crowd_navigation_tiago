@@ -264,10 +264,9 @@ class ControllerManager:
                     rospy.logwarn("NMPC solver failed")
                     rospy.logwarn('{}'.format(e))
                     self.control_input = np.zeros((self.nmpc_controller.nu))
-                    print("Stop configuration #######################")
+                    print("Failure configuration ####################")
                     print(self.configuration)
                     print("##########################################")
-                    self.status = Status.READY
                 
         else:
             if not(self.sensing) and self.hparams.n_obstacles > 0:
