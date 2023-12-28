@@ -22,7 +22,11 @@ class ControllerManager:
         self.hparams = Hparams()
         
         # Set status
-        self.status = Status.WAITING # WAITING for the initial robot configuration
+        # 3 possibilities:
+        #   WAITING for the initial robot configuration
+        #   READY to get the target position while the robot is at rest
+        #   MOVING towards the desired target position (the target position can be changed while moving)
+        self.status = Status.WAITING
         self.sensing = False
 
         # counter for the angle unwrapping
@@ -276,7 +280,7 @@ class ControllerManager:
             
             if norm(error) < self.hparams.error_tol:
                 self.control_input = np.zeros((self.nmpc_controller.nu))
-                print("Stop state #######################")
+                print("Stop state ###############################")
                 print(self.state)
                 print("##########################################")
                 self.status = Status.READY
@@ -292,17 +296,16 @@ class ControllerManager:
                     rospy.logwarn("NMPC solver failed")
                     rospy.logwarn('{}'.format(e))
                     self.control_input = np.zeros((self.nmpc_controller.nu))
-                    print("Stop state #######################")
+                    print("Failure state ############################")
                     print(self.state)
                     print("##########################################")
-                    self.status = Status.READY
                 
         else:
             if not(self.sensing) and self.hparams.n_obstacles > 0:
                 rospy.logwarn("Missing sensing info")
             self.control_input = np.zeros((self.nmpc_controller.nu))
             if self.status == Status.MOVING:
-                print("Stop state #######################")
+                print("Stop state ###############################")
                 print(self.state)
                 print("##########################################")
                 self.status = Status.READY
@@ -315,7 +318,7 @@ class ControllerManager:
         # Waiting for initial state
         while self.status == Status.WAITING:
             self.init()
-        print("Initial state ********************")
+        print("Initial state ****************************")
         print(self.state)
         print("******************************************")
 
