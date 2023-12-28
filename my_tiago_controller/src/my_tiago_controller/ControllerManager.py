@@ -28,7 +28,7 @@ class ControllerManager:
         #   WAITING for the initial robot configuration
         #   READY to get the target position while the robot is at rest
         #   MOVING towards the desired target position (the target position can be changed while moving)
-        self.status = Status.WAITING # WAITING for the initial robot configuration
+        self.status = Status.WAITING
         
         self.sensing = False
 
