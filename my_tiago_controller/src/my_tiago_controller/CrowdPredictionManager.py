@@ -123,7 +123,7 @@ class CrowdPredictionManager:
                 rate.sleep()
                 continue
             elif self.status == Status.MOVING:
-
+                continue
             # Reset crowd_motion_prediction message
             crowd_motion_prediction = CrowdMotionPrediction()
             
