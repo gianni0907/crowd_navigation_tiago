@@ -26,14 +26,6 @@ class Kalman:
         if self.print_info:
             print(f"State covariance: {self.Vk}")
             print(f"Output covariance: {self.Wk}")
-
-    def predict_new_state(self, xk, dt):
-        F = np.array([[1.0, 0.0, dt, 0.0],
-                      [0.0, 1.0, 0.0, dt],
-                      [0.0, 0.0, 1.0, 0.0],
-                      [0.0, 0.0, 0.0, 1.0]])
-        xkp1 = np.matmul(F, xk)
-        return xkp1
     
     def predict(self, time):
         dt = time - self.t_start

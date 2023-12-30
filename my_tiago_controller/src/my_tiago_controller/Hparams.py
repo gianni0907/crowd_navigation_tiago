@@ -3,7 +3,8 @@ import numpy as np
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    logfile = 'test.json'
+    controller_file = 'controller_p1_diffgamma.json'
+    prediction_file = 'prediction_p1_diffgamma.json'
 
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
@@ -54,8 +55,9 @@ class Hparams:
     # Parameters for the CBF
     rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
-    gamma_cbf = 0.4 # in (0,1], hyperparameter for cbf constraint
-    n_obstacles = 3 # number of obstacles
+    gamma_actor = 0.5 # in (0,1], hyperparameter for cbf constraint associated to actors
+    gamma_bound = 0.8 # in (0,1], hyperparameter for cbf constraint associated to bounds
+    n_actors = 3 # number of actors
 
     # Parameters for the crowd prediction
     innovation_threshold = 1

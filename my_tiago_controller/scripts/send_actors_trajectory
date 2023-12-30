@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+
+import my_tiago_controller.SendActorsTrajectory as SendActorsTrajectory
+if __name__ == '__main__':
+    SendActorsTrajectory.main()

@@ -22,7 +22,7 @@ class FSM():
         self.T_bar = self.hparams.max_pred_time
         self.next_state = FSMStates.IDLE
         self.state = FSMStates.IDLE
-        self.last_valid_measurement = (np.zeros(), 0)
+        self.last_valid_measurement = (np.zeros(2), 0)
         self.reset = False
 
     def idle_state(self, time, measure):
@@ -33,7 +33,7 @@ class FSM():
             self.current_estimate = np.empty(4)
             self.previous_estimate = np.empty(4)
             estimate = self.current_estimate
-
+            
         if measure[0] != 0 or measure[1] != 0:
             estimate = np.array([measure[0], measure[1], 0.0, 0.0])
             self.next_state = FSMStates.START
@@ -101,7 +101,7 @@ class FSM():
 
         return estimate
     
-    def choose_state(self, time, measure):
+    def update(self, time, measure):
         self.state = self.next_state
         self.previous_estimate = np.copy(self.current_estimate)
 

@@ -5,3 +5,6 @@ class FSMStates(Enum):
     START = 1
     ACTIVE = 2
     HOLD = 3
+
+    def print(state):
+        return f'{state}'
