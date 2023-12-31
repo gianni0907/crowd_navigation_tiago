@@ -1,5 +1,0 @@
-<launch>
-  <group ns="my_tiago_controller">
-      <node pkg="my_tiago_controller" type="send_humans_trajectory" name="send_humans_trajectory" output="screen" />
-  </group>
-</launch>

@@ -30,7 +30,7 @@ catkin_install_python(PROGRAMS
   scripts/logger
   scripts/plotter
   scripts/send_desired_target_position
-  scripts/send_humans_trajectory
+  scripts/send_actors_trajectory
   scripts/crowd_prediction
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
