@@ -64,7 +64,6 @@ class NMPC:
         return omega
     
     def __h(self, q, p):
-
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
         theta = q[self.hparams.theta_idx]
@@ -104,9 +103,8 @@ class NMPC:
         v = self.hparams.wheel_radius * 0.5 * (u[self.hparams.wr_idx] + u[self.hparams.wl_idx])
         omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * (u[self.hparams.wr_idx] - u[self.hparams.wl_idx])
         b = self.hparams.b
-        xdot = self.__x_dot(q, v, omega)
-        ydot = self.__y_dot(q, v, omega)
-        thetadot = self.__theta_dot(omega)
+
+        # Set the coordinates of the robot center
         x_c = x - b * casadi.cos(theta)
         y_c = y - b * casadi.sin(theta)
 
@@ -116,22 +114,69 @@ class NMPC:
         else:
             hdot = casadi.SX.zeros(4)
 
-        hdot[0] = - xdot - b * casadi.sin(theta) * thetadot
-        hdot[1] = xdot + b * casadi.sin(theta) * thetadot
-        hdot[2] = - ydot + b * casadi.cos(theta) * thetadot
-        hdot[3] = ydot - b * casadi.cos(theta) * thetadot
-        if n_actors > 0:
-            for i in range(n_actors):
-                dhdx = 2 * (x_c - p[i*4 + self.hparams.x_idx])
-                dhdy = 2 * (y_c - p[i*4 + self.hparams.y_idx])
-                dhdth = b * dhdx * casadi.sin(theta) - b * dhdy * casadi.cos(theta)
-                dhdpx = - dhdx
-                dhdpy = - dhdy
-                hdot[i + 4] = dhdx * xdot + dhdy * ydot + dhdth * thetadot
-                            #   dhdpx * p[i*4 + 2 + self.hparams.x_idx] + dhdpy * p[i*4 + 2 + self.hparams.y_idx]
-
+        hdot[0] = - v * casadi.cos(theta)
+        hdot[1] = v * casadi.cos(theta)
+        hdot[2] = - v * casadi.sin(theta)
+        hdot[3] = v * casadi.sin(theta)
+        for i in range(n_actors):
+            s1 = 2 * (x_c - p[i*4 + self.hparams.x_idx])
+            s2 = 2 * (y_c - p[i*4 + self.hparams.y_idx])
+            hdot[i + 4] = s1 * (v * casadi.cos(theta) - p[i*4 + 2 + self.hparams.x_idx]) + \
+                          s2 * (v * casadi.sin(theta) - p[i*4 + 2 + self.hparams.y_idx])
         return hdot
 
+    def __h_b(self, q, p):
+        x = q[self.hparams.x_idx]
+        y = q[self.hparams.y_idx]
+
+        n_actors = self.hparams.n_actors
+        if n_actors > 0:
+            h = casadi.SX.zeros(4 + n_actors)
+        else:
+            h = casadi.SX.zeros(4)
+
+        h[0] = self.hparams.x_upper_bound - x - self.hparams.rho_cbf
+        h[1] = x - self.hparams.x_lower_bound - self.hparams.rho_cbf
+        h[2] = self.hparams.y_upper_bound - y - self.hparams.rho_cbf
+        h[3] = y - self.hparams.y_lower_bound - self.hparams.rho_cbf
+
+        # Consider the robot distance from actors, if actors are present
+        if n_actors > 0:
+            distance_vectors = casadi.SX.zeros((n_actors, 2))
+            cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
+            for i in range(n_actors):
+                distance_vectors[i, self.hparams.x_idx] = x - p[i*4 + self.hparams.x_idx]
+                distance_vectors[i, self.hparams.y_idx] = y - p[i*4 + self.hparams.y_idx]
+                h[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
+                        distance_vectors[i, self.hparams.y_idx]**2 - \
+                        cbf_radius**2
+                
+        return h
+
+    def __h_dot_b(self, q, u, p):
+        x = q[self.hparams.x_idx]
+        y = q[self.hparams.y_idx]
+        theta = q[self.hparams.theta_idx]
+        v = self.hparams.wheel_radius * 0.5 * (u[self.hparams.wr_idx] + u[self.hparams.wl_idx])
+        omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * (u[self.hparams.wr_idx] - u[self.hparams.wl_idx])
+        b = self.hparams.b
+
+        n_actors = self.hparams.n_actors
+        if n_actors > 0:
+            hdot = casadi.SX.zeros(4 + n_actors)
+        else:
+            hdot = casadi.SX.zeros(4)
+
+        hdot[0] = - v * casadi.cos(theta) + omega * b * casadi.sin(theta)
+        hdot[1] = v * casadi.cos(theta) - omega * b * casadi.sin(theta)
+        hdot[2] = - v * casadi.sin(theta) - omega * b * casadi.cos(theta)
+        hdot[3] = v * casadi.sin(theta) + omega * b * casadi.cos(theta)
+        for i in range(n_actors):
+            s1 = 2 * (x - p[i*4 + self.hparams.x_idx])
+            s2 = 2 * (y - p[i*4 + self.hparams.y_idx])
+            hdot[i + 4] = s1 * (v * casadi.cos(theta) - omega * b * casadi.sin(theta) - p[i*4 + 2 + self.hparams.x_idx]) + \
+                          s2 * (v * casadi.sin(theta) + omega * b * casadi.cos(theta) - p[i*4 + 2 + self.hparams.y_idx])
+        return hdot
     
     def __create_acados_model(self) -> AcadosModel:
         # Setup CasADi expressions:
@@ -156,8 +201,16 @@ class NMPC:
         np.fill_diagonal(gamma_mat[:4, :4], self.hparams.gamma_bound)
         if n_actors > 0:
             np.fill_diagonal(gamma_mat[4:, 4:], self.hparams.gamma_actor)
-        con_h_expr = self.__h_dot(q, u, p) + np.matmul(gamma_mat, self.__h(q, p))
+
+        # if you consider robot center for the CBF constraints, uncomment next two lines
+        # con_h_expr = self.__h_dot(q, u, p) + np.matmul(gamma_mat, self.__h(q, p))
+        # acados_model.con_h_expr = con_h_expr
+
+        # if you consider point B for the CBF constraints, uncomment next two lines
+        con_h_expr = self.__h_dot_b(q, u, p) + np.matmul(gamma_mat, self.__h_b(q, p))
         acados_model.con_h_expr = con_h_expr
+    
+
 
         # Variables and params:
         acados_model.x = q
