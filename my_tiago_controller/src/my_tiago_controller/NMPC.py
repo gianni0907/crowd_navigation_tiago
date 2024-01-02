@@ -37,11 +37,11 @@ class NMPC:
         self.acados_ocp_solver.set(self.N, 'x', x0.get_state())
 
     # Systems dynamics:
-    def __f(self, x, u):
+    def __f(self, q, u):
         xdot = casadi.SX.zeros(self.nq)
-        xdot[self.hparams.x_idx] = self.__x_dot(x)
-        xdot[self.hparams.y_idx] = self.__y_dot(x)
-        xdot[self.hparams.theta_idx] = self.__theta_dot(x)
+        xdot[self.hparams.x_idx] = self.__x_dot(q)
+        xdot[self.hparams.y_idx] = self.__y_dot(q)
+        xdot[self.hparams.theta_idx] = self.__theta_dot(q)
         xdot[self.hparams.v_idx] = self.__v_dot(u)
         xdot[self.hparams.omega_idx] = self.__omega_dot(u)
         return xdot
@@ -109,7 +109,7 @@ class NMPC:
 
         return h
 
-    def __h_dot(self, q, u, p):
+    def __h_dot(self, q, p):
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
         theta = q[self.hparams.theta_idx]
@@ -166,7 +166,7 @@ class NMPC:
                 
         return h
 
-    def __h_dot_b(self, q, u, p):
+    def __h_dot_b(self, q, p):
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
         theta = q[self.hparams.theta_idx]
@@ -217,11 +217,11 @@ class NMPC:
             np.fill_diagonal(gamma_mat[4:, 4:], self.hparams.gamma_actor)
 
         # if you consider robot center for the CBF constraints, uncomment next two lines
-        # con_h_expr = self.__h_dot(q, u, p) + np.matmul(gamma_mat, self.__h(q, p))
+        # con_h_expr = self.__h_dot(q, p) + np.matmul(gamma_mat, self.__h(q, p))
         # acados_model.con_h_expr = con_h_expr
 
         # if you consider point B for the CBF constraints, uncomment next two lines
-        con_h_expr = self.__h_dot_b(q, u, p) + np.matmul(gamma_mat, self.__h_b(q, p))
+        con_h_expr = self.__h_dot_b(q, p) + np.matmul(gamma_mat, self.__h_b(q, p))
         acados_model.con_h_expr = con_h_expr
     
 

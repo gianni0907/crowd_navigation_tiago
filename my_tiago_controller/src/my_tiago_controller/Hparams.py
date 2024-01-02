@@ -72,9 +72,10 @@ class Hparams:
     ds_cbf = 0.5 # safety clearance
     gamma_actor = 0.8 # in (0,1], hyperparameter for cbf constraint associated to actors
     gamma_bound = 0.8 # in (0,1], hyperparameter for cbf constraint associated to bounds
-    n_actors = 3 # number of actors
+    n_actors = 0 # number of actors
 
     # Parameters for the crowd prediction
-    innovation_threshold = 1
-    matching_threshold = 0.1
-    max_pred_time = 1
+    if n_actors > 0:
+        innovation_threshold = 1
+        matching_threshold = 0.1
+        max_pred_time = 1

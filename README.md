@@ -1,16 +1,19 @@
 # Crowd Navigation with TIAGo
 ## Project on-track
-Accomplished ask: TIAGo robot navigation to a desired target position in an environment populated by `n_actors` moving actors (along linear paths). 
+Accomplished task: TIAGo robot navigation to a desired target position in an environment populated by `n_actors` moving actors (along linear paths). 
 2 modules implemented:
 -   crowd prediction module:
     assuming to know the whole actors trajectory and the data association, consider iteratively the current actors position and estimate their next state (position and velocity) using `n_actors` Kalman Filters (KFs), managed via as many Finite State Machines (FSMs). Then, propagate the estimated state over the whole control horizon assuming a constant velocity motion. Finally, send a message containing the predicted actors trajectory.
 
 -   controller module:
-    given a desired target position, at each iteration, read the crowd motion prediction message and the current robot configuration and run the NMPC. The kinematic model of the TIAGo robot is considered, with wheels angular velcoities as control inputs. The moving humans avoidance is realized introducing nonlinear constraints defined by CBFs in the NMPC model of the Acados solver. CBFs constraints are also adopted to ensure the permanence of the robot within a predefined region.
+    given a desired target position, at each iteration, read the crowd motion prediction message and the current robot configuration and run the NMPC. The extended kinematic model of the TIAGo robot is considered, with wheels angular accelerations as control inputs. The moving humans avoidance is realized introducing nonlinear constraints defined by CBFs in the NMPC model of the Acados solver. CBFs constraints are also adopted to ensure the permanence of the robot within a predefined region.
 ## Next goal
-Implemenation of the sensing module:
+Implementation of the sensing module:
 
 -   Read the data from the Laser Scan and implement a data association
+
+## Open problems
+The current version of this branch is not working properly in case of configuration bounds (of course, also in case of actors), maybe the problem is due to the CBFs constraints implementation. Anyway, this is still a problem to solve.
 
 ## Usage
 To run the Gazebo simulation:

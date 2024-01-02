@@ -248,7 +248,6 @@ class ControllerManager:
         output_dict['input_weight'] = self.hparams.u_weight
         output_dict['terminal_factor'] = self.hparams.terminal_factor
         output_dict['offset_b'] = self.hparams.b
-        output_dict['residuals'] = self.residuals
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -361,12 +360,11 @@ class ControllerManager:
                     self.target_position[self.hparams.y_idx],
                     time
                 ])
-                predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+2))
+                predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
                 for i in range(self.hparams.N_horizon):
                     predicted_trajectory[:, i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')
                 predicted_trajectory[:, self.hparams.N_horizon] = \
                     self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
-                predicted_trajectory[:, self.hparams.N_horizon + 1] = time
 
                 self.robot_prediction_history.append(predicted_trajectory.tolist())
                 
