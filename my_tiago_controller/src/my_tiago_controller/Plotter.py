@@ -41,16 +41,16 @@ def plot_results(filename=None):
 
     # Setup all the data
     states = np.array(data['states'])
-    b = data['offset_b']
     configurations = states[:, :3]
-    driving_velocities = states[:, 3]
-    steering_velocities = states[:, 4]
     robot_center = np.empty((configurations.shape[0], 2))
+    b = data['offset_b']
     for i in range(configurations.shape[0]):
         robot_center[i, 0] = configurations[i, 0] - b * math.cos(configurations[i, 2])
         robot_center[i, 1] = configurations[i, 1] - b * math.sin(configurations[i, 2])
     
-    predictions = np.array(data['predictions'])
+    driving_velocities = states[:, 3]
+    steering_velocities = states[:, 4]
+    robot_predictions = np.array(data['robot_predictions'])
     inputs = np.array(data['wheels_accelerations'])
     wheels_velocities = np.array(data['wheels_velocities'])
     targets = np.array(data['targets'])
@@ -62,15 +62,13 @@ def plot_results(filename=None):
     omega_bounds = np.array(data['omega_bounds'])
     wheels_vel_bounds = np.array(data['wheels_vel_bounds'])
 
-    n_obstacles = data['n_obstacles']
-    if n_obstacles > 0:
-        obstacles_position = np.array(data['obstacles_position'])
-
+    n_actors = data['n_actors']
+    if n_actors > 0:
+        actors_predictions = np.array(data['actors_predictions'])
     N_horizon = data['N_horizon']
     rho_cbf = data['rho_cbf']
     ds_cbf = data['ds_cbf']
     frequency = data['frequency']
-
     shooting_nodes = inputs.shape[0]
     t = inputs[:, 2]
 
@@ -201,16 +199,19 @@ def plot_results(filename=None):
     robot_clearance = Circle(np.nan, np.nan, facecolor='none', edgecolor='blue')
     goal = ax_big.scatter([], [], s=80.0, marker='*', label='goal', color='magenta', alpha=0.7)
     goal_label = ax_big.text(np.nan, np.nan, goal.get_label(), fontsize=8, ha='left', va='bottom')
-    if n_obstacles > 0:
-        obstacles = []
-        obstacles_label = []
-        obstacles_clearance = []
-    for i in range(n_obstacles):
-        obstacles.append(ax_big.scatter([], [], marker='o', label='human{}'.format(i+1), color='red', alpha=0.7))
-        obstacles_clearance.append(Circle(np.nan, np.nan, facecolor='none', edgecolor='red'))
-        obstacles_label.append(ax_big.text(np.nan, np.nan, obstacles[i].get_label(), fontsize=8, ha='left', va='bottom'))
+    if n_actors > 0:
+        actors = []
+        actors_label = []
+        actors_clearance = []
+        actors_pred_line = []
+    for i in range(n_actors):
+        actors.append(ax_big.scatter([], [], marker='o', label='actor{}'.format(i+1), color='red', alpha=0.7))
+        actors_clearance.append(Circle(np.nan, np.nan, facecolor='none', edgecolor='red'))
+        actors_label.append(ax_big.text(np.nan, np.nan, actors[i].get_label(), fontsize=8, ha='left', va='bottom'))
+        actor_pred_line, = ax_big.plot([], [], color='orange', label='actor prediction')
+        actors_pred_line.append(actor_pred_line)
     traj_line, = ax_big.plot([], [], color='blue', label='trajectory')
-    pred_line, = ax_big.plot([], [], color='green', label='prediction')
+    robot_pred_line, = ax_big.plot([], [], color='green', label='prediction')
     ex_line, = ax1.plot([], [], label='$e_x$')
     ey_line, = ax1.plot([], [], label='$e_y$')
     wr_line, = ax2.plot([], [], label='$\omega_r$')
@@ -270,21 +271,21 @@ def plot_results(filename=None):
         goal.set_offsets(targets[0, :2])
         goal_label.set_position(targets[0])
         
-        for i in range(n_obstacles):
-            obs_position = obstacles_position[0, i, :2]
-            obstacles[i].set_offsets(obs_position)
-            obstacles_clearance[i].set_center(obs_position)
-            obstacles_clearance[i].set_radius(ds_cbf)
-            ax_big.add_patch(obstacles_clearance[i])
-            obstacles_label[i].set_position(obs_position)
-        if n_obstacles > 0:
+        for i in range(n_actors):
+            actor_position = actors_predictions[0, i, :, 0]
+            actors[i].set_offsets(actor_position)
+            actors_clearance[i].set_center(actor_position)
+            actors_clearance[i].set_radius(ds_cbf)
+            ax_big.add_patch(actors_clearance[i])
+            actors_label[i].set_position(actor_position)
+        if n_actors > 0:
             return robot, robot_clearance, robot_label, goal, goal_label, \
-                    obstacles, obstacles_clearance, obstacles_label
+                    actors, actors_clearance, actors_label
         else:
             return robot, robot_clearance, robot_label, goal, goal_label,
 
     def update_sim(frame):
-        current_prediction = predictions[frame, :, :N_horizon]
+        robot_prediction = robot_predictions[frame, :, :]
         current_target = targets[frame, :]
 
         ex_line.set_data(t[:frame + 1], targets[:frame + 1, 0] - configurations[:frame + 1, 0])
@@ -294,7 +295,7 @@ def plot_results(filename=None):
         alphar_line.set_data(t[:frame + 1], inputs[:frame + 1, 0])
         alphal_line.set_data(t[:frame + 1], inputs[:frame + 1, 1])
         traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
-        pred_line.set_data(current_prediction[0, :], current_prediction[1, :])
+        robot_pred_line.set_data(robot_prediction[0, :], robot_prediction[1, :])
 
         robot.set_offsets(robot_center[frame, :])
         controlled_pt.set_offsets(configurations[frame, :2])
@@ -302,22 +303,25 @@ def plot_results(filename=None):
         robot_label.set_position(robot_center[frame, :])
         goal.set_offsets(current_target[:2])
         goal_label.set_position(current_target)
-        for i in range(n_obstacles):
-            obs_position = obstacles_position[frame, i , :2]
-            obstacles[i].set_offsets(obs_position)
-            obstacles_clearance[i].set_center(obs_position)
-            obstacles_label[i].set_position(obs_position)
+        if n_actors > 0:
+            for i in range(n_actors):
+                actor_prediction = actors_predictions[frame, i, :, :]
+                actor_position = actor_prediction[: , 0]
+                actors[i].set_offsets(actor_position)
+                actors_clearance[i].set_center(actor_position)
+                actors_label[i].set_position(actor_position)
+                actors_pred_line[i].set_data(actor_prediction[0, :], actor_prediction[1, :])
 
         if frame == shooting_nodes - 1:
             sim_animation.event_source.stop()
 
-        if n_obstacles > 0:
+        if n_actors > 0:
             return robot, robot_clearance, robot_label, goal, goal_label, \
-                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, pred_line, \
-                    obstacles, obstacles_clearance, obstacles_label
+                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line, \
+                    actors, actors_clearance, actors_label
         else:
             return robot, robot_clearance, robot_label, goal, goal_label, \
-                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, pred_line
+                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line
 
     sim_animation = FuncAnimation(sim_fig, update_sim,
                                   frames=shooting_nodes,

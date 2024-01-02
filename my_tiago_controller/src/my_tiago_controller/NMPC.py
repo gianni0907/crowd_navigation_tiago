@@ -76,56 +76,128 @@ class NMPC:
         wheel_separation = self.hparams.wheel_separation
         return (wheel_radius / wheel_separation) * (alpha_r - alpha_l)
     
-    def __h(self, q):
-        n_obs = self.hparams.n_obstacles
-        if n_obs > 0:
-            p = casadi.SX.zeros((n_obs, 2))
-            h = casadi.SX.zeros(4 + n_obs)
+    def __h(self, q, p):
+        x = q[self.hparams.x_idx]
+        y = q[self.hparams.y_idx]
+        theta = q[self.hparams.theta_idx]
+        b = self.hparams.b
+
+        n_actors = self.hparams.n_actors
+        if n_actors > 0:
+            h = casadi.SX.zeros(4 + n_actors)
         else:
             h = casadi.SX.zeros(4)
 
         # Consider the robot distance from the bounds [ubx, lbx, uby, lby]
-        b = self.hparams.b
-        x_c = q[self.hparams.x_idx] - b * casadi.cos(q[self.hparams.theta_idx])
-        y_c = q[self.hparams.y_idx] - b * casadi.sin(q[self.hparams.theta_idx])
-        h[0] = self.hparams.x_upper_bound - x_c
-        h[1] = x_c - self.hparams.x_lower_bound
-        h[2] = self.hparams.y_upper_bound - y_c 
-        h[3] = y_c - self.hparams.y_lower_bound
+        x_c = x - b * casadi.cos(theta)
+        y_c = y - b * casadi.sin(theta)
+        h[0] = self.hparams.x_upper_bound - x_c - self.hparams.rho_cbf
+        h[1] = x_c - self.hparams.x_lower_bound - self.hparams.rho_cbf
+        h[2] = self.hparams.y_upper_bound - y_c - self.hparams.rho_cbf
+        h[3] = y_c - self.hparams.y_lower_bound - self.hparams.rho_cbf
 
-        # Consider the robot distance from obstacles, if obstacles are present
-        if n_obs > 0:
-            distance_vectors = casadi.SX.zeros((n_obs, 2))
+        # Consider the robot distance from actors, if actors are present
+        if n_actors > 0:
+            distance_vectors = casadi.SX.zeros((n_actors, 2))
             cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
-            for i in range(n_obs):
-                p[i, :] = self.hparams.obstacles_position[i, :]
-                distance_vectors[i, self.hparams.x_idx] = x_c - p[i, self.hparams.x_idx]
-                distance_vectors[i, self.hparams.y_idx] = y_c - p[i, self.hparams.y_idx]
+            for i in range(n_actors):
+                distance_vectors[i, self.hparams.x_idx] = x_c - p[i*4 + self.hparams.x_idx]
+                distance_vectors[i, self.hparams.y_idx] = y_c - p[i*4 + self.hparams.y_idx]
                 h[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
                         distance_vectors[i, self.hparams.y_idx]**2 - \
                         cbf_radius**2
 
         return h
 
-    def __h_dot(self, q, u):
+    def __h_dot(self, q, u, p):
+        x = q[self.hparams.x_idx]
+        y = q[self.hparams.y_idx]
+        theta = q[self.hparams.theta_idx]
+        v = q[self.hparams.v_idx]
+        b = self.hparams.b
+
+        # Set the coordinates of the robot center
+        x_c = x - b * casadi.cos(theta)
+        y_c = y - b * casadi.sin(theta)
+
+        n_actors = self.hparams.n_actors
+        if n_actors > 0:
+            hdot = casadi.SX.zeros(4 + n_actors)
+        else:
+            hdot = casadi.SX.zeros(4)
+
+        hdot[0] = - v * casadi.cos(theta)
+        hdot[1] = v * casadi.cos(theta)
+        hdot[2] = - v * casadi.sin(theta)
+        hdot[3] = v * casadi.sin(theta)
+        for i in range(n_actors):
+            s1 = 2 * (x_c - p[i*4 + self.hparams.x_idx])
+            s2 = 2 * (y_c - p[i*4 + self.hparams.y_idx])
+            hdot[i + 4] = s1 * (v * casadi.cos(theta) - p[i*4 + 2 + self.hparams.x_idx]) + \
+                          s2 * (v * casadi.sin(theta) - p[i*4 + 2 + self.hparams.y_idx])
+            
+        return hdot
+
+    def __h_b(self, q, p):
+        x = q[self.hparams.x_idx]
+        y = q[self.hparams.y_idx]
+
+        n_actors = self.hparams.n_actors
+        if n_actors > 0:
+            h = casadi.SX.zeros(4 + n_actors)
+        else:
+            h = casadi.SX.zeros(4)
+
+        h[0] = self.hparams.x_upper_bound - x - self.hparams.rho_cbf
+        h[1] = x - self.hparams.x_lower_bound - self.hparams.rho_cbf
+        h[2] = self.hparams.y_upper_bound - y - self.hparams.rho_cbf
+        h[3] = y - self.hparams.y_lower_bound - self.hparams.rho_cbf
+
+        # Consider the robot distance from actors, if actors are present
+        if n_actors > 0:
+            distance_vectors = casadi.SX.zeros((n_actors, 2))
+            cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
+            for i in range(n_actors):
+                distance_vectors[i, self.hparams.x_idx] = x - p[i*4 + self.hparams.x_idx]
+                distance_vectors[i, self.hparams.y_idx] = y - p[i*4 + self.hparams.y_idx]
+                h[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
+                        distance_vectors[i, self.hparams.y_idx]**2 - \
+                        cbf_radius**2
+                
+        return h
+
+    def __h_dot_b(self, q, u, p):
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
         theta = q[self.hparams.theta_idx]
         v = q[self.hparams.v_idx]
         omega = q[self.hparams.omega_idx]
+        b = self.hparams.b
 
-        return casadi.jacobian(self.__h(q), x) * self.__x_dot(q) + \
-               casadi.jacobian(self.__h(q), y) * self.__y_dot(q) + \
-               casadi.jacobian(self.__h(q), theta) * self.__theta_dot(q) + \
-               casadi.jacobian(self.__h(q), v) * self.__v_dot(u) + \
-               casadi.jacobian(self.__h(q), omega) * self.__omega_dot(u)
+        n_actors = self.hparams.n_actors
+        if n_actors > 0:
+            hdot = casadi.SX.zeros(4 + n_actors)
+        else:
+            hdot = casadi.SX.zeros(4)
 
+        hdot[0] = - v * casadi.cos(theta) + omega * b * casadi.sin(theta)
+        hdot[1] = v * casadi.cos(theta) - omega * b * casadi.sin(theta)
+        hdot[2] = - v * casadi.sin(theta) - omega * b * casadi.cos(theta)
+        hdot[3] = v * casadi.sin(theta) + omega * b * casadi.cos(theta)
+        for i in range(n_actors):
+            s1 = 2 * (x - p[i*4 + self.hparams.x_idx])
+            s2 = 2 * (y - p[i*4 + self.hparams.y_idx])
+            hdot[i + 4] = s1 * (v * casadi.cos(theta) - omega * b * casadi.sin(theta) - p[i*4 + 2 + self.hparams.x_idx]) + \
+                          s2 * (v * casadi.sin(theta) + omega * b * casadi.cos(theta) - p[i*4 + 2 + self.hparams.y_idx])
+            
+        return hdot
     
     def __create_acados_model(self) -> AcadosModel:
         # Setup CasADi expressions:
         q = casadi.SX.sym('q', self.nq)
         qdot = casadi.SX.sym('qdot', self.nq)
         u = casadi.SX.sym('u', self.nu)
+        p = casadi.SX.sym('p', self.hparams.n_actors * 4)
         f_expl = self.__f(q, u)
         f_impl = qdot - f_expl
 
@@ -138,13 +210,27 @@ class NMPC:
         acados_model.f_expl_expr = f_expl
 
         # CBF constraints:
-        con_h_expr = self.__h_dot(q, u) + self.hparams.gamma_cbf * self.__h(q)
+        n_actors = self.hparams.n_actors
+        gamma_mat = np.zeros((n_actors + 4, n_actors + 4))
+        np.fill_diagonal(gamma_mat[:4, :4], self.hparams.gamma_bound)
+        if n_actors > 0:
+            np.fill_diagonal(gamma_mat[4:, 4:], self.hparams.gamma_actor)
+
+        # if you consider robot center for the CBF constraints, uncomment next two lines
+        # con_h_expr = self.__h_dot(q, u, p) + np.matmul(gamma_mat, self.__h(q, p))
+        # acados_model.con_h_expr = con_h_expr
+
+        # if you consider point B for the CBF constraints, uncomment next two lines
+        con_h_expr = self.__h_dot_b(q, u, p) + np.matmul(gamma_mat, self.__h_b(q, p))
         acados_model.con_h_expr = con_h_expr
+    
+
 
         # Variables and params:
         acados_model.x = q
         acados_model.xdot = qdot
         acados_model.u = u
+        acados_model.p = p
 
         return acados_model
     
@@ -214,10 +300,10 @@ class NMPC:
                                           self.hparams.driving_acc_max,
                                           self.hparams.steering_acc_max])
 
-        # Nonlinear constraints (CBFs) (for both obstacles and configuration bounds):
-        if self.hparams.n_obstacles > 0:
-            acados_constraints.lh = np.zeros(self.hparams.n_obstacles + 4)
-            acados_constraints.uh = 10000 * np.ones(self.hparams.n_obstacles + 4)
+        # Nonlinear constraints (CBFs) (for both actors and configuration bounds):
+        if self.hparams.n_actors > 0:
+            acados_constraints.lh = np.zeros(self.hparams.n_actors + 4)
+            acados_constraints.uh = 10000 * np.ones(self.hparams.n_actors + 4)
         else:
             acados_constraints.lh = np.zeros(4)
             acados_constraints.uh = 10000 * np.ones(4) 
@@ -240,6 +326,7 @@ class NMPC:
         acados_ocp = AcadosOcp()
         acados_ocp.model = self.__create_acados_model()
         acados_ocp.dims.N = N
+        acados_ocp.parameter_values = np.zeros((self.hparams.n_actors * 4,))
         acados_ocp.cost = self.__create_acados_cost()
         acados_ocp.constraints = self.__create_acados_constraints()
         acados_ocp.solver_options = self.__create_acados_solver_options(T)
@@ -259,10 +346,19 @@ class NMPC:
             self,
             state: State,
             q_ref: np.array,
-            u_ref: np.array):
+            u_ref: np.array,
+            crowd_motion_prediction : CrowdMotionPrediction
+            ):
         # Set parameters
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
+            actors_state = np.zeros((self.hparams.n_actors * 4))
+            for j in range(self.hparams.n_actors):
+                actors_state[j*4 + 0] = crowd_motion_prediction.motion_predictions[j].positions[k].x
+                actors_state[j*4 + 1] = crowd_motion_prediction.motion_predictions[j].positions[k].y
+                actors_state[j*4 + 2] = crowd_motion_prediction.motion_predictions[j].velocities[k].x
+                actors_state[j*4 + 3] = crowd_motion_prediction.motion_predictions[j].velocities[k].y
+            self.acados_ocp_solver.set(k, 'p', actors_state)
         self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])
 
         # Solve NLP

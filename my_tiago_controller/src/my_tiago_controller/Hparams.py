@@ -3,12 +3,13 @@ import numpy as np
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    logfile = 'test.json'
+    controller_file = 'test_controller.json'
+    prediction_file = 'test_predictor.json'
 
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
-    b = 0.0 # [m]
+    b = 0.1 # [m]
 
     # NMPC parameters
     controller_frequency = 40.0 # [Hz]
@@ -25,10 +26,14 @@ class Hparams:
     alpha_max = driving_acc_max / wheel_radius # [rad/s^2], 5.0761
     alpha_min = - alpha_max
 
+    # Velocity bounds reduction in case of real_robot
+    driving_bound_factor = 1.0
+    steering_bound_factor = 1.0
+    
     # Driving and steering velocity limits
-    driving_vel_max = 1 # [m/s]
-    driving_vel_min = -0.2 # [m/s]
-    steering_vel_max = 1.05 # [rad/s]
+    driving_vel_max = 1 * driving_bound_factor # [m/s]
+    driving_vel_min = - 0.2 # [m/s]
+    steering_vel_max = 1.05 * steering_bound_factor # [rad/s]
     steering_vel_max_neg = - steering_vel_max
     
     # Wheels velocity limits
@@ -63,12 +68,13 @@ class Hparams:
     terminal_factor = 1e2 # factor for the terminal state
 
     # Parameters for the CBF
-    rho_cbf = 0.6 # the radius of the circle around the robot center
+    rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
-    gamma_cbf = 1.0 # in (0,1], hyperparameter for cbf constraint
-    n_obstacles = 0 # number of obstacles, for now static obstacles
-    obstacles_position = np.array([[2.0, 2.0],
-                                   [2.0, -0.5],
-                                   [-1.0, 2.3],
-                                   [-2.0, -1.0],
-                                   [4.5, 1.0]]) # fixed position of the obstacles (for NMPC, to be deleted)
+    gamma_actor = 0.8 # in (0,1], hyperparameter for cbf constraint associated to actors
+    gamma_bound = 0.8 # in (0,1], hyperparameter for cbf constraint associated to bounds
+    n_actors = 3 # number of actors
+
+    # Parameters for the crowd prediction
+    innovation_threshold = 1
+    matching_threshold = 0.1
+    max_pred_time = 1

@@ -19,7 +19,7 @@ add_message_files(
 add_service_files(
   FILES
   SetDesiredTargetPosition.srv
-  SetHumansTrajectory.srv
+  SetActorsTrajectory.srv
 )
 
 ## Generate added messages and services with any dependencies listed here

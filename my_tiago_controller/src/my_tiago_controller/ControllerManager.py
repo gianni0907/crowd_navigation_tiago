@@ -18,15 +18,18 @@ import my_tiago_msgs.srv
 
 class ControllerManager:
     def __init__(self):
+        self.data_lock = threading.Lock()
+
         # Set the Hyperparameters
         self.hparams = Hparams()
         
         # Set status
         # 3 possibilities:
-        #   WAITING for the initial robot configuration
+        #   WAITING for the initial robot state
         #   READY to get the target position while the robot is at rest
         #   MOVING towards the desired target position (the target position can be changed while moving)
         self.status = Status.WAITING
+        
         self.sensing = False
 
         # counter for the angle unwrapping
@@ -38,7 +41,6 @@ class ControllerManager:
 
         self.state = State(0.0, 0.0, 0.0, 0.0, 0.0)
         self.wheels_vel = np.zeros(2) # [w_r, w_l]
-        self.data_lock = threading.Lock()
         self.crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.now(),
                                                                             'map',
                                                                             CrowdMotionPrediction())
@@ -87,20 +89,18 @@ class ControllerManager:
         # Set variables to store data
         if self.hparams.log:
             self.state_history = []
-            self.prediction_history = []
+            self.robot_prediction_history = []
             self.wheels_vel_history = []
             self.wheels_acc_history = []
             self.target_history = []
-            self.obstacles_history = []
-            self.residuals = []
+            self.actors_prediction_history = []
 
     def init(self):
-        # Init robot state
-        if self.update_state():
-            self.status = Status.READY
-            self.target_position = np.array([self.state.x,
-                                            self.state.y])
-            self.nmpc_controller.init(self.state)
+        # Initialize target position to the current position
+        self.target_position = np.array([self.state.x,
+                                         self.state.y])
+        # Initialize the NMPC controller
+        self.nmpc_controller.init(self.state)
 
     def saturate_velocities(self, v, omega):
         if v > 0.95 * self.hparams.driving_vel_max:
@@ -217,17 +217,17 @@ class ControllerManager:
                 rospy.loginfo(f"Desired target position successfully changed: {self.target_position}")
             return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(True)
         
-    def log_values(self, filename):
+    def log_values(self):
         output_dict = {}
         output_dict['states'] = self.state_history
-        output_dict['predictions'] = self.prediction_history
+        output_dict['robot_predictions'] = self.robot_prediction_history
         output_dict['wheels_velocities'] = self.wheels_vel_history
         output_dict['wheels_accelerations'] = self.wheels_acc_history
         output_dict['targets'] = self.target_history
 
-        output_dict['n_obstacles'] = self.hparams.n_obstacles
-        if self.hparams.n_obstacles > 0:        
-            output_dict['obstacles_position'] = self.obstacles_history
+        output_dict['n_actors'] = self.hparams.n_actors
+        if self.hparams.n_actors > 0:        
+            output_dict['actors_predictions'] = self.actors_prediction_history
 
         output_dict['x_bounds'] = [self.hparams.x_lower_bound, self.hparams.x_upper_bound]
         output_dict['y_bounds'] = [self.hparams.y_lower_bound, self.hparams.y_upper_bound]
@@ -238,7 +238,8 @@ class ControllerManager:
 
         output_dict['rho_cbf'] = self.hparams.rho_cbf
         output_dict['ds_cbf'] = self.hparams.ds_cbf
-        output_dict['gamma_cbf'] = self.hparams.gamma_cbf
+        output_dict['gamma_bound'] = self.hparams.gamma_bound
+        output_dict['gamma_actor'] = self.hparams.gamma_actor
         output_dict['frequency'] = self.hparams.controller_frequency
         output_dict['N_horizon'] = self.hparams.N_horizon
         output_dict['position_weight'] = self.hparams.p_weight
@@ -251,6 +252,7 @@ class ControllerManager:
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
+        filename = self.hparams.controller_file
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         log_path = os.path.join(log_dir, filename)
@@ -264,7 +266,7 @@ class ControllerManager:
         u_ref = np.zeros((self.nmpc_controller.nu, self.hparams.N_horizon))
         q_ref[:self.hparams.y_idx + 1, self.hparams.N_horizon] = self.target_position
         
-        if self.hparams.n_obstacles > 0:
+        if self.hparams.n_actors > 0:
             if self.data_lock.acquire(False):
                 self.crowd_motion_prediction_stamped_rt = self.crowd_motion_prediction_stamped
                 self.data_lock.release()
@@ -273,7 +275,7 @@ class ControllerManager:
         flag = self.update_state()
         self.data_lock.release()
 
-        if flag and (self.sensing or self.hparams.n_obstacles == 0) and self.status == Status.MOVING:
+        if flag and (self.sensing or self.hparams.n_actors == 0) and self.status == Status.MOVING:
             # Compute the position error
             error = np.array([self.target_position[self.hparams.x_idx] - self.state.x, 
                               self.target_position[self.hparams.y_idx] - self.state.y])
@@ -289,7 +291,8 @@ class ControllerManager:
                     self.nmpc_controller.update(
                         self.state,
                         q_ref,
-                        u_ref
+                        u_ref,
+                        self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction
                     )
                     self.control_input = self.nmpc_controller.get_command()
                 except Exception as e:
@@ -301,7 +304,7 @@ class ControllerManager:
                     print("##########################################")
                 
         else:
-            if not(self.sensing) and self.hparams.n_obstacles > 0:
+            if not(self.sensing) and self.hparams.n_actors > 0:
                 rospy.logwarn("Missing sensing info")
             self.control_input = np.zeros((self.nmpc_controller.nu))
             if self.status == Status.MOVING:
@@ -312,82 +315,76 @@ class ControllerManager:
             
     def run(self):
         rate = rospy.Rate(self.hparams.controller_frequency)
-        # Variables for Analysis of required time
-        self.previous_time = rospy.get_time()
+        if self.hparams.log:
+            rospy.on_shutdown(self.log_values)
 
-        # Waiting for initial state
-        while self.status == Status.WAITING:
-            self.init()
-        print("Initial state ****************************")
-        print(self.state)
-        print("******************************************")
+        while not(rospy.is_shutdown()):
+            time = rospy.get_time()
+            init_time = time
 
-        try:
-            while not(rospy.is_shutdown()):
-                time = rospy.get_time()
-                init_time = time
- 
-                self.update()
-                self.publish_command()
+            if self.status == Status.WAITING:
+                if self.update_state():
+                    self.init()
+                    self.status = Status.READY
+                    print("Initial state ****************************")
+                    print(self.state)
+                    print("******************************************")
+                else:
+                    rate.sleep()
+                    continue
+
+            self.update()
+            self.publish_command()
+            
+            # Saving data for plots
+            if self.hparams.log and (self.sensing or self.hparams.n_actors == 0):
+                self.state_history.append([
+                    self.state.x,
+                    self.state.y,
+                    self.state.theta,
+                    self.state.v,
+                    self.state.omega,
+                    time
+                ])
+                self.wheels_vel_history.append([
+                    self.wheels_vel[self.hparams.r_wheel_idx],
+                    self.wheels_vel[self.hparams.l_wheel_idx],
+                    time
+                ])
+                self.wheels_acc_history.append([
+                    self.control_input[self.hparams.r_wheel_idx],
+                    self.control_input[self.hparams.l_wheel_idx],
+                    time
+                ])
+                self.target_history.append([
+                    self.target_position[self.hparams.x_idx],
+                    self.target_position[self.hparams.y_idx],
+                    time
+                ])
+                predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+2))
+                for i in range(self.hparams.N_horizon):
+                    predicted_trajectory[:, i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')
+                predicted_trajectory[:, self.hparams.N_horizon] = \
+                    self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
+                predicted_trajectory[:, self.hparams.N_horizon + 1] = time
+
+                self.robot_prediction_history.append(predicted_trajectory.tolist())
                 
-                # Saving data for plots
-                if self.hparams.log and (self.sensing or self.hparams.n_obstacles == 0):
-                    self.state_history.append([
-                        self.state.x,
-                        self.state.y,
-                        self.state.theta,
-                        self.state.v,
-                        self.state.omega,
-                        time
-                    ])
-                    self.wheels_vel_history.append([
-                        self.wheels_vel[self.hparams.r_wheel_idx],
-                        self.wheels_vel[self.hparams.l_wheel_idx],
-                        time
-                    ])
-                    self.wheels_acc_history.append([
-                        self.control_input[self.hparams.r_wheel_idx],
-                        self.control_input[self.hparams.l_wheel_idx],
-                        time
-                    ])
-                    self.target_history.append([
-                        self.target_position[self.hparams.x_idx],
-                        self.target_position[self.hparams.y_idx],
-                        time
-                    ])
-                    predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+2))
-                    for i in range(self.hparams.N_horizon):
-                        predicted_trajectory[:, i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')
-                    predicted_trajectory[:, self.hparams.N_horizon] = \
-                        self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
-                    predicted_trajectory[:, self.hparams.N_horizon + 1] = time
+                if self.hparams.n_actors > 0:
+                    predicted_trajectory = np.zeros((self.hparams.n_actors, 2, self.hparams.N_horizon))
+                    for i in range(self.hparams.n_actors):
+                        for j in range(self.hparams.N_horizon):
+                            motion_prediction = self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i]
+                            predicted_trajectory[i, 0, j] = motion_prediction.positions[j].x
+                            predicted_trajectory[i, 1, j] = motion_prediction.positions[j].y
+                    self.actors_prediction_history.append(predicted_trajectory.tolist())
 
-                    self.prediction_history.append(predicted_trajectory.tolist())
-                    self.residuals.append(self.nmpc_controller.acados_ocp_solver.get_stats('residuals').tolist())
-                    
-                    if self.hparams.n_obstacles > 0:
-                        first_predictions = []
-                        for i in range(self.hparams.n_obstacles):
-                            first_predictions.append([
-                                self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i].positions[0].x,
-                                self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i].positions[0].y,
-                                time
-                            ])
-                        self.obstacles_history.append(first_predictions)
+            final_time = rospy.get_time()        
+            deltat = final_time - init_time
+            if deltat > 1 / (2 * self.hparams.controller_frequency):
+                print(f"Iteration time {deltat} at instant {time}")
 
-                final_time = rospy.get_time()        
-                deltat = final_time - init_time
-                if deltat > 1 / (2 * self.hparams.controller_frequency):
-                    print(f"Iteration time {deltat} at instant {time}")
-
-                rate.sleep()
-        except rospy.ROSInterruptException as e:
-            rospy.logwarn("ROS node shutting down")
-            rospy.logwarn('{}'.format(e))
-        finally:
-            if self.hparams.log:
-                self.log_values(self.hparams.logfile)
-
+            rate.sleep()
 
 def main():
     rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
