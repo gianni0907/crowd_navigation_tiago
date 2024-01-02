@@ -3,8 +3,8 @@ import numpy as np
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    controller_file = 'test.json'
-    prediction_file = 'test.json'
+    controller_file = 'test_controller.json'
+    prediction_file = 'test_predictor.json'
 
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
