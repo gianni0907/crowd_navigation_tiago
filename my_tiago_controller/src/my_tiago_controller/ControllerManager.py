@@ -120,7 +120,10 @@ class ControllerManager:
         The NMPC solver returns wheels accelerations as control input
         Transform it into the avilable robot control input: driving and steering velocities
         """
-        if self.status == Status.MOVING:
+        if all(input == 0.0 for input in self.control_input):
+            v = 0.0
+            omega = 0.0
+        else:
             dt = self.hparams.dt
             alpha_r = self.control_input[self.hparams.r_wheel_idx]
             alpha_l = self.control_input[self.hparams.l_wheel_idx]
@@ -135,9 +138,6 @@ class ControllerManager:
             v = self.state.v + v_dot * dt
             omega = self.state.omega + omega_dot * dt
             # v, omega = self.saturate_velocities(v, omega)
-        else:
-            v = 0.0
-            omega = 0.0
 
         # Create a twist ROS message:
         cmd_vel_msg = geometry_msgs.msg.Twist()
@@ -275,9 +275,11 @@ class ControllerManager:
         self.data_lock.release()
 
         if flag and (self.sensing or self.hparams.n_actors == 0) and self.status == Status.MOVING:
-            # Compute the position error
+            # Compute the position and velocity error
             error = np.array([self.target_position[self.hparams.x_idx] - self.state.x, 
-                              self.target_position[self.hparams.y_idx] - self.state.y])
+                              self.target_position[self.hparams.y_idx] - self.state.y,
+                              0.0 - self.state.v,
+                              0.0 - self.state.omega])
             
             if norm(error) < self.hparams.error_tol:
                 self.control_input = np.zeros((self.nmpc_controller.nu))
@@ -303,13 +305,17 @@ class ControllerManager:
                     print("##########################################")
                 
         else:
+            self.control_input = np.zeros((self.nmpc_controller.nu))
             if not(self.sensing) and self.hparams.n_actors > 0:
                 rospy.logwarn("Missing sensing info")
-            self.control_input = np.zeros((self.nmpc_controller.nu))
             if self.status == Status.MOVING:
+                rospy.logwarn("Cannot reach target position, not enough environmental info")
                 print("Stop state ###############################")
                 print(self.state)
                 print("##########################################")
+                # Reset target position to the current position
+                self.target_position = np.array([self.state.x,
+                                                 self.state.y])
                 self.status = Status.READY
             
     def run(self):
