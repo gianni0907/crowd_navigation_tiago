@@ -70,8 +70,8 @@ class Hparams:
     # Parameters for the CBF
     rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
-    gamma_actor = 1.0 # in (0,1], hyperparameter for the h function associated to actor
-    gamma_d_actor = 1.0 # in (0,1], hyperparameter for the h_dot function associated to actor
+    gamma_actor = 0.8 # in (0,1], hyperparameter for the h function associated to actor
+    gamma_d_actor = 0.8 # in (0,1], hyperparameter for the h_dot function associated to actor
     gamma_bound = 1.0 # in (0,1], hyperparameter for the h function associated to bounds
     gamma_d_bound = 1.0 # in (0,1], hyperparameter for the h_dot function associated to bounds
     n_actors = 3 # number of actors

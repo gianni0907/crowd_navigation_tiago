@@ -98,15 +98,11 @@ class NMPC:
 
         # Consider the robot distance from actors, if actors are present
         if n_actors > 0:
-            distance_vectors = casadi.SX.zeros((n_actors, 2))
             cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
             for i in range(n_actors):
-                distance_vectors[i, self.hparams.x_idx] = x_c - p[i*4 + self.hparams.x_idx]
-                distance_vectors[i, self.hparams.y_idx] = y_c - p[i*4 + self.hparams.y_idx]
-                h[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
-                        distance_vectors[i, self.hparams.y_idx]**2 - \
-                        cbf_radius**2
-
+                sx = x_c - p[i*4 + self.hparams.x_idx]
+                sy = y_c - p[i*4 + self.hparams.y_idx]
+                h[i + 4] = sx**2 + sy**2 - cbf_radius**2
         return h
 
     def __h_dot(self, q, p):
@@ -131,11 +127,11 @@ class NMPC:
         hdot[2] = - v * casadi.sin(theta)
         hdot[3] = v * casadi.sin(theta)
         for i in range(n_actors):
-            s1 = 2 * (x_c - p[i*4 + self.hparams.x_idx])
-            s2 = 2 * (y_c - p[i*4 + self.hparams.y_idx])
-            hdot[i + 4] = s1 * (v * casadi.cos(theta) - p[i*4 + 2 + self.hparams.x_idx]) + \
-                          s2 * (v * casadi.sin(theta) - p[i*4 + 2 + self.hparams.y_idx])
-            
+            sx = x_c - p[i*4 + self.hparams.x_idx]
+            sy = y_c - p[i*4 + self.hparams.y_idx]
+            sdx = hdot[1] - p[i*4 + 2 + self.hparams.x_idx]
+            sdy = hdot[3] - p[i*4 + 2 + self.hparams.y_idx]
+            hdot[i + 4] = 2 * sx * sdx + 2 * sy * sdy
         return hdot
 
     def __h_b(self, q, p):
@@ -155,15 +151,11 @@ class NMPC:
 
         # Consider the robot distance from actors, if actors are present
         if n_actors > 0:
-            distance_vectors = casadi.SX.zeros((n_actors, 2))
             cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
             for i in range(n_actors):
-                distance_vectors[i, self.hparams.x_idx] = x - p[i*4 + self.hparams.x_idx]
-                distance_vectors[i, self.hparams.y_idx] = y - p[i*4 + self.hparams.y_idx]
-                h[i + 4] = distance_vectors[i, self.hparams.x_idx]**2 + \
-                        distance_vectors[i, self.hparams.y_idx]**2 - \
-                        cbf_radius**2
-                
+                sx = x - p[i*4 + self.hparams.x_idx]
+                sy = y - p[i*4 + self.hparams.y_idx]
+                h[i + 4] = sx**2 + sy**2 - cbf_radius**2
         return h
 
     def __h_dot_b(self, q, p):
@@ -185,12 +177,11 @@ class NMPC:
         hdot[2] = - v * casadi.sin(theta) - omega * b * casadi.cos(theta)
         hdot[3] = v * casadi.sin(theta) + omega * b * casadi.cos(theta)
         for i in range(n_actors):
-            sx = 2 * (x - p[i*4 + self.hparams.x_idx])
-            sy = 2 * (y - p[i*4 + self.hparams.y_idx])
+            sx = x - p[i*4 + self.hparams.x_idx]
+            sy = y - p[i*4 + self.hparams.y_idx]
             sdx = hdot[1] - p[i*4 + 2 + self.hparams.x_idx]
             sdy = hdot[3] - p[i*4 + 2 + self.hparams.y_idx]
-            hdot[i + 4] = sx * sdx + sy * sdy
-            
+            hdot[i + 4] = 2 * sx * sdx + 2 * sy * sdy
         return hdot
     
     def __h_ddot_b(self, q, u, p):
@@ -210,18 +201,17 @@ class NMPC:
             hddot = casadi.SX.zeros(4)
 
         hddot[0] = - vdot * casadi.cos(theta) + omegadot * b * casadi.sin(theta) + (v * casadi.sin(theta) + omega * b * casadi.cos(theta)) * omega
-        hddot[1] = vdot * casadi.cos(theta) - omegadot * b * casadi.sin(theta) + (- v * casadi.sin(theta) + omega * b * casadi.cos(theta)) * omega
+        hddot[1] = vdot * casadi.cos(theta) - omegadot * b * casadi.sin(theta) - (v * casadi.sin(theta) + omega * b * casadi.cos(theta)) * omega
         hddot[2] = - vdot * casadi.sin(theta) - omegadot * b * casadi.cos(theta) + (- v * casadi.cos(theta) + omega * b * casadi.sin(theta)) * omega
         hddot[3] = vdot * casadi.sin(theta) + omegadot * b * casadi.cos(theta) + (v * casadi.cos(theta) - omega * b * casadi.sin(theta)) * omega
         for i in range(n_actors):
-            sx = 2 * (x - p[i*4 + self.hparams.x_idx])
-            sy = 2 * (y - p[i*4 + self.hparams.y_idx])
+            sx = x - p[i*4 + self.hparams.x_idx]
+            sy = y - p[i*4 + self.hparams.y_idx]
             sdx = v * casadi.cos(theta) - omega * b * casadi.sin(theta) - p[i*4 + 2 + self.hparams.x_idx]
             sdy = v * casadi.sin(theta) + omega * b * casadi.cos(theta) - p[i*4 + 2 + self.hparams.y_idx]
             sddx = hddot[1]
             sddy = hddot[3]
-            hddot[i + 4] = sx * (sdx**2 + sddx) + sy * (sdy**2 + sddy) 
-            
+            hddot[i + 4] = 2 * sx * (sdx**2 + sddx) + 2 * sy * (sdy**2 + sddy) 
         return hddot
     
     def __create_acados_model(self) -> AcadosModel:
