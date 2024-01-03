@@ -185,12 +185,44 @@ class NMPC:
         hdot[2] = - v * casadi.sin(theta) - omega * b * casadi.cos(theta)
         hdot[3] = v * casadi.sin(theta) + omega * b * casadi.cos(theta)
         for i in range(n_actors):
-            s1 = 2 * (x - p[i*4 + self.hparams.x_idx])
-            s2 = 2 * (y - p[i*4 + self.hparams.y_idx])
-            hdot[i + 4] = s1 * (v * casadi.cos(theta) - omega * b * casadi.sin(theta) - p[i*4 + 2 + self.hparams.x_idx]) + \
-                          s2 * (v * casadi.sin(theta) + omega * b * casadi.cos(theta) - p[i*4 + 2 + self.hparams.y_idx])
+            sx = 2 * (x - p[i*4 + self.hparams.x_idx])
+            sy = 2 * (y - p[i*4 + self.hparams.y_idx])
+            sdx = hdot[1] - p[i*4 + 2 + self.hparams.x_idx]
+            sdy = hdot[3] - p[i*4 + 2 + self.hparams.y_idx]
+            hdot[i + 4] = sx * sdx + sy * sdy
             
         return hdot
+    
+    def __h_ddot_b(self, q, u, p):
+        x = q[self.hparams.x_idx]
+        y = q[self.hparams.y_idx]
+        theta = q[self.hparams.theta_idx]
+        v = q[self.hparams.v_idx]
+        omega = q[self.hparams.omega_idx]
+        vdot = self.__v_dot(u)
+        omegadot = self.__omega_dot(u)
+        b = self.hparams.b
+
+        n_actors = self.hparams.n_actors
+        if n_actors > 0:
+            hddot = casadi.SX.zeros(4 + n_actors)
+        else:
+            hddot = casadi.SX.zeros(4)
+
+        hddot[0] = - vdot * casadi.cos(theta) + omegadot * b * casadi.sin(theta) + (v * casadi.sin(theta) + omega * b * casadi.cos(theta)) * omega
+        hddot[1] = vdot * casadi.cos(theta) - omegadot * b * casadi.sin(theta) + (- v * casadi.sin(theta) + omega * b * casadi.cos(theta)) * omega
+        hddot[2] = - vdot * casadi.sin(theta) - omegadot * b * casadi.cos(theta) + (- v * casadi.cos(theta) + omega * b * casadi.sin(theta)) * omega
+        hddot[3] = vdot * casadi.sin(theta) + omegadot * b * casadi.cos(theta) + (v * casadi.cos(theta) - omega * b * casadi.sin(theta)) * omega
+        for i in range(n_actors):
+            sx = 2 * (x - p[i*4 + self.hparams.x_idx])
+            sy = 2 * (y - p[i*4 + self.hparams.y_idx])
+            sdx = v * casadi.cos(theta) - omega * b * casadi.sin(theta) - p[i*4 + 2 + self.hparams.x_idx]
+            sdy = v * casadi.sin(theta) + omega * b * casadi.cos(theta) - p[i*4 + 2 + self.hparams.y_idx]
+            sddx = hddot[1]
+            sddy = hddot[3]
+            hddot[i + 4] = sx * (sdx**2 + sddx) + sy * (sdy**2 + sddy) 
+            
+        return hddot
     
     def __create_acados_model(self) -> AcadosModel:
         # Setup CasADi expressions:
@@ -212,19 +244,23 @@ class NMPC:
         # CBF constraints:
         n_actors = self.hparams.n_actors
         gamma_mat = np.zeros((n_actors + 4, n_actors + 4))
+        gamma_d_mat = np.zeros((n_actors + 4, n_actors + 4))
         np.fill_diagonal(gamma_mat[:4, :4], self.hparams.gamma_bound)
+        np.fill_diagonal(gamma_d_mat[:4, :4], self.hparams.gamma_d_bound)
         if n_actors > 0:
             np.fill_diagonal(gamma_mat[4:, 4:], self.hparams.gamma_actor)
+            np.fill_diagonal(gamma_d_mat[4:, 4:], self.hparams.gamma_d_actor)
 
-        # if you consider robot center for the CBF constraints, uncomment next two lines
+        # if you consider robot center for the CBF constraints, uncomment this
         # con_h_expr = self.__h_dot(q, p) + np.matmul(gamma_mat, self.__h(q, p))
-        # acados_model.con_h_expr = con_h_expr
 
-        # if you consider point B for the CBF constraints, uncomment next two lines
-        con_h_expr = self.__h_dot_b(q, p) + np.matmul(gamma_mat, self.__h_b(q, p))
+        # if you consider point B for the CBF constraints, uncomment this
+        # con_h_expr = self.__h_dot_b(q, p) + np.matmul(gamma_mat, self.__h_b(q, p))
+            
+        # if you consider point B and also hddot for the CBF constraints, uncomment this
+        con_h_expr = self.__h_ddot_b(q, u, p) + np.matmul(gamma_d_mat, self.__h_dot_b(q, p)) + np.matmul(gamma_mat, self.__h_b(q, p))
+        
         acados_model.con_h_expr = con_h_expr
-    
-
 
         # Variables and params:
         acados_model.x = q
