@@ -72,7 +72,7 @@ class Hparams:
     ds_cbf = 0.5 # safety clearance
     gamma_actor = 0.8 # in (0,1], hyperparameter for the h function associated to actor
     gamma_d_actor = 0.8 # in (0,1], hyperparameter for the h_dot function associated to actor
-    gamma_bound = 1.0 # in (0,1], hyperparameter for the h function associated to bounds
+    gamma_bound = 0.3 # in (0,1], hyperparameter for the h function associated to bounds
     gamma_d_bound = 1.0 # in (0,1], hyperparameter for the h_dot function associated to bounds
     n_actors = 3 # number of actors
 

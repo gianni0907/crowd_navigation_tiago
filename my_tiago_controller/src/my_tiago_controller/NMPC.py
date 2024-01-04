@@ -245,10 +245,10 @@ class NMPC:
         # con_h_expr = self.__h_dot(q, p) + np.matmul(gamma_mat, self.__h(q, p))
 
         # if you consider point B for the CBF constraints, uncomment this
-        # con_h_expr = self.__h_dot_b(q, p) + np.matmul(gamma_mat, self.__h_b(q, p))
+        con_h_expr = self.__h_dot_b(q, p) + np.matmul(gamma_mat, self.__h_b(q, p))
             
         # if you consider point B and also hddot for the CBF constraints, uncomment this
-        con_h_expr = self.__h_ddot_b(q, u, p) + np.matmul(gamma_d_mat, self.__h_dot_b(q, p)) + np.matmul(gamma_mat, self.__h_b(q, p))
+        # con_h_expr = self.__h_ddot_b(q, u, p) + np.matmul(gamma_d_mat, self.__h_dot_b(q, p)) + np.matmul(gamma_mat, self.__h_b(q, p))
         
         acados_model.con_h_expr = con_h_expr
 
