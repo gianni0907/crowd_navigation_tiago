@@ -17,6 +17,18 @@ class State:
     def get_state(self):
         return np.array([self.x, self.y, self.theta, self.v, self.omega])
 
+class Configuration:
+    def __init__(self, x, y, theta):
+        self.x = x
+        self.y = y
+        self.theta = theta
+
+    def __repr__(self):
+        return '({}, {}, {})'.format(self.x, self.y, self.theta)
+    
+    def get_q(self):
+        return np.array([self.x, self.y, self.theta])
+
 class Position:
     def __init__(self, x, y):
         self.x = x
@@ -139,6 +151,37 @@ class CrowdMotionPredictionStamped:
             )
         )
 
+class LaserScan:
+    def __init__(self,
+                 time,
+                 frame_id,
+                 angle_min, angle_max, angle_increment,
+                 range_min, range_max,
+                 ranges,
+                 intensities):
+        self.time = time
+        self.frame_id = frame_id
+        self.angle_min = angle_min
+        self.angle_max = angle_max
+        self.angle_increment = angle_increment
+        self.range_min = range_min
+        self.range_max = range_max
+        self.ranges = ranges
+        self.intensities = intensities
+
+    @staticmethod
+    def from_message(msg):
+        return LaserScan(
+            msg.header.stamp.to_sec(),
+            msg.header.frame_id,
+            msg.angle_min,
+            msg.angle_max,
+            msg.angle_increment,
+            msg.range_min,
+            msg.range_max,
+            msg.ranges,
+            msg.intensities
+        )
 
 def Euler(f, x0, u, dt):
     return x0 + f(x0,u)*dt

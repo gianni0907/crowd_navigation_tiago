@@ -1,10 +1,12 @@
 import numpy as np
 import os
 import json
+import math
 import rospy
 import threading
 import sensor_msgs.msg
 import tf2_ros
+from sklearn.cluster import DBSCAN
 
 from my_tiago_controller.utils import *
 from my_tiago_controller.Hparams import *
@@ -14,14 +16,80 @@ from my_tiago_controller.FSM import *
 import my_tiago_msgs.srv
 import my_tiago_msgs.msg
 
+def cluster_scans(scans):
+    '''
+    Simple method to cluster the scans. Close scans are grouped together.
+    Input: array of scans
+    Output: array of clusters
+    '''
+    clusters = []
+    cluster = []
+    for (idx, distance) in scans:
+        if distance == np.inf:
+            if cluster:
+                cluster.sort(key = lambda x: x[1], reverse = False)
+                clusters.append((cluster[0][0],cluster[0][1]))
+                cluster = []
+        else:
+            cluster.append((idx, distance))
+
+    if len(clusters) > 0:
+        clusters.sort(key = lambda x: x[1], reverse = False)
+        clusters = clusters[0:Hparams.n_clusters]
+    return clusters
+
+def cluster_scans_k_means(scans, tiago_config, ang_min, ang_incr):
+    scans_xy_abs = []
+    scans_polar = []
+    for element in scans:
+        if element[1] != np.inf:
+            scan_idx = element[0]
+            scan_dist = element[1]
+            angle = ang_min + scan_idx * ang_incr
+            measure = np.array([scan_dist * math.cos(angle + tiago_config.theta) + tiago_config.x,
+                                scan_dist * math.sin(angle + tiago_config.theta) + tiago_config.y])
+            scans_xy_abs.append(measure)
+            scans_polar(element)
+
+    if len(scans_xy_abs) != 0:
+        dynamic_n_clusters = min(Hparams.n_clusters, len(scans_xy_abs))
+        k_means = DBSCAN(eps=1, min_samples=2)
+        clusters = k_means.fit_predict(np.array(scans_xy_abs))
+        dynamic_n_clusters = max(clusters) + 1
+        if(min(clusters) == -1):
+            print("Noisy samples")
+        
+        cluster_collection = np.zeros((dynamic_n_clusters, 2))
+        cluster_polar_collection = np.zeros((dynamic_n_clusters, 2))
+
+        for cluster_i in range(dynamic_n_clusters):
+            min_distance = 999
+            for id, (idx_scan, cluster_polar) in zip(clusters, enumerate(scans_polar)):
+                if id == cluster_i:
+                    if cluster_polar[1] < min_distance:
+                        min_distance = cluster_polar[1]
+                        cluster_collection[cluster_i] = scans_xy_abs[idx_scan]
+                        cluster_polar_collection[cluster_i] = scans_polar[idx_scan]
+
+        cluster_polar_collection = cluster_polar_collection.tolist()
+        cluster_polar_collection.sort(key = lambda x: x[1], reverse = False)
+        cluster_polar_collection = cluster_polar_collection[0:Hparams.n_clusters]
+    else:
+        cluster_polar_collection = np.array([])
+
+    return cluster_polar_collection
+
+def cluster_to_xy_abs(cluster, tiago_config, ang_min, ang_incr):
+    scan_idx = cluster[0]
+    scan_dist = cluster[1]
+    angle = ang_min + scan_idx * ang_incr
+    measure = np.array([scan_dist * math.cos(angle + tiago_config.theta) + tiago_config.x,
+                        scan_dist * math.sin(angle + tiago_config.theta) + tiago_config.y])
+    return measure
+
 class CrowdPredictionManager:
     '''
     From the laser scans input predict the motion of the actors
-    Simplified case: assume to have the whole actors trajectory
-                     and the data association, 
-                     use the Kalman Filter to estimate next state
-                     and project it over the control horizon,
-                     then send the predicted trajectories to the ControllerManager
     '''
     def __init__(self):
         self.data_lock = threading.Lock()
@@ -32,16 +100,18 @@ class CrowdPredictionManager:
         #   READY to get the actors trajectory
         #   MOVING actors
         self.status = Status.WAITING # WAITING for the initial robot state
-        
-        self.current = 0 # idx of the current actors position within trajectories
 
         self.robot_state = State(0.0, 0.0, 0.0, 0.0, 0.0)
         self.actors_position = {}
         self.hparams = Hparams()
+        self.laser_scan = None
         self.n_actors = self.hparams.n_actors
+        self.n_clusters = self.hparams.n_clusters
+        self.previous_clusters = None
+
         self.actors_name = ['actor_{}'.format(i + 1) for i in range(self.n_actors)]
         self.actors_position_history = {key: list() for key in self.actors_name}
-        # self.robot_state_history = []
+        self.robot_state_history = []
         self.kalman_infos = {}
         kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_actors)]
         self.kalman_infos = {key: list() for key in kalman_names}
@@ -65,6 +135,14 @@ class CrowdPredictionManager:
             self.joint_states_callback
         )
 
+        # Setup subscriber to scan_raw topic
+        scan_topic = '/scan_raw'
+        rospy.Subscriber(
+            scan_topic,
+            sensor_msgs.msg.LaserScan,
+            self.laser_scan_callback
+        )
+
         # Setup publisher for crowd motion prediction:
         crowd_prediction_topic = 'crowd_motion_prediction'
         self.crowd_motion_prediction_publisher = rospy.Publisher(
@@ -73,15 +151,13 @@ class CrowdPredictionManager:
             queue_size=1
         )
 
-        # Setup ROS Service to set actors trajectories:
-        self.set_actors_trajectory_srv = rospy.Service(
-            'SetActorsTrajectory',
-            my_tiago_msgs.srv.SetActorsTrajectory,
-            self.set_actors_trajectory_request
-        )
-
     def joint_states_callback(self, msg):
         self.wheels_vel = np.array([msg.velocity[13], msg.velocity[12]])
+
+    def laser_scan_callback(self, msg):
+        self.data_lock.acquire()
+        self.laser_scan = LaserScan.from_message(msg)
+        self.data_lock.release()
 
     def set_from_tf_transform(self, transform):
         q = transform.transform.rotation
@@ -157,6 +233,7 @@ class CrowdPredictionManager:
 
     def log_values(self):
         output_dict = {}
+        output_dict['TIAgo'] = self.robot_state_history
         output_dict['actors'] = self.actors_position_history
         output_dict['kfs'] = self.kalman_infos
         
