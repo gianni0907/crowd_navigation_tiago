@@ -38,16 +38,16 @@ def cluster_scans(scans):
         clusters = clusters[0:Hparams.n_clusters]
     return clusters
 
-def cluster_scans_k_means(scans, tiago_config, ang_min, ang_incr):
+def cluster_scans_k_means(scans, tiago_state, angle_min, angle_incr):
     scans_xy_abs = []
     scans_polar = []
     for element in scans:
         if element[1] != np.inf:
             scan_idx = element[0]
             scan_dist = element[1]
-            angle = ang_min + scan_idx * ang_incr
-            measure = np.array([scan_dist * math.cos(angle + tiago_config.theta) + tiago_config.x,
-                                scan_dist * math.sin(angle + tiago_config.theta) + tiago_config.y])
+            angle = angle_min + scan_idx * angle_incr
+            measure = np.array([scan_dist * math.cos(angle + tiago_state.theta) + tiago_state.x,
+                                scan_dist * math.sin(angle + tiago_state.theta) + tiago_state.y])
             scans_xy_abs.append(measure)
             scans_polar(element)
 
@@ -63,7 +63,7 @@ def cluster_scans_k_means(scans, tiago_config, ang_min, ang_incr):
         cluster_polar_collection = np.zeros((dynamic_n_clusters, 2))
 
         for cluster_i in range(dynamic_n_clusters):
-            min_distance = 999
+            min_distance = np.inf
             for id, (idx_scan, cluster_polar) in zip(clusters, enumerate(scans_polar)):
                 if id == cluster_i:
                     if cluster_polar[1] < min_distance:
@@ -79,12 +79,12 @@ def cluster_scans_k_means(scans, tiago_config, ang_min, ang_incr):
 
     return cluster_polar_collection
 
-def cluster_to_xy_abs(cluster, tiago_config, ang_min, ang_incr):
+def cluster_to_xy_abs(cluster, tiago_state, angle_min, angle_incr):
     scan_idx = cluster[0]
     scan_dist = cluster[1]
-    angle = ang_min + scan_idx * ang_incr
-    measure = np.array([scan_dist * math.cos(angle + tiago_config.theta) + tiago_config.x,
-                        scan_dist * math.sin(angle + tiago_config.theta) + tiago_config.y])
+    angle = angle_min + scan_idx * angle_incr
+    measure = np.array([scan_dist * math.cos(angle + tiago_state.theta) + tiago_state.x,
+                        scan_dist * math.sin(angle + tiago_state.theta) + tiago_state.y])
     return measure
 
 class CrowdPredictionManager:
@@ -189,28 +189,28 @@ class CrowdPredictionManager:
             rospy.logwarn("Missing current state")
             return False
         
-    def set_actors_trajectory_request(self, request):
-        if self.status == Status.WAITING:
-            rospy.loginfo("Cannot set actors trajectory, robot is not READY")
-            return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)            
-        if self.status == Status.READY:
-            self.trajectories = CrowdMotionPrediction.from_message(request.trajectories)
-            self.status = Status.MOVING
-            self.current = 0
-            self.trajectory_length = len(self.trajectories.motion_predictions[0].positions)
-            rospy.loginfo("Actors trajectory successfully set")
-            return my_tiago_msgs.srv.SetActorsTrajectoryResponse(True)
-        elif self.status == Status.MOVING:
-            rospy.loginfo("Cannot set actors trajectory, actors are already moving")
-            return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)
+    # def set_actors_trajectory_request(self, request):
+    #     if self.status == Status.WAITING:
+    #         rospy.loginfo("Cannot set actors trajectory, robot is not READY")
+    #         return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)            
+    #     if self.status == Status.READY:
+    #         self.trajectories = CrowdMotionPrediction.from_message(request.trajectories)
+    #         self.status = Status.MOVING
+    #         self.current = 0
+    #         self.trajectory_length = len(self.trajectories.motion_predictions[0].positions)
+    #         rospy.loginfo("Actors trajectory successfully set")
+    #         return my_tiago_msgs.srv.SetActorsTrajectoryResponse(True)
+    #     elif self.status == Status.MOVING:
+    #         rospy.loginfo("Cannot set actors trajectory, actors are already moving")
+    #         return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)
         
-    def update_actors_position(self):
-        actors_position = {}
-        for i in range(self.n_actors):
-            actors_position[self.actors_name[i]] = self.trajectories.motion_predictions[i].positions[self.current]
-        self.data_lock.acquire()
-        self.actors_position = actors_position
-        self.data_lock.release()
+    # def update_actors_position(self):
+    #     actors_position = {}
+    #     for i in range(self.n_actors):
+    #         actors_position[self.actors_name[i]] = self.trajectories.motion_predictions[i].positions[self.current]
+    #     self.data_lock.acquire()
+    #     self.actors_position = actors_position
+    #     self.data_lock.release()
 
     def propagate_state(self, state):
         predictions = [np.empty(4) for _ in range(self.N_horizon)]
@@ -275,45 +275,61 @@ class CrowdPredictionManager:
             self.update_state()
             self.data_lock.release()
             
-            if self.status == Status.READY:
-                rospy.logwarn("Missing actors info")
+            if self.laser_scan is None:
+                rospy.logwarn("Missing laser scan info")
                 rate.sleep()
                 continue
+
+            # Reset crowd_motion_prediction message
+            crowd_motion_prediction = CrowdMotionPrediction()
             
-            if self.status == Status.MOVING:
-                self.update_actors_position()
+            angle_min = self.laser_scan.angle_min
+            angle_max = self.laser_scan.angle_max
+            angle_increment = self.laser_scan.angle_increment
+
+            scanlist = []
+            for idx, value in enumerate(self.laser_scan.ranges):
+                scanlist.append((idx, value))
+
+            # Create clusters sorted by descending distance
+            clusters = cluster_scans_k_means(scanlist, self.robot_state, angle_min, angle_increment)
+            for idx, cluster in enumerate(clusters):
+                clusters[idx] = cluster_to_xy_abs(clusters[i], self.robot_state, angle_min, angle_increment)
+
+            for i,fsm in enumerate(fsms):
+                fsm_state = fsm.next_state
+
                 if self.hparams.log:
-                    for actor_name in self.actors_position.keys():
-                        self.actors_position_history[actor_name].append([self.actors_position[actor_name].x,
-                                                                         self.actors_position[actor_name].y,
-                                                                         time])
+                    self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
+                                                                     FSMStates.print(fsm_state),
+                                                                     time])
 
-                # Reset crowd_motion_prediction message
-                crowd_motion_prediction = CrowdMotionPrediction()
+                # Find the closest available cluster to the FSMs' predicted state
 
-                for i,fsm in enumerate(fsms):
-                    fsm_state = fsm.next_state
+                measure = np.array([self.actors_position[self.actors_name[i]].x,
+                                    self.actors_position[self.actors_name[i]].y])
+                fsm.update(time, measure)
 
-                    if self.hparams.log:
-                        self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
-                                                                         FSMStates.print(fsm_state),
-                                                                         time])
+                current_estimate = fsm.current_estimate
+                predictions = self.propagate_state(current_estimate)
+                predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
+                predicted_velocities = [Velocity(0.0, 0.0) for _ in range(self.N_horizon)]
+                for j in range(self.N_horizon):
+                    predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
+                    predicted_velocities[j] = Velocity(predictions[j][2], predictions[j][3])
+                
+                crowd_motion_prediction.append(
+                        MotionPrediction(predicted_positions, predicted_velocities)
+                )
+            # self.update_actors_position()
+            # if self.hparams.log:
+            #     for actor_name in self.actors_position.keys():
+            #         self.actors_position_history[actor_name].append([self.actors_position[actor_name].x,
+            #                                                          self.actors_position[actor_name].y,
+            #                                                          time])
 
-                    measure = np.array([self.actors_position[self.actors_name[i]].x,
-                                        self.actors_position[self.actors_name[i]].y])
-                    fsm.update(time, measure)
 
-                    current_estimate = fsm.current_estimate
-                    predictions = self.propagate_state(current_estimate)
-                    predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
-                    predicted_velocities = [Velocity(0.0, 0.0) for _ in range(self.N_horizon)]
-                    for j in range(self.N_horizon):
-                        predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
-                        predicted_velocities[j] = Velocity(predictions[j][2], predictions[j][3])
-                    
-                    crowd_motion_prediction.append(
-                            MotionPrediction(predicted_positions, predicted_velocities)
-                    )
+
 
                 crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(time),
                                                                                'map',
