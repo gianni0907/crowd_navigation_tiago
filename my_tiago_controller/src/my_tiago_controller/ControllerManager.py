@@ -155,12 +155,15 @@ class ControllerManager:
         self.wheels_vel = np.array([msg.velocity[13], msg.velocity[12]])
 
     def crowd_motion_prediction_stamped_callback(self, msg):
-        if not self.sensing:
-            self.sensing = True
         crowd_motion_prediction_stamped = CrowdMotionPredictionStamped.from_message(msg)
         self.data_lock.acquire()
         self.crowd_motion_prediction_stamped = crowd_motion_prediction_stamped
         self.data_lock.release()
+        if len(self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions) != 0:
+            self.sensing = True
+        else:
+            self.sensing = False
+            print("False sensing")
 
     def set_from_tf_transform(self, transform):
         q = transform.transform.rotation
@@ -226,6 +229,7 @@ class ControllerManager:
         output_dict['targets'] = self.target_history
 
         output_dict['n_actors'] = self.hparams.n_actors
+        output_dict['n_clusters'] = self.hparams.n_clusters
         if self.hparams.n_actors > 0:        
             output_dict['actors_predictions'] = self.actors_prediction_history
 
@@ -373,15 +377,18 @@ class ControllerManager:
                     self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
 
                 self.robot_prediction_history.append(predicted_trajectory.tolist())
-                
-                if self.hparams.n_actors > 0:
-                    predicted_trajectory = np.zeros((self.hparams.n_actors, 2, self.hparams.N_horizon))
-                    for i in range(self.hparams.n_actors):
+
+                predicted_trajectory = np.empty((self.hparams.n_clusters, 2, self.hparams.N_horizon))
+                if len(self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions) != 0:
+                    print("///////////////////////////////")
+                    print(len(self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions))
+                    for i in range(self.hparams.n_clusters):
+                        motion_prediction = self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i]
+                        print(motion_prediction.positions[0])
                         for j in range(self.hparams.N_horizon):
-                            motion_prediction = self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i]
                             predicted_trajectory[i, 0, j] = motion_prediction.positions[j].x
                             predicted_trajectory[i, 1, j] = motion_prediction.positions[j].y
-                    self.actors_prediction_history.append(predicted_trajectory.tolist())
+                self.actors_prediction_history.append(predicted_trajectory.tolist())
 
             final_time = rospy.get_time()        
             deltat = final_time - init_time

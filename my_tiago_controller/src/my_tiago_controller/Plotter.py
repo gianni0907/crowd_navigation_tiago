@@ -63,6 +63,7 @@ def plot_results(filename=None):
     wheels_vel_bounds = np.array(data['wheels_vel_bounds'])
 
     n_actors = data['n_actors']
+    n_clusters = data['n_clusters']
     if n_actors > 0:
         actors_predictions = np.array(data['actors_predictions'])
     N_horizon = data['N_horizon']
@@ -204,7 +205,7 @@ def plot_results(filename=None):
         actors_label = []
         actors_clearance = []
         actors_pred_line = []
-    for i in range(n_actors):
+    for i in range(n_clusters):
         actors.append(ax_big.scatter([], [], marker='o', label='actor{}'.format(i+1), color='red', alpha=0.7))
         actors_clearance.append(Circle(np.nan, np.nan, facecolor='none', edgecolor='red'))
         actors_label.append(ax_big.text(np.nan, np.nan, actors[i].get_label(), fontsize=8, ha='left', va='bottom'))
@@ -271,7 +272,7 @@ def plot_results(filename=None):
         goal.set_offsets(targets[0, :2])
         goal_label.set_position(targets[0])
         
-        for i in range(n_actors):
+        for i in range(n_clusters):
             actor_position = actors_predictions[0, i, :, 0]
             actors[i].set_offsets(actor_position)
             actors_clearance[i].set_center(actor_position)
@@ -304,7 +305,7 @@ def plot_results(filename=None):
         goal.set_offsets(current_target[:2])
         goal_label.set_position(current_target)
         if n_actors > 0:
-            for i in range(n_actors):
+            for i in range(n_clusters):
                 actor_prediction = actors_predictions[frame, i, :, :]
                 actor_position = actor_prediction[: , 0]
                 actors[i].set_offsets(actor_position)

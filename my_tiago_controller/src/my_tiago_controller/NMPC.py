@@ -27,6 +27,9 @@ class NMPC:
         dt = 1.0 / hparams.controller_frequency
         self.T = dt * self.N # [s]
 
+        self.n_actors = self.hparams.n_actors
+        self.n_clusters = self.hparams.n_clusters
+
         # Setup solver:
         self.acados_ocp_solver = self.__create_acados_ocp_solver(self.N,self.T)
 
@@ -82,9 +85,8 @@ class NMPC:
         theta = q[self.hparams.theta_idx]
         b = self.hparams.b
 
-        n_actors = self.hparams.n_actors
-        if n_actors > 0:
-            h = casadi.SX.zeros(4 + n_actors)
+        if self.n_actors > 0:
+            h = casadi.SX.zeros(4 + self.n_clusters)
         else:
             h = casadi.SX.zeros(4)
 
@@ -97,9 +99,9 @@ class NMPC:
         h[3] = y_c - self.hparams.y_lower_bound - self.hparams.rho_cbf
 
         # Consider the robot distance from actors, if actors are present
-        if n_actors > 0:
+        if self.n_actors > 0:
             cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
-            for i in range(n_actors):
+            for i in range(self.n_clusters):
                 sx = x_c - p[i*4 + self.hparams.x_idx]
                 sy = y_c - p[i*4 + self.hparams.y_idx]
                 h[i + 4] = sx**2 + sy**2 - cbf_radius**2
@@ -116,9 +118,8 @@ class NMPC:
         x_c = x - b * casadi.cos(theta)
         y_c = y - b * casadi.sin(theta)
 
-        n_actors = self.hparams.n_actors
-        if n_actors > 0:
-            hdot = casadi.SX.zeros(4 + n_actors)
+        if self.n_actors > 0:
+            hdot = casadi.SX.zeros(4 + self.n_clusters)
         else:
             hdot = casadi.SX.zeros(4)
 
@@ -126,7 +127,7 @@ class NMPC:
         hdot[1] = v * casadi.cos(theta)
         hdot[2] = - v * casadi.sin(theta)
         hdot[3] = v * casadi.sin(theta)
-        for i in range(n_actors):
+        for i in range(self.n_clusters):
             sx = x_c - p[i*4 + self.hparams.x_idx]
             sy = y_c - p[i*4 + self.hparams.y_idx]
             sdx = hdot[1] - p[i*4 + 2 + self.hparams.x_idx]
@@ -138,9 +139,8 @@ class NMPC:
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
 
-        n_actors = self.hparams.n_actors
-        if n_actors > 0:
-            h = casadi.SX.zeros(4 + n_actors)
+        if self.n_actors > 0:
+            h = casadi.SX.zeros(4 + self.n_clusters)
         else:
             h = casadi.SX.zeros(4)
 
@@ -150,9 +150,9 @@ class NMPC:
         h[3] = y - self.hparams.y_lower_bound - self.hparams.rho_cbf
 
         # Consider the robot distance from actors, if actors are present
-        if n_actors > 0:
+        if self.n_actors > 0:
             cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
-            for i in range(n_actors):
+            for i in range(self.n_clusters):
                 sx = x - p[i*4 + self.hparams.x_idx]
                 sy = y - p[i*4 + self.hparams.y_idx]
                 h[i + 4] = sx**2 + sy**2 - cbf_radius**2
@@ -166,9 +166,8 @@ class NMPC:
         omega = q[self.hparams.omega_idx]
         b = self.hparams.b
 
-        n_actors = self.hparams.n_actors
-        if n_actors > 0:
-            hdot = casadi.SX.zeros(4 + n_actors)
+        if self.n_actors > 0:
+            hdot = casadi.SX.zeros(4 + self.n_clusters)
         else:
             hdot = casadi.SX.zeros(4)
 
@@ -176,7 +175,7 @@ class NMPC:
         hdot[1] = v * casadi.cos(theta) - omega * b * casadi.sin(theta)
         hdot[2] = - v * casadi.sin(theta) - omega * b * casadi.cos(theta)
         hdot[3] = v * casadi.sin(theta) + omega * b * casadi.cos(theta)
-        for i in range(n_actors):
+        for i in range(self.n_clusters):
             sx = x - p[i*4 + self.hparams.x_idx]
             sy = y - p[i*4 + self.hparams.y_idx]
             sdx = hdot[1] - p[i*4 + 2 + self.hparams.x_idx]
@@ -194,9 +193,8 @@ class NMPC:
         omegadot = self.__omega_dot(u)
         b = self.hparams.b
 
-        n_actors = self.hparams.n_actors
-        if n_actors > 0:
-            hddot = casadi.SX.zeros(4 + n_actors)
+        if self.n_actors > 0:
+            hddot = casadi.SX.zeros(4 + self.n_clusters)
         else:
             hddot = casadi.SX.zeros(4)
 
@@ -204,7 +202,7 @@ class NMPC:
         hddot[1] = vdot * casadi.cos(theta) - omegadot * b * casadi.sin(theta) - (v * casadi.sin(theta) + omega * b * casadi.cos(theta)) * omega
         hddot[2] = - vdot * casadi.sin(theta) - omegadot * b * casadi.cos(theta) + (- v * casadi.cos(theta) + omega * b * casadi.sin(theta)) * omega
         hddot[3] = vdot * casadi.sin(theta) + omegadot * b * casadi.cos(theta) + (v * casadi.cos(theta) - omega * b * casadi.sin(theta)) * omega
-        for i in range(n_actors):
+        for i in range(self.n_clusters):
             sx = x - p[i*4 + self.hparams.x_idx]
             sy = y - p[i*4 + self.hparams.y_idx]
             sdx = v * casadi.cos(theta) - omega * b * casadi.sin(theta) - p[i*4 + 2 + self.hparams.x_idx]
@@ -219,7 +217,7 @@ class NMPC:
         q = casadi.SX.sym('q', self.nq)
         qdot = casadi.SX.sym('qdot', self.nq)
         u = casadi.SX.sym('u', self.nu)
-        p = casadi.SX.sym('p', self.hparams.n_actors * 4)
+        p = casadi.SX.sym('p', self.n_clusters * 4)
         f_expl = self.__f(q, u)
         f_impl = qdot - f_expl
 
@@ -232,12 +230,12 @@ class NMPC:
         acados_model.f_expl_expr = f_expl
 
         # CBF constraints:
-        n_actors = self.hparams.n_actors
-        gamma_mat = np.zeros((n_actors + 4, n_actors + 4))
-        gamma_d_mat = np.zeros((n_actors + 4, n_actors + 4))
+        n_clusters = self.n_clusters
+        gamma_mat = np.zeros((n_clusters + 4, n_clusters + 4))
+        gamma_d_mat = np.zeros((n_clusters + 4, n_clusters + 4))
         np.fill_diagonal(gamma_mat[:4, :4], self.hparams.gamma_bound)
         np.fill_diagonal(gamma_d_mat[:4, :4], self.hparams.gamma_d_bound)
-        if n_actors > 0:
+        if self.n_actors > 0:
             np.fill_diagonal(gamma_mat[4:, 4:], self.hparams.gamma_actor)
             np.fill_diagonal(gamma_d_mat[4:, 4:], self.hparams.gamma_d_actor)
 
@@ -327,9 +325,9 @@ class NMPC:
                                           self.hparams.steering_acc_max])
 
         # Nonlinear constraints (CBFs) (for both actors and configuration bounds):
-        if self.hparams.n_actors > 0:
-            acados_constraints.lh = np.zeros(self.hparams.n_actors + 4)
-            acados_constraints.uh = 10000 * np.ones(self.hparams.n_actors + 4)
+        if self.n_actors > 0:
+            acados_constraints.lh = np.zeros(self.n_clusters + 4)
+            acados_constraints.uh = 10000 * np.ones(self.n_clusters + 4)
         else:
             acados_constraints.lh = np.zeros(4)
             acados_constraints.uh = 10000 * np.ones(4) 
@@ -352,7 +350,7 @@ class NMPC:
         acados_ocp = AcadosOcp()
         acados_ocp.model = self.__create_acados_model()
         acados_ocp.dims.N = N
-        acados_ocp.parameter_values = np.zeros((self.hparams.n_actors * 4,))
+        acados_ocp.parameter_values = np.zeros((self.n_clusters * 4,))
         acados_ocp.cost = self.__create_acados_cost()
         acados_ocp.constraints = self.__create_acados_constraints()
         acados_ocp.solver_options = self.__create_acados_solver_options(T)
@@ -378,8 +376,8 @@ class NMPC:
         # Set parameters
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
-            actors_state = np.zeros((self.hparams.n_actors * 4))
-            for j in range(self.hparams.n_actors):
+            actors_state = np.zeros((self.hparams.n_clusters * 4))
+            for j in range(self.n_clusters):
                 actors_state[j*4 + 0] = crowd_motion_prediction.motion_predictions[j].positions[k].x
                 actors_state[j*4 + 1] = crowd_motion_prediction.motion_predictions[j].positions[k].y
                 actors_state[j*4 + 2] = crowd_motion_prediction.motion_predictions[j].velocities[k].x
