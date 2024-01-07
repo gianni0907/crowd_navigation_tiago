@@ -41,8 +41,8 @@ class Hparams:
     w_max_neg = - w_max
 
     # Configuration limits (only for cartesian position)
-    x_lower_bound = -5 # [m]
-    x_upper_bound = 5  # [m]
+    x_lower_bound = -6 # [m]
+    x_upper_bound = 6  # [m]
     y_lower_bound = x_lower_bound
     y_upper_bound = x_upper_bound
     
