@@ -44,7 +44,7 @@ class ControllerManager:
         self.state = State(0.0, 0.0, 0.0, 0.0, 0.0)
         self.wheels_vel = np.zeros(2) # [w_r, w_l]
         self.actors_configuration = np.zeros(self.hparams.n_actors, dtype=Configuration)
-        self.actors_name = ['actor_{}'.format(i+1) for i in range(self.hparams.n_actors)]
+        self.actors_name = ['actor_{}'.format(i) for i in range(self.hparams.n_actors)]
         self.crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.now(),
                                                                             'map',
                                                                             CrowdMotionPrediction())
@@ -192,7 +192,7 @@ class ControllerManager:
                 actors_configuration[actor_idx - 1] = actor_configuration
 
         self.data_lock.acquire()
-        self.actors_configuration = np.copy(actors_configuration)
+        self.actors_configuration = actors_configuration
         self.data_lock.release()
 
     def set_from_tf_transform(self, transform):
