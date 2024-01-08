@@ -58,22 +58,17 @@ class CrowdPredictionManager:
         self.data_lock = threading.Lock()
 
         # Set status
-        # 3 possibilities:
+        # 2 possibilities:
         #   WAITING for the initial robot state
         #   READY to perceive and act
         self.status = Status.WAITING # WAITING for the initial robot state
 
         self.robot_state = State(0.0, 0.0, 0.0, 0.0, 0.0)
-        self.actors_position = {}
         self.hparams = Hparams()
         self.laser_scan = None
         self.n_actors = self.hparams.n_actors
         self.n_clusters = self.hparams.n_clusters
-        self.previous_clusters = None
 
-        self.actors_name = ['actor_{}'.format(i + 1) for i in range(self.n_actors)]
-        self.actors_position_history = {key: list() for key in self.actors_name}
-        self.robot_state_history = []
         self.kalman_infos = {}
         kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_actors)]
         self.kalman_infos = {key: list() for key in kalman_names}
@@ -151,14 +146,6 @@ class CrowdPredictionManager:
             rospy.logwarn("Missing current state")
             return False
 
-    # def update_actors_position(self):
-    #     actors_position = {}
-    #     for i in range(self.n_actors):
-    #         actors_position[self.actors_name[i]] = self.trajectories.motion_predictions[i].positions[self.current]
-    #     self.data_lock.acquire()
-    #     self.actors_position = actors_position
-    #     self.data_lock.release()
-
     def propagate_state(self, state, N):
         predictions = [np.empty(4) for _ in range(N)]
         time = 0
@@ -180,8 +167,6 @@ class CrowdPredictionManager:
 
     def log_values(self):
         output_dict = {}
-        output_dict['TIAGo'] = self.robot_state_history
-        output_dict['actors'] = self.actors_position_history
         output_dict['kfs'] = self.kalman_infos
         
         # log the data in a .json file
@@ -314,12 +299,7 @@ class CrowdPredictionManager:
                 crowd_motion_prediction.append(
                         MotionPrediction(predicted_positions, predicted_velocities)
                 )
-            # # self.update_actors_position()
-            # # if self.hparams.log:
-            # #     for actor_name in self.actors_position.keys():
-            # #         self.actors_position_history[actor_name].append([self.actors_position[actor_name].x,
-            # #                                                          self.actors_position[actor_name].y,
-            # #                                                          time])
+
             crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(time),
                                                                             'map',
                                                                             crowd_motion_prediction)

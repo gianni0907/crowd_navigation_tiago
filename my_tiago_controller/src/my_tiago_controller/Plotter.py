@@ -66,6 +66,8 @@ def plot_results(filename=None):
     n_clusters = data['n_clusters']
     if n_actors > 0:
         actors_predictions = np.array(data['actors_predictions'])
+        actors_groundtruth = np.array(data['actors_gt'])
+        
     N_horizon = data['N_horizon']
     rho_cbf = data['rho_cbf']
     ds_cbf = data['ds_cbf']
@@ -197,7 +199,7 @@ def plot_results(filename=None):
     robot = ax_big.scatter([], [], s=100.0, marker='o',label='TIAGo', facecolors='none', edgecolors='blue')
     controlled_pt = ax_big.scatter([], [], marker='.', color='blue')
     robot_label = ax_big.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
-    robot_clearance = Circle(np.nan, np.nan, facecolor='none', edgecolor='blue')
+    robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='blue')
     goal = ax_big.scatter([], [], s=80.0, marker='*', label='goal', color='magenta', alpha=0.7)
     goal_label = ax_big.text(np.nan, np.nan, goal.get_label(), fontsize=8, ha='left', va='bottom')
     if n_actors > 0:
@@ -205,12 +207,22 @@ def plot_results(filename=None):
         actors_label = []
         actors_clearance = []
         actors_pred_line = []
-    for i in range(n_clusters):
-        actors.append(ax_big.scatter([], [], marker='o', label='actor{}'.format(i+1), color='red', alpha=0.7))
-        actors_clearance.append(Circle(np.nan, np.nan, facecolor='none', edgecolor='red'))
-        actors_label.append(ax_big.text(np.nan, np.nan, actors[i].get_label(), fontsize=8, ha='left', va='bottom'))
-        actor_pred_line, = ax_big.plot([], [], color='orange', label='actor prediction')
-        actors_pred_line.append(actor_pred_line)
+        actors_gt = []
+        actors_gt_label = []
+        actors_gt_clearance = []
+        
+        for i in range(n_clusters):
+            actors.append(ax_big.scatter([], [], marker='o', label='actor{}'.format(i+1), color='red', alpha=0.7))
+            actors_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='red'))
+            actors_label.append(ax_big.text(np.nan, np.nan, actors[i].get_label(), fontsize=8, ha='left', va='bottom'))
+            actor_pred_line, = ax_big.plot([], [], color='orange', label='actor prediction')
+            actors_pred_line.append(actor_pred_line)
+    
+        for i in range(n_actors):
+            actors_gt.append(ax_big.scatter([], [], marker='o', label='actor{}'.format(i+1), color='cyan', alpha=0.7))
+            actors_gt_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='cyan'))
+            actors_gt_label.append(ax_big.text(np.nan, np.nan, actors_gt[i].get_label(), fontsize=8, ha='left', va='bottom'))
+    
     traj_line, = ax_big.plot([], [], color='blue', label='trajectory')
     robot_pred_line, = ax_big.plot([], [], color='green', label='prediction')
     ex_line, = ax1.plot([], [], label='$e_x$')
@@ -271,17 +283,28 @@ def plot_results(filename=None):
 
         goal.set_offsets(targets[0, :2])
         goal_label.set_position(targets[0])
-        
-        for i in range(n_clusters):
-            actor_position = actors_predictions[0, i, :, 0]
-            actors[i].set_offsets(actor_position)
-            actors_clearance[i].set_center(actor_position)
-            actors_clearance[i].set_radius(ds_cbf)
-            ax_big.add_patch(actors_clearance[i])
-            actors_label[i].set_position(actor_position)
+
+        if n_actors > 0:        
+            for i in range(n_clusters):
+                actor_position = actors_predictions[0, i, :, 0]
+                actors[i].set_offsets(actor_position)
+                actors_clearance[i].set_center(actor_position)
+                actors_clearance[i].set_radius(ds_cbf)
+                ax_big.add_patch(actors_clearance[i])
+                actors_label[i].set_position(actor_position)
+
+        for i in range(n_actors):
+            actor_gt_position = actors_groundtruth[0, i, :]
+            actors_gt[i].set_offsets(actor_gt_position)
+            actors_gt_clearance[i].set_center(actor_gt_position)
+            actors_gt_clearance[i].set_radius(ds_cbf)
+            ax_big.add_patch(actors_gt_clearance[i])
+            actors_gt_label[i].set_position(actor_gt_position)
+
         if n_actors > 0:
             return robot, robot_clearance, robot_label, goal, goal_label, \
-                    actors, actors_clearance, actors_label
+                    actors, actors_clearance, actors_label, \
+                    actors_gt, actors_gt_clearance, actors_gt_label
         else:
             return robot, robot_clearance, robot_label, goal, goal_label,
 
@@ -304,6 +327,7 @@ def plot_results(filename=None):
         robot_label.set_position(robot_center[frame, :])
         goal.set_offsets(current_target[:2])
         goal_label.set_position(current_target)
+
         if n_actors > 0:
             for i in range(n_clusters):
                 actor_prediction = actors_predictions[frame, i, :, :]
@@ -313,13 +337,20 @@ def plot_results(filename=None):
                 actors_label[i].set_position(actor_position)
                 actors_pred_line[i].set_data(actor_prediction[0, :], actor_prediction[1, :])
 
+        for i in range(n_actors):
+            actor_gt_position = actors_groundtruth[frame, i, :]
+            actors_gt[i].set_offsets(actor_gt_position)
+            actors_gt_clearance[i].set_center(actor_gt_position)
+            actors_gt_label[i].set_position(actor_gt_position)
+
         if frame == shooting_nodes - 1:
             sim_animation.event_source.stop()
 
         if n_actors > 0:
             return robot, robot_clearance, robot_label, goal, goal_label, \
                     ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line, \
-                    actors, actors_clearance, actors_label
+                    actors, actors_clearance, actors_label, \
+                    actors_gt, actors_gt_clearance, actors_gt_label
         else:
             return robot, robot_clearance, robot_label, goal, goal_label, \
                     ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line

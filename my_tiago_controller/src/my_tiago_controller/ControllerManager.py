@@ -1,11 +1,13 @@
 import json
-import rospy
 import threading
 import math
 import os
+import rospy
+import tf2_ros
+
+import gazebo_msgs.msg
 import geometry_msgs.msg
 import sensor_msgs.msg
-import tf2_ros
 
 from numpy.linalg import *
 
@@ -41,6 +43,8 @@ class ControllerManager:
 
         self.state = State(0.0, 0.0, 0.0, 0.0, 0.0)
         self.wheels_vel = np.zeros(2) # [w_r, w_l]
+        self.actors_configuration = np.zeros(self.hparams.n_actors, dtype=Configuration)
+        self.actors_name = ['actor_{}'.format(i+1) for i in range(self.hparams.n_actors)]
         self.crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.now(),
                                                                             'map',
                                                                             CrowdMotionPrediction())
@@ -86,6 +90,13 @@ class ControllerManager:
             self.crowd_motion_prediction_stamped_callback
         )
 
+        # Setup subscriber for model_states topic
+        model_states_topic = "/gazebo/model_states"
+        rospy.Subscriber(
+            model_states_topic,
+            gazebo_msgs.msg.ModelStates,
+            self.gazebo_model_states_callback
+        )
         # Set variables to store data
         if self.hparams.log:
             self.state_history = []
@@ -94,6 +105,7 @@ class ControllerManager:
             self.wheels_acc_history = []
             self.target_history = []
             self.actors_prediction_history = []
+            self.actors_gt_history = []
 
     def init(self):
         # Initialize target position to the current position
@@ -163,7 +175,25 @@ class ControllerManager:
             self.sensing = True
         else:
             self.sensing = False
-            print("False sensing")
+
+    def gazebo_model_states_callback(self, msg):
+        actors_configuration = np.empty(self.hparams.n_actors, dtype=Configuration)
+        for actor_name in self.actors_name:
+            if actor_name in msg.name:
+                actor_idx = msg.name.index(actor_name)
+                p = msg.pose[actor_idx].position
+                q = msg.pose[actor_idx].orientation
+                actor_configuration = Configuration(
+                    p.x,
+                    p.y,
+                    math.atan2(2.0 * (q.w * q.z + q.x * q.y),
+                               1.0 - 2.0 * (q.y**2 + q.z**2))
+                )
+                actors_configuration[actor_idx - 1] = actor_configuration
+
+        self.data_lock.acquire()
+        self.actors_configuration = np.copy(actors_configuration)
+        self.data_lock.release()
 
     def set_from_tf_transform(self, transform):
         q = transform.transform.rotation
@@ -232,6 +262,7 @@ class ControllerManager:
         output_dict['n_clusters'] = self.hparams.n_clusters
         if self.hparams.n_actors > 0:        
             output_dict['actors_predictions'] = self.actors_prediction_history
+            output_dict['actors_gt'] = self.actors_gt_history
 
         output_dict['x_bounds'] = [self.hparams.x_lower_bound, self.hparams.x_upper_bound]
         output_dict['y_bounds'] = [self.hparams.y_lower_bound, self.hparams.y_upper_bound]
@@ -378,17 +409,20 @@ class ControllerManager:
 
                 self.robot_prediction_history.append(predicted_trajectory.tolist())
 
-                predicted_trajectory = np.empty((self.hparams.n_clusters, 2, self.hparams.N_horizon))
+                predicted_trajectory = np.zeros((self.hparams.n_clusters, 2, self.hparams.N_horizon))
                 if len(self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions) != 0:
-                    print("///////////////////////////////")
-                    print(len(self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions))
                     for i in range(self.hparams.n_clusters):
                         motion_prediction = self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i]
-                        print(motion_prediction.positions[0])
                         for j in range(self.hparams.N_horizon):
                             predicted_trajectory[i, 0, j] = motion_prediction.positions[j].x
                             predicted_trajectory[i, 1, j] = motion_prediction.positions[j].y
                 self.actors_prediction_history.append(predicted_trajectory.tolist())
+
+                gt_trajectory = np.zeros((self.hparams.n_actors, 2))
+                for i in range(self.hparams.n_actors):
+                    gt_trajectory[i, 0] = self.actors_configuration[i].x
+                    gt_trajectory[i, 1] = self.actors_configuration[i].y
+                self.actors_gt_history.append(gt_trajectory.tolist())
 
             final_time = rospy.get_time()        
             deltat = final_time - init_time
