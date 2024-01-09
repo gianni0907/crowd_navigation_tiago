@@ -79,6 +79,7 @@ class Hparams:
 
     # Parameters for the crowd prediction
     if n_actors > 0:
+        nullstate = np.array([x_lower_bound - 10, y_lower_bound - 10, 0.0, 0.0])
         innovation_threshold = 1
         matching_threshold = 0.1
         max_pred_time = 1

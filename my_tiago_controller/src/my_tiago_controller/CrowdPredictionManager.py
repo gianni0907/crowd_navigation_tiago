@@ -147,11 +147,11 @@ class CrowdPredictionManager:
             return False
 
     def propagate_state(self, state, N):
-        predictions = [np.empty(4) for _ in range(N)]
+        predictions = [self.hparams.nullstate for _ in range(N)]
         time = 0
         dt = 1 / self.frequency
         for i in range(N):
-            time = dt * (i + 1)
+            time = dt * (i)
             predictions[i] = self.predict_next_state(state, time)
 
         return predictions
@@ -251,7 +251,7 @@ class CrowdPredictionManager:
                 elif fsm.next_state is FSMStates.START:
                     predicted_state = fsm.current_estimate
                 else:
-                    predicted_state = np.empty(4)
+                    predicted_state = self.hparams.nullstate
                 predicted_positions[i] = predicted_state[:2]
             
             # compute pairwise distance between predicted positions and positions from clusters

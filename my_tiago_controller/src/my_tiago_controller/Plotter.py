@@ -212,7 +212,7 @@ def plot_results(filename=None):
         actors_gt_clearance = []
         
         for i in range(n_clusters):
-            actors.append(ax_big.scatter([], [], marker='o', label='actor{}'.format(i+1), color='red', alpha=0.7))
+            actors.append(ax_big.scatter([], [], marker='o', label='fsm{}'.format(i+1), color='red', alpha=0.7))
             actors_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='red'))
             actors_label.append(ax_big.text(np.nan, np.nan, actors[i].get_label(), fontsize=8, ha='left', va='bottom'))
             actor_pred_line, = ax_big.plot([], [], color='orange', label='actor prediction')
