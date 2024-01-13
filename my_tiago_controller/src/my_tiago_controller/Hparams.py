@@ -71,11 +71,9 @@ class Hparams:
     rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_actor = 0.8 # in (0,1], hyperparameter for the h function associated to actor
-    gamma_d_actor = 0.8 # in (0,1], hyperparameter for the h_dot function associated to actor
-    gamma_bound = 0.8 # in (0,1], hyperparameter for the h function associated to bounds
-    gamma_d_bound = 1.0 # in (0,1], hyperparameter for the h_dot function associated to bounds
-    n_actors = 5 # number of actors
-    n_clusters = 3 # number of clusters
+    gamma_bound = 0.5 # in (0,1], hyperparameter for the h function associated to bounds
+    n_actors = 0 # number of actors
+    n_clusters = 0 # number of clusters
 
     # Parameters for the crowd prediction
     if n_actors > 0:

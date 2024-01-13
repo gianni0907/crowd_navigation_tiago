@@ -1,5 +1,4 @@
 import numpy as np
-import rospy
 import scipy.linalg
 
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions, AcadosOcpSolver
@@ -9,6 +8,7 @@ import casadi
 
 from my_tiago_controller.Hparams import *
 from my_tiago_controller.utils import *
+from my_tiago_controller.KinematicModel import *
 
 class NMPC:
     def __init__(self,
@@ -27,6 +27,9 @@ class NMPC:
         dt = 1.0 / hparams.controller_frequency
         self.T = dt * self.N # [s]
 
+        # Setup kinematic model
+        self.kinematic_model = KinematicModel()
+
         self.n_actors = self.hparams.n_actors
         self.n_clusters = self.hparams.n_clusters
 
@@ -38,6 +41,34 @@ class NMPC:
             self.acados_ocp_solver.set(k, 'x', x0.get_state())
             self.acados_ocp_solver.set(k, 'u', np.zeros(self.nu))
         self.acados_ocp_solver.set(self.N, 'x', x0.get_state())
+
+    def __Euler(self, f, x0, u, dt):
+        return x0 + f(x0,u)*dt
+
+    def __RK4(self, f, x0, u ,dt):
+        k1 = f(x0, u)
+        k2 = f(x0 + k1 * dt / 2.0, u)
+        k3 = f(x0 + k2 * dt / 2.0, u)
+        k4 = f(x0 + k3 * dt, u)
+        yf = x0 + dt / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        return yf
+
+    def __integrate(self, f, x0, u, integration_method='RK4'):
+        dt = 1 / self.hparams.controller_frequency
+        if integration_method == 'RK4':
+            return self.__RK4(f, x0, u, dt)
+        else:
+            return self.__Euler(f, x0, u, dt)
+
+    def __next_actor_state(self, state):
+        dt = 1 / self.hparams.controller_frequency
+        F = np.array([[1.0, 0.0, dt, 0.0],
+                      [0.0, 1.0, 0.0, dt],
+                      [0.0, 0.0, 1.0, 0.0],
+                      [0.0, 0.0, 0.0, 1.0]])
+        F_complete= np.kron(np.eye(self.hparams.n_actors), F)
+        next_state = np.matmul(F_complete, state)
+        return next_state
 
     # Systems dynamics:
     def __f(self, q, u):
@@ -82,62 +113,6 @@ class NMPC:
     def __h(self, q, p):
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
-        theta = q[self.hparams.theta_idx]
-        b = self.hparams.b
-
-        if self.n_actors > 0:
-            h = casadi.SX.zeros(4 + self.n_clusters)
-        else:
-            h = casadi.SX.zeros(4)
-
-        # Consider the robot distance from the bounds [ubx, lbx, uby, lby]
-        x_c = x - b * casadi.cos(theta)
-        y_c = y - b * casadi.sin(theta)
-        h[0] = self.hparams.x_upper_bound - x_c - self.hparams.rho_cbf
-        h[1] = x_c - self.hparams.x_lower_bound - self.hparams.rho_cbf
-        h[2] = self.hparams.y_upper_bound - y_c - self.hparams.rho_cbf
-        h[3] = y_c - self.hparams.y_lower_bound - self.hparams.rho_cbf
-
-        # Consider the robot distance from actors, if actors are present
-        if self.n_actors > 0:
-            cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
-            for i in range(self.n_clusters):
-                sx = x_c - p[i*4 + self.hparams.x_idx]
-                sy = y_c - p[i*4 + self.hparams.y_idx]
-                h[i + 4] = sx**2 + sy**2 - cbf_radius**2
-        return h
-
-    def __h_dot(self, q, p):
-        x = q[self.hparams.x_idx]
-        y = q[self.hparams.y_idx]
-        theta = q[self.hparams.theta_idx]
-        v = q[self.hparams.v_idx]
-        b = self.hparams.b
-
-        # Set the coordinates of the robot center
-        x_c = x - b * casadi.cos(theta)
-        y_c = y - b * casadi.sin(theta)
-
-        if self.n_actors > 0:
-            hdot = casadi.SX.zeros(4 + self.n_clusters)
-        else:
-            hdot = casadi.SX.zeros(4)
-
-        hdot[0] = - v * casadi.cos(theta)
-        hdot[1] = v * casadi.cos(theta)
-        hdot[2] = - v * casadi.sin(theta)
-        hdot[3] = v * casadi.sin(theta)
-        for i in range(self.n_clusters):
-            sx = x_c - p[i*4 + self.hparams.x_idx]
-            sy = y_c - p[i*4 + self.hparams.y_idx]
-            sdx = hdot[1] - p[i*4 + 2 + self.hparams.x_idx]
-            sdy = hdot[3] - p[i*4 + 2 + self.hparams.y_idx]
-            hdot[i + 4] = 2 * sx * sdx + 2 * sy * sdy
-        return hdot
-
-    def __h_b(self, q, p):
-        x = q[self.hparams.x_idx]
-        y = q[self.hparams.y_idx]
 
         if self.n_actors > 0:
             h = casadi.SX.zeros(4 + self.n_clusters)
@@ -158,60 +133,6 @@ class NMPC:
                 h[i + 4] = sx**2 + sy**2 - cbf_radius**2
         return h
 
-    def __h_dot_b(self, q, p):
-        x = q[self.hparams.x_idx]
-        y = q[self.hparams.y_idx]
-        theta = q[self.hparams.theta_idx]
-        v = q[self.hparams.v_idx]
-        omega = q[self.hparams.omega_idx]
-        b = self.hparams.b
-
-        if self.n_actors > 0:
-            hdot = casadi.SX.zeros(4 + self.n_clusters)
-        else:
-            hdot = casadi.SX.zeros(4)
-
-        hdot[0] = - v * casadi.cos(theta) + omega * b * casadi.sin(theta)
-        hdot[1] = v * casadi.cos(theta) - omega * b * casadi.sin(theta)
-        hdot[2] = - v * casadi.sin(theta) - omega * b * casadi.cos(theta)
-        hdot[3] = v * casadi.sin(theta) + omega * b * casadi.cos(theta)
-        for i in range(self.n_clusters):
-            sx = x - p[i*4 + self.hparams.x_idx]
-            sy = y - p[i*4 + self.hparams.y_idx]
-            sdx = hdot[1] - p[i*4 + 2 + self.hparams.x_idx]
-            sdy = hdot[3] - p[i*4 + 2 + self.hparams.y_idx]
-            hdot[i + 4] = 2 * sx * sdx + 2 * sy * sdy
-        return hdot
-    
-    def __h_ddot_b(self, q, u, p):
-        x = q[self.hparams.x_idx]
-        y = q[self.hparams.y_idx]
-        theta = q[self.hparams.theta_idx]
-        v = q[self.hparams.v_idx]
-        omega = q[self.hparams.omega_idx]
-        vdot = self.__v_dot(u)
-        omegadot = self.__omega_dot(u)
-        b = self.hparams.b
-
-        if self.n_actors > 0:
-            hddot = casadi.SX.zeros(4 + self.n_clusters)
-        else:
-            hddot = casadi.SX.zeros(4)
-
-        hddot[0] = - vdot * casadi.cos(theta) + omegadot * b * casadi.sin(theta) + (v * casadi.sin(theta) + omega * b * casadi.cos(theta)) * omega
-        hddot[1] = vdot * casadi.cos(theta) - omegadot * b * casadi.sin(theta) - (v * casadi.sin(theta) + omega * b * casadi.cos(theta)) * omega
-        hddot[2] = - vdot * casadi.sin(theta) - omegadot * b * casadi.cos(theta) + (- v * casadi.cos(theta) + omega * b * casadi.sin(theta)) * omega
-        hddot[3] = vdot * casadi.sin(theta) + omegadot * b * casadi.cos(theta) + (v * casadi.cos(theta) - omega * b * casadi.sin(theta)) * omega
-        for i in range(self.n_clusters):
-            sx = x - p[i*4 + self.hparams.x_idx]
-            sy = y - p[i*4 + self.hparams.y_idx]
-            sdx = v * casadi.cos(theta) - omega * b * casadi.sin(theta) - p[i*4 + 2 + self.hparams.x_idx]
-            sdy = v * casadi.sin(theta) + omega * b * casadi.cos(theta) - p[i*4 + 2 + self.hparams.y_idx]
-            sddx = hddot[1]
-            sddy = hddot[3]
-            hddot[i + 4] = 2 * sx * (sdx**2 + sddx) + 2 * sy * (sdy**2 + sddy) 
-        return hddot
-    
     def __create_acados_model(self) -> AcadosModel:
         # Setup CasADi expressions:
         q = casadi.SX.sym('q', self.nq)
@@ -232,21 +153,20 @@ class NMPC:
         # CBF constraints:
         n_clusters = self.n_clusters
         gamma_mat = np.zeros((n_clusters + 4, n_clusters + 4))
-        gamma_d_mat = np.zeros((n_clusters + 4, n_clusters + 4))
+        id_mat = np.eye(n_clusters + 4)
         np.fill_diagonal(gamma_mat[:4, :4], self.hparams.gamma_bound)
-        np.fill_diagonal(gamma_d_mat[:4, :4], self.hparams.gamma_d_bound)
         if self.n_actors > 0:
             np.fill_diagonal(gamma_mat[4:, 4:], self.hparams.gamma_actor)
-            np.fill_diagonal(gamma_d_mat[4:, 4:], self.hparams.gamma_d_actor)
 
-        # if you consider robot center for the CBF constraints, uncomment this
-        # con_h_expr = self.__h_dot(q, p) + np.matmul(gamma_mat, self.__h(q, p))
-
-        # if you consider point B for the CBF constraints, uncomment this
-        con_h_expr = self.__h_dot_b(q, p) + np.matmul(gamma_mat, self.__h_b(q, p))
-            
-        # if you consider point B and also hddot for the CBF constraints, uncomment this
-        # con_h_expr = self.__h_ddot_b(q, u, p) + np.matmul(gamma_d_mat, self.__h_dot_b(q, p)) + np.matmul(gamma_mat, self.__h_b(q, p))
+        h_k = self.__h(q, p)
+        
+        q_k1 = self.__integrate(self.kinematic_model, q, u)
+        if self.n_actors > 0:
+            p_k1 = self.__next_actor_state(p)
+        else:
+            p_k1 = p # just for consistency, it is not used in case of 0 actors
+        h_k1 = self.__h(q_k1, p_k1)
+        con_h_expr = h_k1 + np.matmul(gamma_mat - id_mat, h_k)
         
         acados_model.con_h_expr = con_h_expr
 
