@@ -65,14 +65,14 @@ class Hparams:
     v_weight = 1e4 # driving velocity weight
     omega_weight = 1e0 # steering velocity weight
     u_weight = 1e0 # input weights
-    terminal_factor = 1e2 # factor for the terminal state
+    terminal_factor = 3e1 # factor for the terminal state
 
     # Parameters for the CBF
     rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_actor = 0.8 # in (0,1], hyperparameter for the h function associated to actor
     gamma_d_actor = 0.8 # in (0,1], hyperparameter for the h_dot function associated to actor
-    gamma_bound = 0.3 # in (0,1], hyperparameter for the h function associated to bounds
+    gamma_bound = 0.8 # in (0,1], hyperparameter for the h function associated to bounds
     gamma_d_bound = 1.0 # in (0,1], hyperparameter for the h_dot function associated to bounds
     n_actors = 5 # number of actors
     n_clusters = 3 # number of clusters

@@ -1,3 +1,4 @@
+import time
 import json
 import threading
 import math
@@ -106,6 +107,7 @@ class ControllerManager:
             self.target_history = []
             self.actors_prediction_history = []
             self.actors_gt_history = []
+            self.time_history = []
 
     def init(self):
         # Initialize target position to the current position
@@ -257,6 +259,7 @@ class ControllerManager:
         output_dict['wheels_velocities'] = self.wheels_vel_history
         output_dict['wheels_accelerations'] = self.wheels_acc_history
         output_dict['targets'] = self.target_history
+        output_dict['cpu_time'] = self.time_history
 
         output_dict['n_actors'] = self.hparams.n_actors
         output_dict['n_clusters'] = self.hparams.n_clusters
@@ -359,8 +362,7 @@ class ControllerManager:
             rospy.on_shutdown(self.log_values)
 
         while not(rospy.is_shutdown()):
-            time = rospy.get_time()
-            init_time = time
+            start_time = time.process_time()
 
             if self.status == Status.WAITING:
                 if self.update_state():
@@ -384,22 +386,22 @@ class ControllerManager:
                     self.state.theta,
                     self.state.v,
                     self.state.omega,
-                    time
+                    start_time
                 ])
                 self.wheels_vel_history.append([
                     self.wheels_vel[self.hparams.r_wheel_idx],
                     self.wheels_vel[self.hparams.l_wheel_idx],
-                    time
+                    start_time
                 ])
                 self.wheels_acc_history.append([
                     self.control_input[self.hparams.r_wheel_idx],
                     self.control_input[self.hparams.l_wheel_idx],
-                    time
+                    start_time
                 ])
                 self.target_history.append([
                     self.target_position[self.hparams.x_idx],
                     self.target_position[self.hparams.y_idx],
-                    time
+                    start_time
                 ])
                 predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
                 for i in range(self.hparams.N_horizon):
@@ -424,10 +426,11 @@ class ControllerManager:
                     gt_trajectory[i, 1] = self.actors_configuration[i].y
                 self.actors_gt_history.append(gt_trajectory.tolist())
 
-            final_time = rospy.get_time()        
-            deltat = final_time - init_time
-            if deltat > 1 / (2 * self.hparams.controller_frequency):
-                print(f"Iteration time {deltat} at instant {time}")
+                end_time = time.process_time()        
+                deltat = end_time - start_time
+                self.time_history.append([deltat, start_time])
+                if deltat > 1 / (2 * self.hparams.controller_frequency):
+                    print(f"Iteration time {deltat} at instant {start_time}")
 
             rate.sleep()
 

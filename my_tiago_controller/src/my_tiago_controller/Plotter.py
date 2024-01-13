@@ -27,8 +27,9 @@ def plot_results(filename=None):
         os.makedirs(save_sim_dir)
 
     log_path = os.path.join(log_dir, filename + '.json')
-    save_plot1_path = os.path.join(save_plots_dir, filename + '_plot1.png')
-    save_plot2_path = os.path.join(save_plots_dir, filename + '_plot2.png')
+    save_profiles1_path = os.path.join(save_plots_dir, filename + '_profiles1.png')
+    save_profiles2_path = os.path.join(save_plots_dir, filename + '_profiles2.png')
+    save_time_path = os.path.join(save_plots_dir, filename + '_time.png')
     save_sim_path = os.path.join(save_sim_dir, filename + '_simulation.mp4')
 
     if os.path.exists(log_path):
@@ -40,6 +41,7 @@ def plot_results(filename=None):
         )
 
     # Setup all the data
+    iteration_time = np.array(data['cpu_time'])
     states = np.array(data['states'])
     configurations = states[:, :3]
     robot_center = np.empty((configurations.shape[0], 2))
@@ -68,15 +70,27 @@ def plot_results(filename=None):
         actors_predictions = np.array(data['actors_predictions'])
         actors_groundtruth = np.array(data['actors_gt'])
         
-    N_horizon = data['N_horizon']
     rho_cbf = data['rho_cbf']
     ds_cbf = data['ds_cbf']
     frequency = data['frequency']
     shooting_nodes = inputs.shape[0]
     t = inputs[:, 2]
 
-    # Figure plot1
-    plot1_fig, axs1 = plt.subplots(3, 2, figsize=(16, 8))
+    # Plot the elapsed time for each iteration
+    plt.figure(figsize=(16,4))
+    plt.step(t, iteration_time[:, 0])
+    plt.grid(True)
+    plt.hlines(1 / frequency, t[0], t[-1], color='red', linestyle='--')
+    plt.xlim(t[0], t[-1])
+    plt.title('Elapsed time per iteration')
+    plt.xlabel('$t \quad [s]$')
+    plt.ylabel('$iteration time [s]$')
+    plt.tight_layout()
+    plt.savefig(save_time_path)
+    plt.show()
+
+    # Figure profiles1
+    profiles1_fig, axs1 = plt.subplots(3, 2, figsize=(16, 8))
 
     axs1[0, 0].plot(t, wheels_velocities[:, 0], label='$\omega_r$')
     axs1[0, 0].plot(t, wheels_velocities[:, 1], label='$\omega_l$')
@@ -144,7 +158,7 @@ def plot_results(filename=None):
     axs1[2, 1].grid(True)
     
     plt.tight_layout()
-    plt.savefig(save_plot1_path)
+    plt.savefig(save_profiles1_path)
     plt.show()
 
     # Figure plot2
@@ -185,7 +199,7 @@ def plot_results(filename=None):
     axs2[2].grid(True)
 
     plt.tight_layout()
-    plt.savefig(save_plot2_path)
+    plt.savefig(save_profiles2_path)
     plt.show()
 
     # Figure to plot simulation
@@ -276,7 +290,7 @@ def plot_results(filename=None):
     def init_sim():
         robot.set_offsets(robot_center[0, :])
         controlled_pt.set_offsets(configurations[0, :2])
-        robot_clearance.set_center(robot_center[0, :])
+        robot_clearance.set_center(configurations[0, :2])
         robot_clearance.set_radius(rho_cbf)
         ax_big.add_patch(robot_clearance)
         robot_label.set_position(robot_center[0])
@@ -323,7 +337,7 @@ def plot_results(filename=None):
 
         robot.set_offsets(robot_center[frame, :])
         controlled_pt.set_offsets(configurations[frame, :2])
-        robot_clearance.set_center(robot_center[frame, :])
+        robot_clearance.set_center(configurations[frame, :2])
         robot_label.set_position(robot_center[frame, :])
         goal.set_offsets(current_target[:2])
         goal_label.set_position(current_target)
