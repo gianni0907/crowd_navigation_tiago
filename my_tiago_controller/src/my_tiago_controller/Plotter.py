@@ -56,9 +56,9 @@ def plot_results(filename=None):
     inputs = np.array(data['wheels_accelerations'])
     wheels_velocities = np.array(data['wheels_velocities'])
     targets = np.array(data['targets'])
-
-    x_bounds = np.array(data['x_bounds'])
-    y_bounds = np.array(data['y_bounds'])
+    errors = targets[:, :2] - configurations[:, :2]
+    n_edges = data['n_edges']
+    boundary_vertexes = np.array(data['boundary_vertexes'])
     input_bounds = np.array(data['input_bounds'])
     v_bounds = np.array(data['v_bounds'])
     omega_bounds = np.array(data['omega_bounds'])
@@ -134,9 +134,6 @@ def plot_results(filename=None):
     axs1[0, 1].set_xlabel('$t \quad [s]$')
     axs1[0, 1].set_ylabel('$[m]$')
     axs1[0, 1].legend(loc='upper left')
-    axs1[0, 1].hlines(x_bounds[0], t[0], t[-1], color='red', linestyle='--')
-    axs1[0, 1].hlines(x_bounds[1], t[0], t[-1], color='red', linestyle='--')
-    axs1[0, 1].set_ylim([-1 + x_bounds[0], 1 + x_bounds[1]])
     axs1[0, 1].set_xlim([t[0], t[-1]])
     axs1[0, 1].grid(True)
 
@@ -144,9 +141,6 @@ def plot_results(filename=None):
     axs1[1, 1].set_xlabel('$t \quad [s]$')
     axs1[1, 1].set_ylabel('$[m]$')
     axs1[1, 1].legend(loc='upper left')
-    axs1[1, 1].hlines(y_bounds[0], t[0], t[-1], color='red', linestyle='--')
-    axs1[1, 1].hlines(y_bounds[1], t[0], t[-1], color='red', linestyle='--')
-    axs1[1, 1].set_ylim([-1 + y_bounds[0], 1 + y_bounds[1]])
     axs1[1, 1].set_xlim([t[0], t[-1]])
     axs1[1, 1].grid(True)
 
@@ -161,10 +155,10 @@ def plot_results(filename=None):
     plt.savefig(save_profiles1_path)
     plt.show()
 
-    # Figure plot2
+    # Figure profiles2
     plot2_fig, axs2 = plt.subplots(3, 1, figsize=(16, 8))
-    axs2[0].plot(t, targets[:, 0] - configurations[:, 0], label='$e_x$')
-    axs2[0].plot(t, targets[:, 1] - configurations[:, 1], label='$e_y$')
+    axs2[0].plot(t, errors[:, 0], label='$e_x$')
+    axs2[0].plot(t, errors[:, 1], label='$e_y$')
     axs2[1].plot(t, wheels_velocities[:, 0], label='$\omega_r$')
     axs2[1].plot(t, wheels_velocities[:, 1], label='$\omega_l$')
     axs2[2].plot(t, inputs[:, 0], label='$\\alpha_r$')
@@ -174,7 +168,6 @@ def plot_results(filename=None):
     axs2[0].set_xlabel("$t \quad [s]$")
     axs2[0].set_ylabel('$[m]$')
     axs2[0].legend(loc='upper left')
-    axs2[0].set_ylim([-1 + np.min([x_bounds[0], y_bounds[0]]), 1 + np.max([x_bounds[1], y_bounds[1]])])
     axs2[0].set_xlim([t[0], t[-1]])
     axs2[0].grid(True)
 
@@ -245,16 +238,20 @@ def plot_results(filename=None):
     wl_line, = ax2.plot([], [], label='$\omega_l$')
     alphar_line, = ax3.plot([], [], label='$\\alpha_r$')
     alphal_line, = ax3.plot([], [], label='$\\alpha_l$')
+    boundary_line = []
+    for i in range(n_edges - 1):
+        x_values = [boundary_vertexes[i, 0], boundary_vertexes [i + 1, 0]]
+        y_values = [boundary_vertexes[i, 1], boundary_vertexes [i + 1, 1]]
+        line, = ax_big.plot(x_values, y_values, color='red', linestyle='--')
+        boundary_line.append(line)
+    x_values = [boundary_vertexes[n_edges - 1, 0], boundary_vertexes [0, 0]]
+    y_values = [boundary_vertexes[n_edges - 1, 1], boundary_vertexes [0, 1]]
+    line, = ax_big.plot(x_values, y_values, color='red', linestyle='--')
+    boundary_line.append(line)
 
     ax_big.set_title('Simulation')
     ax_big.set_xlabel("$x \quad [m]$")
     ax_big.set_ylabel('$y \quad [m]$')
-    ax_big.axhline(y_bounds[0], color='red', linestyle='--')
-    ax_big.axhline(y_bounds[1], color='red', linestyle="--")
-    ax_big.axvline(x_bounds[0], color='red', linestyle='--')
-    ax_big.axvline(x_bounds[1], color='red', linestyle='--')
-    ax_big.set_ylim([-1 + y_bounds[0], 1 + y_bounds[1]])
-    ax_big.set_xlim([-1 + x_bounds[0], 1 + x_bounds[1]])
     ax_big.set_aspect('equal', adjustable='box')
     ax_big.grid(True)
 
@@ -262,7 +259,7 @@ def plot_results(filename=None):
     ax1.set_xlabel("$t \quad [s]$")
     ax1.set_ylabel('$[m]$')
     ax1.legend(loc='upper left')
-    ax1.set_ylim([-1 + np.min([x_bounds[0], y_bounds[0]]), 1 + np.max([x_bounds[1], y_bounds[1]])])
+    ax1.set_ylim([-1 + np.min(errors), 1 + np.max(errors)])
     ax1.set_xlim([t[0], t[-1]])
     ax1.grid(True)
 

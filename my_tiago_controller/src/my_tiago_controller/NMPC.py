@@ -30,6 +30,9 @@ class NMPC:
         # Setup kinematic model
         self.kinematic_model = KinematicModel()
 
+        self.n_edges = self.hparams.n_points
+        self.vertexes = self.hparams.vertexes
+        self.normals = self.hparams.normals
         self.n_actors = self.hparams.n_actors
         self.n_clusters = self.hparams.n_clusters
 
@@ -66,7 +69,7 @@ class NMPC:
                       [0.0, 1.0, 0.0, dt],
                       [0.0, 0.0, 1.0, 0.0],
                       [0.0, 0.0, 0.0, 1.0]])
-        F_complete= np.kron(np.eye(self.hparams.n_actors), F)
+        F_complete= np.kron(np.eye(self.n_clusters), F)
         next_state = np.matmul(F_complete, state)
         return next_state
 
@@ -115,14 +118,17 @@ class NMPC:
         y = q[self.hparams.y_idx]
 
         if self.n_actors > 0:
-            h = casadi.SX.zeros(4 + self.n_clusters)
+            h = casadi.SX.zeros(self.n_edges + self.n_clusters)
         else:
-            h = casadi.SX.zeros(4)
+            h = casadi.SX.zeros(self.n_edges)
 
-        h[0] = self.hparams.x_upper_bound - x - self.hparams.rho_cbf
-        h[1] = x - self.hparams.x_lower_bound - self.hparams.rho_cbf
-        h[2] = self.hparams.y_upper_bound - y - self.hparams.rho_cbf
-        h[3] = y - self.hparams.y_lower_bound - self.hparams.rho_cbf
+        # Define the safe set wrt the configuration bounds
+        robot_position = np.array([x, y])
+        for i in range(self.n_edges - 1):
+            vertex = np.array([self.vertexes[i + 1].x, self.vertexes[i + 1].y])
+            h[i] = np.dot(self.normals[i], robot_position - vertex) - self.hparams.rho_cbf
+        vertex = np.array([self.vertexes[0].x, self.vertexes[0].y])
+        h[self.n_edges - 1] = np.dot(self.normals[self.n_edges - 1], robot_position - vertex) - self.hparams.rho_cbf
 
         # Consider the robot distance from actors, if actors are present
         if self.n_actors > 0:
@@ -130,7 +136,7 @@ class NMPC:
             for i in range(self.n_clusters):
                 sx = x - p[i*4 + self.hparams.x_idx]
                 sy = y - p[i*4 + self.hparams.y_idx]
-                h[i + 4] = sx**2 + sy**2 - cbf_radius**2
+                h[i + self.n_edges] = sx**2 + sy**2 - cbf_radius**2
         return h
 
     def __create_acados_model(self) -> AcadosModel:
@@ -151,12 +157,11 @@ class NMPC:
         acados_model.f_expl_expr = f_expl
 
         # CBF constraints:
-        n_clusters = self.n_clusters
-        gamma_mat = np.zeros((n_clusters + 4, n_clusters + 4))
-        id_mat = np.eye(n_clusters + 4)
-        np.fill_diagonal(gamma_mat[:4, :4], self.hparams.gamma_bound)
+        gamma_mat = np.zeros((self.n_edges + self.n_clusters, self.n_edges + self.n_clusters))
+        id_mat = np.eye(self.n_edges + self.n_clusters)
+        np.fill_diagonal(gamma_mat[:self.n_edges, :self.n_edges], self.hparams.gamma_bound)
         if self.n_actors > 0:
-            np.fill_diagonal(gamma_mat[4:, 4:], self.hparams.gamma_actor)
+            np.fill_diagonal(gamma_mat[self.n_edges:, self.n_edges:], self.hparams.gamma_actor)
 
         h_k = self.__h(q, p)
         
@@ -246,11 +251,11 @@ class NMPC:
 
         # Nonlinear constraints (CBFs) (for both actors and configuration bounds):
         if self.n_actors > 0:
-            acados_constraints.lh = np.zeros(self.n_clusters + 4)
-            acados_constraints.uh = 10000 * np.ones(self.n_clusters + 4)
+            acados_constraints.lh = np.zeros(self.n_edges + self.n_clusters)
+            acados_constraints.uh = 10000 * np.ones(self.n_edges + self.n_clusters)
         else:
-            acados_constraints.lh = np.zeros(4)
-            acados_constraints.uh = 10000 * np.ones(4) 
+            acados_constraints.lh = np.zeros(self.n_edges)
+            acados_constraints.uh = 10000 * np.ones(self.n_edges) 
 
         return acados_constraints
     

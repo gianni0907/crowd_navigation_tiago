@@ -108,6 +108,7 @@ class ControllerManager:
             self.actors_prediction_history = []
             self.actors_gt_history = []
             self.time_history = []
+            self.boundary_vertexes = []
 
     def init(self):
         # Initialize target position to the current position
@@ -267,8 +268,10 @@ class ControllerManager:
             output_dict['actors_predictions'] = self.actors_prediction_history
             output_dict['actors_gt'] = self.actors_gt_history
 
-        output_dict['x_bounds'] = [self.hparams.x_lower_bound, self.hparams.x_upper_bound]
-        output_dict['y_bounds'] = [self.hparams.y_lower_bound, self.hparams.y_upper_bound]
+        for i in range(self.hparams.n_points):
+            self.boundary_vertexes.append([self.hparams.vertexes[i].x, self.hparams.vertexes[i].y])
+        output_dict['n_edges'] = self.hparams.n_points
+        output_dict['boundary_vertexes'] = self.boundary_vertexes   
         output_dict['input_bounds'] = [self.hparams.alpha_min, self.hparams.alpha_max]
         output_dict['v_bounds'] = [self.hparams.driving_vel_min, self.hparams.driving_vel_max]
         output_dict['omega_bounds'] = [self.hparams.steering_vel_max_neg, self.hparams.steering_vel_max]

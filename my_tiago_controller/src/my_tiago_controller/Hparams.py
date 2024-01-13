@@ -1,4 +1,5 @@
 import numpy as np
+from my_tiago_controller.utils import *
 
 class Hparams:
     # Specify whether to save data for plots and .json filename
@@ -40,11 +41,16 @@ class Hparams:
     w_max = 1.05 * driving_vel_max / wheel_radius # [rad/s], 10.1523
     w_max_neg = - w_max
 
-    # Configuration limits (only for cartesian position)
-    x_lower_bound = -6 # [m]
-    x_upper_bound = 6  # [m]
-    y_lower_bound = x_lower_bound
-    y_upper_bound = x_upper_bound
+    # Set n points to be the vertexes of the admitted region
+    n_points = 4
+    vertexes = np.array([Position(-5.0, 5.0),
+                         Position(-5.0, -5.0),
+                         Position(5.0, -5.0),
+                         Position(5.0, 5.0)])
+    normals = np.zeros((n_points, 2))
+    for i in range(n_points - 1):
+        normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
+    normals[n_points - 1] = compute_normal_vector(vertexes[n_points - 1], vertexes[0])
     
     # State indices:
     x_idx = 0
@@ -77,7 +83,7 @@ class Hparams:
 
     # Parameters for the crowd prediction
     if n_actors > 0:
-        nullstate = np.array([x_lower_bound - 10, y_lower_bound - 10, 0.0, 0.0])
+        nullstate = np.array([-30, -30, 0.0, 0.0])
         innovation_threshold = 1
         matching_threshold = 0.1
         max_pred_time = 1

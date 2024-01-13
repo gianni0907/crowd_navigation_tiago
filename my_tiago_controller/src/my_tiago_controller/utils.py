@@ -250,3 +250,14 @@ def linear_trajectory(p_i : Position, p_f : Position, n_steps):
     velocities[n_steps - 1] = Velocity(0.0, 0.0)
 
     return positions, velocities
+
+def compute_normal_vector(p1 : Position, p2 : Position):
+    # Compute the direction vector and its magnitude
+    direction_vector = np.array([p2.x - p1.x, p2.y - p1.y])
+    magnitude = np.linalg.norm(direction_vector)
+
+    # Compute the normalized normal vector
+    normal_vector = np.array([- direction_vector[1], direction_vector[0]])
+    normalized_normal_vector = normal_vector / magnitude
+
+    return normalized_normal_vector
