@@ -58,16 +58,23 @@ class CrowdPredictionManager:
         self.data_lock = threading.Lock()
 
         # Set status
-        # 2 possibilities:
-        #   WAITING for the initial robot state
-        #   READY to perceive and act
+        # 2 scenarios:
+        #   self.hparams.fake_sensing == True -> 3 possible status
+        #       WAITING for the initial robot state
+        #       READY to get actors trajectory
+        #       MOVING when actors are moving
+        #   self.hparams.fake_sensing == False -> 2 possible status
+        #       WAITING for the initial robot state
+        #       READY to read from laser scan topic and to move
         self.status = Status.WAITING # WAITING for the initial robot state
 
         self.robot_state = State(0.0, 0.0, 0.0, 0.0, 0.0)
+        self.wheels_vel = np.zeros(2) # [w_r, w_l]
         self.hparams = Hparams()
         self.laser_scan = None
         self.n_actors = self.hparams.n_actors
         self.n_clusters = self.hparams.n_clusters
+        self.actors_position = np.zeros((self.hparams.n_clusters, 2))
 
         self.kalman_infos = {}
         kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_actors)]
@@ -108,6 +115,13 @@ class CrowdPredictionManager:
             queue_size=1
         )
 
+        # Setup ROS Service to set actors trajectories:
+        self.set_actors_trajectory_srv = rospy.Service(
+            'SetActorsTrajectory',
+            my_tiago_msgs.srv.SetActorsTrajectory,
+            self.set_actors_trajectory_request
+        )
+
     def joint_states_callback(self, msg):
         self.wheels_vel = np.array([msg.velocity[13], msg.velocity[12]])
 
@@ -125,6 +139,64 @@ class CrowdPredictionManager:
         self.robot_state.theta = theta
         self.robot_state.x = transform.transform.translation.x + self.hparams.b * math.cos(theta)
         self.robot_state.y = transform.transform.translation.y + self.hparams.b * math.sin(theta)
+
+    def set_actors_trajectory_request(self, request):
+        if not self.hparams.fake_sensing:
+            rospy.loginfo("Cannot set synthetic trajectories, real sensing is active")
+            return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False) 
+        else:
+            if self.status == Status.WAITING:
+                rospy.loginfo("Cannot set actors trajectory, robot is not READY")
+                return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)            
+            elif self.status == Status.READY:
+                self.trajectories = CrowdMotionPrediction.from_message(request.trajectories)
+                self.status = Status.MOVING
+                self.current = 0
+                self.trajectory_length = len(self.trajectories.motion_predictions[0].positions)
+                rospy.loginfo("Actors trajectory successfully set")
+                return my_tiago_msgs.srv.SetActorsTrajectoryResponse(True)
+            else:
+                rospy.loginfo("Cannot set actors trajectory, actors are already moving")
+                return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)
+
+    def update_actors_position(self):
+            actors_position = np.zeros((self.n_clusters, 2))
+            if self.hparams.fake_sensing:
+                for i in range(self.n_clusters):
+                            actors_position[i] = np.array(
+                                [self.trajectories.motion_predictions[i].positions[self.current].x,
+                                 self.trajectories.motion_predictions[i].positions[self.current].y]
+                            )
+                self.current += 1
+                if self.current == self.trajectory_length:
+                    self.current = 0
+            else:
+                angle_min = self.laser_scan.angle_min
+                angle_increment = self.laser_scan.angle_increment
+                offset = 20
+
+                scanlist = []
+                for idx, value in enumerate(self.laser_scan.ranges):
+                    scanlist.append((idx, value))
+
+                # Delete the first and last 20 laser scan ranges (wrong measurements?)
+                scanlist = np.delete(scanlist, range(offset), 0)
+                scanlist = np.delete(scanlist, range(len(scanlist) - offset, len(scanlist)), 0)
+
+                # Perform data clustering
+                actors_polar_position = data_clustering(scanlist,
+                                                        self.robot_state,
+                                                        angle_min,
+                                                        angle_increment)
+                for (i, dist) in enumerate(actors_polar_position):
+                    actors_position[i] = polar2absolute(actors_polar_position[i],
+                                                        self.robot_state,
+                                                        angle_min,
+                                                        angle_increment)
+
+            self.data_lock.acquire()
+            self.actors_position = actors_position
+            self.data_lock.release()
 
     def update_state(self):
         try:
@@ -207,7 +279,12 @@ class CrowdPredictionManager:
             self.update_state()
             self.data_lock.release()
             
-            if self.laser_scan is None:
+            if self.hparams.fake_sensing and self.status == Status.READY:
+                rospy.logwarn("Missing fake sensing info")
+                rate.sleep()
+                continue
+            
+            if self.laser_scan is None and not self.hparams.fake_sensing:
                 rospy.logwarn("Missing laser scan info")
                 rate.sleep()
                 continue
@@ -215,30 +292,8 @@ class CrowdPredictionManager:
             # Reset crowd_motion_prediction message
             crowd_motion_prediction = CrowdMotionPrediction()
             
-            angle_min = self.laser_scan.angle_min
-            angle_max = self.laser_scan.angle_max
-            angle_increment = self.laser_scan.angle_increment
-            offset = 20
-
-            scanlist = []
-            for idx, value in enumerate(self.laser_scan.ranges):
-                scanlist.append((idx, value))
-
-            # Delete the first and last 20 laser scan ranges (wrong measurements?)
-            scanlist = np.delete(scanlist, range(offset), 0)
-            scanlist = np.delete(scanlist, range(len(scanlist) - offset, len(scanlist)), 0)
-
-            # Perform data clustering
-            actors_polar_position = data_clustering(scanlist,
-                                                    self.robot_state,
-                                                    angle_min,
-                                                    angle_increment)
-            actors_absolute_position = np.copy(actors_polar_position)
-            for (i, dist) in enumerate(actors_absolute_position):
-                actors_absolute_position[i] = polar2absolute(actors_absolute_position[i],
-                                                             self.robot_state,
-                                                             angle_min,
-                                                             angle_increment)
+            # update the actors position (based on fake or real sensing)
+            self.update_actors_position()
 
             # Perform data association
             # predict next positions according to fsms
@@ -255,8 +310,8 @@ class CrowdPredictionManager:
                 predicted_positions[i] = predicted_state[:2]
             
             # compute pairwise distance between predicted positions and positions from clusters
-            if actors_absolute_position.shape[0] > 0:
-                distances = cdist(predicted_positions, actors_absolute_position)
+            if self.actors_position.shape[0] > 0:
+                distances = cdist(predicted_positions, self.actors_position)
             else:
                 distances = None
 
@@ -281,7 +336,7 @@ class CrowdPredictionManager:
                             min_dist = distance
                             cluster = j
                 if cluster is not None:
-                    measure = actors_absolute_position[cluster]
+                    measure = self.actors_position[cluster]
                     fsm.update(time, measure)
                     associated_clusters.append(cluster)
                 else:

@@ -7,6 +7,9 @@ class Hparams:
     controller_file = 'test_controller.json'
     prediction_file = 'test_predictor.json'
 
+    # Specify whether to use laser scans data or ground truth
+    fake_sensing = True
+
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
@@ -43,10 +46,10 @@ class Hparams:
 
     # Set n points to be the vertexes of the admitted region
     n_points = 4
-    vertexes = np.array([Position(-5.0, 5.0),
-                         Position(-5.0, -5.0),
-                         Position(5.0, -5.0),
-                         Position(5.0, 5.0)])
+    vertexes = np.array([Position(-6.0, 6.0),
+                         Position(-6.0, -6.0),
+                         Position(6.0, -6.0),
+                         Position(6.0, 6.0)])
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
         normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
@@ -71,15 +74,19 @@ class Hparams:
     v_weight = 1e4 # driving velocity weight
     omega_weight = 1e0 # steering velocity weight
     u_weight = 1e0 # input weights
-    terminal_factor = 3e1 # factor for the terminal state
+    terminal_factor = 5e1 # factor for the terminal state
 
     # Parameters for the CBF
     rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_actor = 0.8 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.5 # in (0,1], hyperparameter for the h function associated to bounds
-    n_actors = 0 # number of actors
-    n_clusters = 0 # number of clusters
+    
+    n_actors = 5 # number of actors
+    if fake_sensing:
+        n_clusters = n_actors
+    else:
+        n_clusters = 3 # number of clusters
 
     # Parameters for the crowd prediction
     if n_actors > 0:

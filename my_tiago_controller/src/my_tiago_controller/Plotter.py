@@ -66,9 +66,11 @@ def plot_results(filename=None):
 
     n_actors = data['n_actors']
     n_clusters = data['n_clusters']
+    fake_sensing = data['fake_sensing']
     if n_actors > 0:
         actors_predictions = np.array(data['actors_predictions'])
-        actors_groundtruth = np.array(data['actors_gt'])
+        if not fake_sensing:
+            actors_groundtruth = np.array(data['actors_gt'])
         
     rho_cbf = data['rho_cbf']
     ds_cbf = data['ds_cbf']
@@ -304,22 +306,28 @@ def plot_results(filename=None):
                 ax_big.add_patch(actors_clearance[i])
                 actors_label[i].set_position(actor_position)
 
-        for i in range(n_actors):
-            actor_gt_position = actors_groundtruth[0, i, :]
-            actors_gt[i].set_offsets(actor_gt_position)
-            actors_gt_clearance[i].set_center(actor_gt_position)
-            actors_gt_clearance[i].set_radius(ds_cbf)
-            ax_big.add_patch(actors_gt_clearance[i])
-            actors_gt_label[i].set_position(actor_gt_position)
+            if not fake_sensing:
+                for i in range(n_actors):
+                    actor_gt_position = actors_groundtruth[0, i, :]
+                    actors_gt[i].set_offsets(actor_gt_position)
+                    actors_gt_clearance[i].set_center(actor_gt_position)
+                    actors_gt_clearance[i].set_radius(ds_cbf)
+                    ax_big.add_patch(actors_gt_clearance[i])
+                    actors_gt_label[i].set_position(actor_gt_position)
 
-        if n_actors > 0:
-            return robot, robot_clearance, robot_label, goal, goal_label, \
-                    actors, actors_clearance, actors_label, \
-                    actors_gt, actors_gt_clearance, actors_gt_label
+                return robot, robot_clearance, robot_label, goal, goal_label, \
+                       actors, actors_clearance, actors_label, \
+                       actors_gt, actors_gt_clearance, actors_gt_label
+            else:
+                return robot, robot_clearance, robot_label, goal, goal_label, \
+                       actors, actors_clearance, actors_label
         else:
-            return robot, robot_clearance, robot_label, goal, goal_label,
+            return robot, robot_clearance, robot_label, goal, goal_label
 
     def update_sim(frame):
+        if frame == shooting_nodes - 1:
+            sim_animation.event_source.stop()
+        
         robot_prediction = robot_predictions[frame, :, :]
         current_target = targets[frame, :]
 
@@ -348,23 +356,24 @@ def plot_results(filename=None):
                 actors_label[i].set_position(actor_position)
                 actors_pred_line[i].set_data(actor_prediction[0, :], actor_prediction[1, :])
 
-        for i in range(n_actors):
-            actor_gt_position = actors_groundtruth[frame, i, :]
-            actors_gt[i].set_offsets(actor_gt_position)
-            actors_gt_clearance[i].set_center(actor_gt_position)
-            actors_gt_label[i].set_position(actor_gt_position)
+            if not fake_sensing:
+                for i in range(n_actors):
+                    actor_gt_position = actors_groundtruth[frame, i, :]
+                    actors_gt[i].set_offsets(actor_gt_position)
+                    actors_gt_clearance[i].set_center(actor_gt_position)
+                    actors_gt_label[i].set_position(actor_gt_position)
 
-        if frame == shooting_nodes - 1:
-            sim_animation.event_source.stop()
-
-        if n_actors > 0:
-            return robot, robot_clearance, robot_label, goal, goal_label, \
-                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line, \
-                    actors, actors_clearance, actors_label, \
-                    actors_gt, actors_gt_clearance, actors_gt_label
+                return robot, robot_clearance, robot_label, goal, goal_label, \
+                       ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line, \
+                       actors, actors_clearance, actors_label, \
+                       actors_gt, actors_gt_clearance, actors_gt_label
+            else:
+                return robot, robot_clearance, robot_label, goal, goal_label, \
+                       ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line, \
+                       actors, actors_clearance, actors_label
         else:
             return robot, robot_clearance, robot_label, goal, goal_label, \
-                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line
+                   ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line
 
     sim_animation = FuncAnimation(sim_fig, update_sim,
                                   frames=shooting_nodes,

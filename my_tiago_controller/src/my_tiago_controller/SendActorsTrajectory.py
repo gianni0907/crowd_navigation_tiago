@@ -34,13 +34,17 @@ def main():
         rospy.logwarn("No actors")
         return
     
-    positions_i = np.array([Position(2.0, 3.0),
+    positions_i = np.array([Position(2.0, 5.0),
                             Position(3.5, 3.0),
-                            Position(3.5, -2.0)]) # initial position of the actors
-    positions_f = np.array([Position(2.0, -2.0),
-                            Position(-1.5, 3.0),
-                            Position(3.5, 3.0)]) # final position of the actors
-    n_steps = 250 # number of steps to go from init to final positions (and vice-versa)
+                            Position(3.5, -4.0),
+                            Position(4.0, -1.0),
+                            Position(-2.0, -3.0)]) # initial position of the actors
+    positions_f = np.array([Position(2.0, -4.0),
+                            Position(-4.5, 3.0),
+                            Position(3.5, 4.0),
+                            Position(-4.0, -1.0),
+                            Position(-2.0, 5.0)]) # final position of the actors
+    n_steps = 300 # number of steps to go from init to final positions (and vice-versa)
     trajectories = CrowdMotionPrediction()
 
     for i in range(n_actors):

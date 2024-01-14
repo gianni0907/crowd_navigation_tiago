@@ -44,8 +44,9 @@ class ControllerManager:
 
         self.state = State(0.0, 0.0, 0.0, 0.0, 0.0)
         self.wheels_vel = np.zeros(2) # [w_r, w_l]
-        self.actors_configuration = np.zeros(self.hparams.n_actors, dtype=Configuration)
-        self.actors_name = ['actor_{}'.format(i) for i in range(self.hparams.n_actors)]
+        if not self.hparams.fake_sensing:
+            self.actors_configuration = np.zeros(self.hparams.n_actors, dtype=Configuration)
+            self.actors_name = ['actor_{}'.format(i) for i in range(self.hparams.n_actors)]
         self.crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.now(),
                                                                             'map',
                                                                             CrowdMotionPrediction())
@@ -180,23 +181,24 @@ class ControllerManager:
             self.sensing = False
 
     def gazebo_model_states_callback(self, msg):
-        actors_configuration = np.empty(self.hparams.n_actors, dtype=Configuration)
-        for actor_name in self.actors_name:
-            if actor_name in msg.name:
-                actor_idx = msg.name.index(actor_name)
-                p = msg.pose[actor_idx].position
-                q = msg.pose[actor_idx].orientation
-                actor_configuration = Configuration(
-                    p.x,
-                    p.y,
-                    math.atan2(2.0 * (q.w * q.z + q.x * q.y),
-                               1.0 - 2.0 * (q.y**2 + q.z**2))
-                )
-                actors_configuration[actor_idx - 1] = actor_configuration
+        if not self.hparams.fake_sensing:
+            actors_configuration = np.empty(self.hparams.n_actors, dtype=Configuration)
+            for actor_name in self.actors_name:
+                if actor_name in msg.name:
+                    actor_idx = msg.name.index(actor_name)
+                    p = msg.pose[actor_idx].position
+                    q = msg.pose[actor_idx].orientation
+                    actor_configuration = Configuration(
+                        p.x,
+                        p.y,
+                        math.atan2(2.0 * (q.w * q.z + q.x * q.y),
+                                1.0 - 2.0 * (q.y**2 + q.z**2))
+                    )
+                    actors_configuration[actor_idx - 1] = actor_configuration
 
-        self.data_lock.acquire()
-        self.actors_configuration = actors_configuration
-        self.data_lock.release()
+            self.data_lock.acquire()
+            self.actors_configuration = actors_configuration
+            self.data_lock.release()
 
     def set_from_tf_transform(self, transform):
         q = transform.transform.rotation
@@ -266,7 +268,9 @@ class ControllerManager:
         output_dict['n_clusters'] = self.hparams.n_clusters
         if self.hparams.n_actors > 0:        
             output_dict['actors_predictions'] = self.actors_prediction_history
-            output_dict['actors_gt'] = self.actors_gt_history
+            output_dict['fake_sensing'] = self.hparams.fake_sensing
+            if not self.hparams.fake_sensing:
+                output_dict['actors_gt'] = self.actors_gt_history
 
         for i in range(self.hparams.n_points):
             self.boundary_vertexes.append([self.hparams.vertexes[i].x, self.hparams.vertexes[i].y])
@@ -411,23 +415,24 @@ class ControllerManager:
                     predicted_trajectory[:, i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')
                 predicted_trajectory[:, self.hparams.N_horizon] = \
                     self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
-
                 self.robot_prediction_history.append(predicted_trajectory.tolist())
 
-                predicted_trajectory = np.zeros((self.hparams.n_clusters, 2, self.hparams.N_horizon))
-                if len(self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions) != 0:
-                    for i in range(self.hparams.n_clusters):
-                        motion_prediction = self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i]
-                        for j in range(self.hparams.N_horizon):
-                            predicted_trajectory[i, 0, j] = motion_prediction.positions[j].x
-                            predicted_trajectory[i, 1, j] = motion_prediction.positions[j].y
-                self.actors_prediction_history.append(predicted_trajectory.tolist())
+                if self.hparams.n_actors > 0:
+                    predicted_trajectory = np.zeros((self.hparams.n_clusters, 2, self.hparams.N_horizon))
+                    if len(self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions) != 0:
+                        for i in range(self.hparams.n_clusters):
+                            motion_prediction = self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction.motion_predictions[i]
+                            for j in range(self.hparams.N_horizon):
+                                predicted_trajectory[i, 0, j] = motion_prediction.positions[j].x
+                                predicted_trajectory[i, 1, j] = motion_prediction.positions[j].y
+                    self.actors_prediction_history.append(predicted_trajectory.tolist())
 
-                gt_trajectory = np.zeros((self.hparams.n_actors, 2))
-                for i in range(self.hparams.n_actors):
-                    gt_trajectory[i, 0] = self.actors_configuration[i].x
-                    gt_trajectory[i, 1] = self.actors_configuration[i].y
-                self.actors_gt_history.append(gt_trajectory.tolist())
+                    if not self.hparams.fake_sensing:
+                        gt_trajectory = np.zeros((self.hparams.n_actors, 2))
+                        for i in range(self.hparams.n_actors):
+                            gt_trajectory[i, 0] = self.actors_configuration[i].x
+                            gt_trajectory[i, 1] = self.actors_configuration[i].y
+                        self.actors_gt_history.append(gt_trajectory.tolist())
 
                 end_time = time.process_time()        
                 deltat = end_time - start_time
