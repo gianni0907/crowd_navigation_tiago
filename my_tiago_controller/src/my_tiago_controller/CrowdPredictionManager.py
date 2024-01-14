@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import time
 import json
 import math
 import rospy
@@ -284,7 +285,7 @@ class CrowdPredictionManager:
         fsms = [FSM(self.hparams) for _ in range(self.n_clusters)]
 
         while not rospy.is_shutdown():
-            time = rospy.get_time()
+            instant = time.process_time()
             
             if self.status == Status.WAITING:
                 if self.update_state():
@@ -343,7 +344,7 @@ class CrowdPredictionManager:
                 if self.hparams.log:
                     self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
                                                                      FSMStates.print(fsm_state),
-                                                                     time])
+                                                                     instant])
 
                 # find the closest available cluster to the fsm's prediction
                 min_dist = np.inf
@@ -358,11 +359,11 @@ class CrowdPredictionManager:
                             cluster = j
                 if cluster is not None:
                     measure = self.actors_position[cluster]
-                    fsm.update(time, measure)
+                    fsm.update(instant, measure)
                     associated_clusters.append(cluster)
                 else:
                     measure = np.array([0.0, 0.0])
-                    fsm.update(time, measure)
+                    fsm.update(instant, measure)
 
                 current_estimate = fsm.current_estimate
                 predictions = self.propagate_state(current_estimate, self.N_horizon)
@@ -376,7 +377,7 @@ class CrowdPredictionManager:
                         MotionPrediction(predicted_positions, predicted_velocities)
                 )
 
-            crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(time),
+            crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(instant),
                                                                             'map',
                                                                             crowd_motion_prediction)
             crowd_motion_prediction_stamped_msg = CrowdMotionPredictionStamped.to_message(crowd_motion_prediction_stamped)

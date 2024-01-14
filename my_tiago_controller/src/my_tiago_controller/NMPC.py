@@ -17,6 +17,9 @@ class NMPC:
         self.nq = 5
         self.nu = 2 # right and left wheel angular accelerations
 
+        # Size of actors state:
+        self.actor_state_size = 4
+
         # Parameters:
         self.hparams = hparams
 
@@ -134,8 +137,8 @@ class NMPC:
         if self.n_actors > 0:
             cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
             for i in range(self.n_clusters):
-                sx = x - p[i*4 + self.hparams.x_idx]
-                sy = y - p[i*4 + self.hparams.y_idx]
+                sx = x - p[i*self.actor_state_size + self.hparams.x_idx]
+                sy = y - p[i*self.actor_state_size + self.hparams.y_idx]
                 h[i + self.n_edges] = sx**2 + sy**2 - cbf_radius**2
         return h
 
@@ -144,7 +147,7 @@ class NMPC:
         q = casadi.SX.sym('q', self.nq)
         qdot = casadi.SX.sym('qdot', self.nq)
         u = casadi.SX.sym('u', self.nu)
-        p = casadi.SX.sym('p', self.n_clusters * 4)
+        p = casadi.SX.sym('p', self.n_clusters * self.actor_state_size)
         f_expl = self.__f(q, u)
         f_impl = qdot - f_expl
 
@@ -275,7 +278,7 @@ class NMPC:
         acados_ocp = AcadosOcp()
         acados_ocp.model = self.__create_acados_model()
         acados_ocp.dims.N = N
-        acados_ocp.parameter_values = np.zeros((self.n_clusters * 4,))
+        acados_ocp.parameter_values = np.zeros((self.n_clusters * self.actor_state_size,))
         acados_ocp.cost = self.__create_acados_cost()
         acados_ocp.constraints = self.__create_acados_constraints()
         acados_ocp.solver_options = self.__create_acados_solver_options(T)
@@ -301,12 +304,12 @@ class NMPC:
         # Set parameters
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
-            actors_state = np.zeros((self.hparams.n_clusters * 4))
+            actors_state = np.zeros((self.hparams.n_clusters * self.actor_state_size))
             for j in range(self.n_clusters):
-                actors_state[j*4 + 0] = crowd_motion_prediction.motion_predictions[j].positions[k].x
-                actors_state[j*4 + 1] = crowd_motion_prediction.motion_predictions[j].positions[k].y
-                actors_state[j*4 + 2] = crowd_motion_prediction.motion_predictions[j].velocities[k].x
-                actors_state[j*4 + 3] = crowd_motion_prediction.motion_predictions[j].velocities[k].y
+                actors_state[j*self.actor_state_size + 0] = crowd_motion_prediction.motion_predictions[j].positions[k].x
+                actors_state[j*self.actor_state_size + 1] = crowd_motion_prediction.motion_predictions[j].positions[k].y
+                actors_state[j*self.actor_state_size + 2] = crowd_motion_prediction.motion_predictions[j].velocities[k].x
+                actors_state[j*self.actor_state_size + 3] = crowd_motion_prediction.motion_predictions[j].velocities[k].y
             self.acados_ocp_solver.set(k, 'p', actors_state)
         self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])
 

@@ -7,6 +7,9 @@ class Hparams:
     controller_file = 'test_controller.json'
     prediction_file = 'test_predictor.json'
 
+    # Specify whether to use gazebo or real robot
+    simulation = True
+
     # Specify whether to use laser scans data or ground truth
     fake_sensing = False
 

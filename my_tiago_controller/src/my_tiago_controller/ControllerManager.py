@@ -44,7 +44,7 @@ class ControllerManager:
 
         self.state = State(0.0, 0.0, 0.0, 0.0, 0.0)
         self.wheels_vel = np.zeros(2) # [w_r, w_l]
-        if not self.hparams.fake_sensing:
+        if self.hparams.simulation and not self.hparams.fake_sensing:
             self.actors_configuration = np.zeros(self.hparams.n_actors, dtype=Configuration)
             self.actors_name = ['actor_{}'.format(i) for i in range(self.hparams.n_actors)]
         self.crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.now(),
@@ -181,7 +181,7 @@ class ControllerManager:
             self.sensing = False
 
     def gazebo_model_states_callback(self, msg):
-        if not self.hparams.fake_sensing:
+        if self.hparams.simulation and not self.hparams.fake_sensing:
             actors_configuration = np.empty(self.hparams.n_actors, dtype=Configuration)
             for actor_name in self.actors_name:
                 if actor_name in msg.name:
@@ -266,10 +266,11 @@ class ControllerManager:
 
         output_dict['n_actors'] = self.hparams.n_actors
         output_dict['n_clusters'] = self.hparams.n_clusters
+        output_dict['simulation'] = self.hparams.simulation
         if self.hparams.n_actors > 0:        
             output_dict['actors_predictions'] = self.actors_prediction_history
             output_dict['fake_sensing'] = self.hparams.fake_sensing
-            if not self.hparams.fake_sensing:
+            if self.hparams.simulation and not self.hparams.fake_sensing:
                 output_dict['actors_gt'] = self.actors_gt_history
 
         for i in range(self.hparams.n_points):
@@ -427,7 +428,7 @@ class ControllerManager:
                                 predicted_trajectory[i, 1, j] = motion_prediction.positions[j].y
                     self.actors_prediction_history.append(predicted_trajectory.tolist())
 
-                    if not self.hparams.fake_sensing:
+                    if self.hparams.simulation and not self.hparams.fake_sensing:
                         gt_trajectory = np.zeros((self.hparams.n_actors, 2))
                         for i in range(self.hparams.n_actors):
                             gt_trajectory[i, 0] = self.actors_configuration[i].x
