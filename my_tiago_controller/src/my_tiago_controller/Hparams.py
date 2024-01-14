@@ -8,12 +8,13 @@ class Hparams:
     prediction_file = 'test_predictor.json'
 
     # Specify whether to use laser scans data or ground truth
-    fake_sensing = True
+    fake_sensing = False
 
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
     b = 0.1 # [m]
+    relative_laser_pos = np.array([0.2012 - b, -0.0009])
 
     # NMPC parameters
     controller_frequency = 40.0 # [Hz]
@@ -79,7 +80,7 @@ class Hparams:
     # Parameters for the CBF
     rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
-    gamma_actor = 0.8 # in (0,1], hyperparameter for the h function associated to actor
+    gamma_actor = 0.3 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.5 # in (0,1], hyperparameter for the h function associated to bounds
     
     n_actors = 5 # number of actors

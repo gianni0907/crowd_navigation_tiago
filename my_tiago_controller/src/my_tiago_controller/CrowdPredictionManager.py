@@ -50,6 +50,27 @@ def data_clustering(scans, tiago_state, angle_min, angle_incr):
 
     return polar_core_points
 
+def z_rotation(angle, point2d):
+    R = np.array([[math.cos(angle), - math.sin(angle), 0.0],
+                  [math.sin(angle), math.cos(angle), 0.0],
+                  [0.0, 0.0, 1.0]])
+    point3d = np.array([point2d[0], point2d[1], 0.0])
+    rotated_point2d = np.matmul(R, point3d)[:2]
+    return rotated_point2d
+
+def polar2relative(scan, angle_min, angle_incr):
+    relative_laser_pos = Hparams.relative_laser_pos
+    idx = scan[0]
+    distance = scan[1]
+    angle = angle_min + idx * angle_incr
+    xy_relative = np.array([distance * math.cos(angle) + relative_laser_pos[0],
+                            distance * math.sin(angle) + relative_laser_pos[1]])
+    return xy_relative
+
+def polar2absolute(scan, state, angle_min, angle_incr):
+    xy_relative = polar2relative(scan, angle_min, angle_incr)
+    xy_absolute = z_rotation(state.theta, xy_relative) + np.array([state.x, state.y])
+    return xy_absolute
 class CrowdPredictionManager:
     '''
     From the laser scans input predict the motion of the actors
@@ -143,11 +164,11 @@ class CrowdPredictionManager:
     def set_actors_trajectory_request(self, request):
         if not self.hparams.fake_sensing:
             rospy.loginfo("Cannot set synthetic trajectories, real sensing is active")
-            return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False) 
+            return my_tiago_msgs.srv.SetActorsTrajectoryResponse(False) 
         else:
             if self.status == Status.WAITING:
                 rospy.loginfo("Cannot set actors trajectory, robot is not READY")
-                return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)            
+                return my_tiago_msgs.srv.SetActorsTrajectoryResponse(False)            
             elif self.status == Status.READY:
                 self.trajectories = CrowdMotionPrediction.from_message(request.trajectories)
                 self.status = Status.MOVING
@@ -157,7 +178,7 @@ class CrowdPredictionManager:
                 return my_tiago_msgs.srv.SetActorsTrajectoryResponse(True)
             else:
                 rospy.loginfo("Cannot set actors trajectory, actors are already moving")
-                return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)
+                return my_tiago_msgs.srv.SetActorsTrajectoryResponse(False)
 
     def update_actors_position(self):
             actors_position = np.zeros((self.n_clusters, 2))

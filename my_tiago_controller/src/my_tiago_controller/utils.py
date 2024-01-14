@@ -203,22 +203,6 @@ def integrate(f, x0, u, dt, integration_method='RK4'):
 # Wrap angle to [-pi, pi):
 def wrap_angle(theta):
     return math.atan2(math.sin(theta), math.cos(theta))
-    
-def polar2relative(scan, state, angle_min, angle_incr):
-    idx = scan[0]
-    distance = scan[1]
-    angle = angle_min + idx * angle_incr
-    xy_relative = np.array([distance * math.cos(angle + state.theta),
-                            distance * math.sin(angle + state.theta)])
-    return xy_relative
-
-def polar2absolute(scan, state, angle_min, angle_incr):
-    idx = scan[0]
-    distance = scan[1]
-    angle = angle_min + idx * angle_incr
-    xy_absolute = np.array([distance * math.cos(angle + state.theta) + state.x,
-                            distance * math.sin(angle + state.theta) + state.y])
-    return xy_absolute
 
 def linear_trajectory(p_i : Position, p_f : Position, n_steps):
     """
