@@ -46,12 +46,14 @@ class FSM():
     def start_state(self, time, measure):
         if any(meas != 0.0 for meas in measure):
             if np.linalg.norm(measure - self.previous_estimate[:2]) < self.matching_threshold:
-                dt = time - self.last_valid_measurement[1]
-                print(f"dt={dt} at instant {time}")
+                # dt = time - self.last_valid_measurement[1]
+                # print(f"dt={dt} at instant {time}")
                 estimate = np.array([measure[0],
                                      measure[1],
-                                     (1 / dt) * (measure[0] - self.previous_estimate[0]),
-                                     (1 / dt) * (measure[1] - self.previous_estimate[1])])
+                                     0.0,
+                                     0.0])
+                                    #  (1 / dt) * (measure[0] - self.previous_estimate[0]),
+                                    #  (1 / dt) * (measure[1] - self.previous_estimate[1])])
                 self.next_state = FSMStates.ACTIVE
                 # Kalman Filter initialization
                 self.kalman_f = Kalman(estimate, time, print_info=False)

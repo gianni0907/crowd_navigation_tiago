@@ -101,6 +101,7 @@ class CrowdPredictionManager:
         self.kalman_infos = {}
         kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_actors)]
         self.kalman_infos = {key: list() for key in kalman_names}
+        self.time_history = []
 
         self.N_horizon = self.hparams.N_horizon
         self.frequency = self.hparams.controller_frequency
@@ -262,6 +263,7 @@ class CrowdPredictionManager:
     def log_values(self):
         output_dict = {}
         output_dict['kfs'] = self.kalman_infos
+        output_dict['cpu_time'] = self.time_history
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -285,7 +287,7 @@ class CrowdPredictionManager:
         fsms = [FSM(self.hparams) for _ in range(self.n_clusters)]
 
         while not rospy.is_shutdown():
-            instant = time.process_time()
+            start_time = time.process_time()
             
             if self.status == Status.WAITING:
                 if self.update_state():
@@ -344,7 +346,7 @@ class CrowdPredictionManager:
                 if self.hparams.log:
                     self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
                                                                      FSMStates.print(fsm_state),
-                                                                     instant])
+                                                                     start_time])
 
                 # find the closest available cluster to the fsm's prediction
                 min_dist = np.inf
@@ -359,11 +361,11 @@ class CrowdPredictionManager:
                             cluster = j
                 if cluster is not None:
                     measure = self.actors_position[cluster]
-                    fsm.update(instant, measure)
+                    fsm.update(start_time, measure)
                     associated_clusters.append(cluster)
                 else:
                     measure = np.array([0.0, 0.0])
-                    fsm.update(instant, measure)
+                    fsm.update(start_time, measure)
 
                 current_estimate = fsm.current_estimate
                 predictions = self.propagate_state(current_estimate, self.N_horizon)
@@ -377,11 +379,15 @@ class CrowdPredictionManager:
                         MotionPrediction(predicted_positions, predicted_velocities)
                 )
 
-            crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(instant),
-                                                                            'map',
-                                                                            crowd_motion_prediction)
+            crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(start_time),
+                                                                           'map',
+                                                                           crowd_motion_prediction)
             crowd_motion_prediction_stamped_msg = CrowdMotionPredictionStamped.to_message(crowd_motion_prediction_stamped)
             self.crowd_motion_prediction_publisher.publish(crowd_motion_prediction_stamped_msg)
+            
+            end_time = time.process_time()
+            deltat = end_time - start_time
+            self.time_history.append([deltat, start_time])
 
             rate.sleep()
 

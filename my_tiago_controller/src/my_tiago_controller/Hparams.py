@@ -4,7 +4,7 @@ from my_tiago_controller.utils import *
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    controller_file = 'test_controller.json'
+    controller_file = 'test_controller_nomod.json'
     prediction_file = 'test_predictor.json'
 
     # Specify whether to use gazebo or real robot
@@ -83,11 +83,11 @@ class Hparams:
     # Parameters for the CBF
     rho_cbf = 0.4 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
-    gamma_actor = 0.3 # in (0,1], hyperparameter for the h function associated to actor
+    gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.5 # in (0,1], hyperparameter for the h function associated to bounds
     
     n_actors = 5 # number of actors
-    if fake_sensing:
+    if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
         n_clusters = 3 # number of clusters
@@ -97,4 +97,4 @@ class Hparams:
         nullstate = np.array([-30, -30, 0.0, 0.0])
         innovation_threshold = 1
         matching_threshold = 0.1
-        max_pred_time = 1
+        max_pred_time = dt * N_horizon

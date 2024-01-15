@@ -27,9 +27,11 @@ def plot_results(filename=None):
         os.makedirs(save_sim_dir)
 
     log_path = os.path.join(log_dir, filename + '.json')
+    log_predictor = os.path.join(log_dir, 'test_predictor.json')
     save_profiles1_path = os.path.join(save_plots_dir, filename + '_profiles1.png')
     save_profiles2_path = os.path.join(save_plots_dir, filename + '_profiles2.png')
     save_time_path = os.path.join(save_plots_dir, filename + '_time.png')
+    save_time_predictor_path = os.path.join(save_plots_dir, filename + '_time_predictor.png')
     save_sim_path = os.path.join(save_sim_dir, filename + '_simulation.mp4')
 
     if os.path.exists(log_path):
@@ -39,9 +41,17 @@ def plot_results(filename=None):
         raise Exception(
             f"Specified file not found"
         )
+    if os.path.exists(log_predictor):
+        with open(log_predictor, 'r') as file:
+            predictor = json.load(file)
+    else:
+        raise Exception(
+            f"Specified file not found"
+        )
 
     # Setup all the data
     iteration_time = np.array(data['cpu_time'])
+    iter_time_predictor = np.array(predictor['cpu_time'])
     states = np.array(data['states'])
     configurations = states[:, :3]
     robot_center = np.empty((configurations.shape[0], 2))
@@ -87,9 +97,22 @@ def plot_results(filename=None):
     plt.xlim(t[0], t[-1])
     plt.title('Elapsed time per iteration')
     plt.xlabel('$t \quad [s]$')
-    plt.ylabel('$iteration time [s]$')
+    plt.ylabel('$iteration \quad time \quad [s]$')
     plt.tight_layout()
     plt.savefig(save_time_path)
+    plt.show()
+
+    # Plot the elapsed time for each iteration (predictor)
+    plt.figure(figsize=(16,4))
+    plt.step(iter_time_predictor[:, 1], iter_time_predictor[:, 0])
+    plt.grid(True)
+    plt.hlines(1 / frequency, iter_time_predictor[0, 1], iter_time_predictor[-1, 1], color='red', linestyle='--')
+    plt.xlim(iter_time_predictor[0, 1], iter_time_predictor[-1, 1])
+    plt.title('Elapsed time per iteration (predictor)')
+    plt.xlabel('$t \quad [s]$')
+    plt.ylabel('$iteration \quad time \quad [s]$')
+    plt.tight_layout()
+    plt.savefig(save_time_predictor_path)
     plt.show()
 
     # Figure profiles1
