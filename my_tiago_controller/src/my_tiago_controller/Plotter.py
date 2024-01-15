@@ -66,9 +66,9 @@ def plot_results(filename=None):
 
     n_actors = data['n_actors']
     n_clusters = data['n_clusters']
-    fake_sensing = data['fake_sensing']
     simulation = data['simulation']
     if n_actors > 0:
+        fake_sensing = data['fake_sensing']
         actors_predictions = np.array(data['actors_predictions'])
         if simulation and not fake_sensing:
             actors_groundtruth = np.array(data['actors_gt'])
