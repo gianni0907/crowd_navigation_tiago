@@ -1,21 +1,20 @@
 # Crowd Navigation with TIAGo
 ## Project on-track
-Accomplished task: TIAGo robot navigation to a desired target position in an environment populated by `n_actors` moving actors (along linear paths). 
+Accomplished task: TIAGo robot navigation to a desired target position in an environment populated by `n_actors` moving actors (along linear paths).
 2 modules implemented:
 -   crowd prediction module:
-    read the laser scan measurement and estimate their state (position and velocity) using `n_actors` Kalman Filters (KFs), managed via as many Finite State Machines (FSMs). Then, propagate the estimated state over the whole control horizon assuming a constant velocity motion. Finally, send a message containing the predicted actors trajectory.
+    read the laser scan measurement and estimate their state (position and velocity) using `n_clusters` Kalman Filters (KFs), managed via as many Finite State Machines (FSMs). Then, propagate the estimated state over the whole control horizon assuming a constant velocity motion. Finally, send a message containing the predicted actors trajectory.
+    Note: if `fake_sensing=True` the module does not consider the laser scan measurement but a custom ground truth trajectory of the actors. 
 
 -   controller module:
-    given a desired target position, at each iteration, read the crowd motion prediction message and the current robot configuration and run the NMPC. The extended kinematic model of the TIAGo robot is considered, with wheels angular accelerations as control inputs. The moving humans avoidance is realized introducing nonlinear constraints defined by CBFs in the NMPC model of the Acados solver. CBFs constraints are also adopted to ensure the permanence of the robot within a predefined region.
-
-## Next goal
-Improvement of the prediction module
+    given a desired target position, at each iteration, read the crowd motion prediction message and the current robot configuration and run the NMPC. The extended kinematic model of the TIAGo robot is considered, with wheels angular accelerations as control inputs. The moving humans avoidance is realized introducing nonlinear constraints defined by discrete-time Control Barrier Functions (CBFs) in the NMPC model of the Acados solver. CBFs constraints are also adopted to ensure the permanence of the robot within a predefined region.
 
 ## Usage
 To run the Gazebo simulation:
 ```bash
-roslaunch labrob_tiago_gazebo tiago_gazebo.launch public_sim:=true end_effector:=pal-gripper world:=labrob_5_humans
+roslaunch labrob_tiago_gazebo tiago_gazebo.launch public_sim:=true end_effector:=pal-gripper world:=WORLD
 ```
+Note that as `WORLD` it is suggested to use either `labrob_5_humans` or `labrob_10_humans` in the `worlds` directory of the repository, since they've been modified in order to create more challengin scenario (please copy them in the `labrob_gazebo_worlds/worlds` directory). Of course, depending on the chosen `WORLD`, modify also the  `n_actors` variable specified in `my_tiago_controller/src/my_tiago_controller/Hparams.py`
 
 To run the NMPC controller module:
 ```bash
@@ -26,6 +25,11 @@ When the node is shutdown, relevant data are logged in a `.json` file located in
 To run the Crowd Prediction module:
 ```bash
 roslaunch my_tiago_controller crowd_prediction.launch
+```
+
+If `fake_sensing=True`, to generate and send the actors trajectory:
+```bash
+roslaunch my_tiago_controller send_actors_trajectory.launch
 ```
 
 To set a desired TIAGo target position:
