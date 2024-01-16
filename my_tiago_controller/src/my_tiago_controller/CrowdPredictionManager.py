@@ -106,6 +106,7 @@ class CrowdPredictionManager:
 
         self.N_horizon = self.hparams.N_horizon
         self.frequency = self.hparams.controller_frequency
+        self.dt = self.hparams.dt
 
         # Setup reference frames:
         self.map_frame = 'map'
@@ -245,7 +246,7 @@ class CrowdPredictionManager:
     def propagate_state(self, state, N):
         predictions = [self.hparams.nullstate for _ in range(N)]
         time = 0
-        dt = 1 / self.frequency
+        dt = self.dt
         for i in range(N):
             time = dt * (i)
             predictions[i] = self.predict_next_state(state, time)

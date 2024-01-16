@@ -21,7 +21,7 @@ class Hparams:
 
     # NMPC parameters
     controller_frequency = 40.0 # [Hz]
-    dt = 1 / controller_frequency # [s]
+    dt = 2.0 / controller_frequency # [s]
     N_horizon = 20
 
     # Driving and steering acceleration limits
@@ -78,7 +78,7 @@ class Hparams:
     v_weight = 1e4 # driving velocity weight
     omega_weight = 1e0 # steering velocity weight
     u_weight = 1e0 # input weights
-    terminal_factor = 5e1 # factor for the terminal state
+    terminal_factor = 7e1 # factor for the terminal state
 
     # Parameters for the CBF
     rho_cbf = 0.4 # the radius of the circle around the robot center

@@ -27,8 +27,8 @@ class NMPC:
         self.N = hparams.N_horizon
 
         # Horizon duration:
-        dt = 1.0 / hparams.controller_frequency
-        self.T = dt * self.N # [s]
+        self.dt = self.hparams.dt
+        self.T = self.dt * self.N # [s]
 
         # Setup kinematic model
         self.kinematic_model = KinematicModel()
@@ -60,14 +60,14 @@ class NMPC:
         return yf
 
     def __integrate(self, f, x0, u, integration_method='RK4'):
-        dt = 1 / self.hparams.controller_frequency
+        dt = self.dt
         if integration_method == 'RK4':
             return self.__RK4(f, x0, u, dt)
         else:
             return self.__Euler(f, x0, u, dt)
 
     def __next_actor_state(self, state):
-        dt = 1 / self.hparams.controller_frequency
+        dt = self.dt
         F = np.array([[1.0, 0.0, dt, 0.0],
                       [0.0, 1.0, 0.0, dt],
                       [0.0, 0.0, 1.0, 0.0],
