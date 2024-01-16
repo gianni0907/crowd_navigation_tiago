@@ -251,7 +251,7 @@ class NMPC:
                                           self.hparams.w_max,
                                           self.hparams.driving_acc_max,
                                           self.hparams.steering_acc_max])
-
+        
         # Nonlinear constraints (CBFs) (for both actors and configuration bounds):
         if self.n_actors > 0:
             acados_constraints.lh = np.zeros(self.n_edges + self.n_clusters)

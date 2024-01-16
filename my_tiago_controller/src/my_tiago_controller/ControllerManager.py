@@ -140,7 +140,7 @@ class ControllerManager:
             v = 0.0
             omega = 0.0
         else:
-            dt = self.hparams.dt
+            dt = 1 / self.hparams.controller_frequency
             alpha_r = self.control_input[self.hparams.r_wheel_idx]
             alpha_l = self.control_input[self.hparams.l_wheel_idx]
             wheel_radius = self.hparams.wheel_radius
