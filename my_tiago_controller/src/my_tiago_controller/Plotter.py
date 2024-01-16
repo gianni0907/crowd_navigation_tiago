@@ -390,12 +390,12 @@ def plot_results(filename=None):
 
                 return robot, robot_clearance, robot_label, goal, goal_label, \
                        ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line, \
-                       actors, actors_clearance, actors_label, \
+                       actors, actors_clearance, actors_label, actors_pred_line, \
                        actors_gt, actors_gt_clearance, actors_gt_label
             else:
                 return robot, robot_clearance, robot_label, goal, goal_label, \
                        ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line, \
-                       actors, actors_clearance, actors_label
+                       actors, actors_clearance, actors_label, actors_pred_line
         else:
             return robot, robot_clearance, robot_label, goal, goal_label, \
                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line

@@ -5,7 +5,6 @@ import json
 import math
 import rospy
 import threading
-import sensor_msgs.msg
 import tf2_ros
 from sklearn.cluster import DBSCAN
 from scipy.spatial.distance import cdist
@@ -15,6 +14,7 @@ from my_tiago_controller.Hparams import *
 from my_tiago_controller.Status import *
 from my_tiago_controller.FSM import *
 
+import sensor_msgs.msg
 import my_tiago_msgs.srv
 import my_tiago_msgs.msg
 
@@ -72,6 +72,7 @@ def polar2absolute(scan, state, angle_min, angle_incr):
     xy_relative = polar2relative(scan, angle_min, angle_incr)
     xy_absolute = z_rotation(state.theta, xy_relative) + np.array([state.x, state.y])
     return xy_absolute
+
 class CrowdPredictionManager:
     '''
     From the laser scans input predict the motion of the actors
@@ -99,7 +100,7 @@ class CrowdPredictionManager:
         self.actors_position = np.zeros((self.hparams.n_clusters, 2))
 
         self.kalman_infos = {}
-        kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_actors)]
+        kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_clusters)]
         self.kalman_infos = {key: list() for key in kalman_names}
         self.time_history = []
 
@@ -287,7 +288,7 @@ class CrowdPredictionManager:
         fsms = [FSM(self.hparams) for _ in range(self.n_clusters)]
 
         while not rospy.is_shutdown():
-            start_time = time.process_time()
+            start_time = time.time()
             
             if self.status == Status.WAITING:
                 if self.update_state():
@@ -385,7 +386,7 @@ class CrowdPredictionManager:
             crowd_motion_prediction_stamped_msg = CrowdMotionPredictionStamped.to_message(crowd_motion_prediction_stamped)
             self.crowd_motion_prediction_publisher.publish(crowd_motion_prediction_stamped_msg)
             
-            end_time = time.process_time()
+            end_time = time.time()
             deltat = end_time - start_time
             self.time_history.append([deltat, start_time])
 

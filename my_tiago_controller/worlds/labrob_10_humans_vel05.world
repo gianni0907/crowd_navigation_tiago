@@ -6,8 +6,8 @@
       <ode>
         <solver>
           <type>quick</type>
-          <iters>20</iters>
-          <sor>1.0</sor>
+          <iters>50</iters>
+          <sor>1.4</sor>
         </solver>
         <constraints>
           <cfm>0.0</cfm>

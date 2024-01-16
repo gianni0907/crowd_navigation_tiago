@@ -153,7 +153,7 @@ class NMPC:
 
         # Create acados model:
         acados_model = AcadosModel()
-        acados_model.name = 'tiago_kinematic_model'
+        acados_model.name = 'tiago_extended_model'
 
         # System dynamics:
         acados_model.f_impl_expr = f_impl

@@ -370,7 +370,7 @@ class ControllerManager:
             rospy.on_shutdown(self.log_values)
 
         while not(rospy.is_shutdown()):
-            start_time = time.process_time()
+            start_time = time.time()
 
             if self.status == Status.WAITING:
                 if self.update_state():
@@ -435,7 +435,7 @@ class ControllerManager:
                             gt_trajectory[i, 1] = self.actors_configuration[i].y
                         self.actors_gt_history.append(gt_trajectory.tolist())
 
-                end_time = time.process_time()        
+                end_time = time.time()        
                 deltat = end_time - start_time
                 self.time_history.append([deltat, start_time])
                 if deltat > 1 / (2 * self.hparams.controller_frequency):
