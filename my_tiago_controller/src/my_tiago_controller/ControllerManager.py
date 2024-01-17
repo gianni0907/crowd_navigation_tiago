@@ -105,6 +105,7 @@ class ControllerManager:
             self.robot_prediction_history = []
             self.wheels_vel_history = []
             self.wheels_acc_history = []
+            self.velocity_history = []
             self.target_history = []
             self.actors_prediction_history = []
             self.actors_gt_history = []
@@ -166,6 +167,7 @@ class ControllerManager:
 
         # Publish wheel velocity commands
         self.cmd_vel_publisher.publish(cmd_vel_msg)
+        return v, omega
     
     def joint_states_callback(self, msg):
         self.wheels_vel = np.array([msg.velocity[13], msg.velocity[12]])
@@ -261,6 +263,7 @@ class ControllerManager:
         output_dict['robot_predictions'] = self.robot_prediction_history
         output_dict['wheels_velocities'] = self.wheels_vel_history
         output_dict['wheels_accelerations'] = self.wheels_acc_history
+        output_dict['velocities'] = self.velocity_history
         output_dict['targets'] = self.target_history
         output_dict['cpu_time'] = self.time_history
 
@@ -384,7 +387,7 @@ class ControllerManager:
                     continue
 
             self.update()
-            self.publish_command()
+            v, omega = self.publish_command()
             
             # Saving data for plots
             if self.hparams.log and (self.sensing or self.hparams.n_actors == 0):
@@ -406,6 +409,7 @@ class ControllerManager:
                     self.control_input[self.hparams.l_wheel_idx],
                     start_time
                 ])
+                self.velocity_history.append([v, omega, start_time])
                 self.target_history.append([
                     self.target_position[self.hparams.x_idx],
                     self.target_position[self.hparams.y_idx],

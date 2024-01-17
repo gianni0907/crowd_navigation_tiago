@@ -65,6 +65,7 @@ def plot_results(filename=None):
     robot_predictions = np.array(data['robot_predictions'])
     inputs = np.array(data['wheels_accelerations'])
     wheels_velocities = np.array(data['wheels_velocities'])
+    velocities = np.array(data['velocities'])
     targets = np.array(data['targets'])
     errors = targets[:, :2] - configurations[:, :2]
     n_edges = data['n_edges']
@@ -122,7 +123,9 @@ def plot_results(filename=None):
     axs1[0, 0].plot(t, wheels_velocities[:, 0], label='$\omega_r$')
     axs1[0, 0].plot(t, wheels_velocities[:, 1], label='$\omega_l$')
     axs1[1, 0].plot(t, driving_velocities[:], label='$v$')
+    axs1[1, 0].plot(t, velocities[:, 0], label='$v_{cmd}$')
     axs1[2, 0].plot(t, steering_velocities[:], label='$\omega$')
+    axs1[2, 0].plot(t, velocities[:, 1], label='$\omega_{cmd}$')
     axs1[0, 1].plot(t, configurations[:, 0], label='$x$')
     axs1[0, 1].plot(t, targets[:, 0], label='$x_g$')
     axs1[1, 1].plot(t, configurations[:, 1], label='$y$')
@@ -142,6 +145,7 @@ def plot_results(filename=None):
     axs1[1, 0].set_title('TIAGo driving velocity')
     axs1[1, 0].set_xlabel("$t \quad [s]$")
     axs1[1, 0].set_ylabel('$[m/s]$')
+    axs1[1, 0].legend(loc='upper left')
     axs1[1, 0].hlines(v_bounds[0], t[0], t[-1], color='red', linestyle='--')
     axs1[1, 0].hlines(v_bounds[1], t[0], t[-1], color='red', linestyle="--")
     axs1[1, 0].set_ylim([-1 + v_bounds[0], 1 + v_bounds[1]])
@@ -151,6 +155,7 @@ def plot_results(filename=None):
     axs1[2, 0].set_title('TIAGo steering velocity')
     axs1[2, 0].set_xlabel("$t \quad [s]$")
     axs1[2, 0].set_ylabel('$[rad/s]$')
+    axs1[2, 0].legend(loc='upper left')
     axs1[2, 0].hlines(omega_bounds[0], t[0], t[-1], color='red', linestyle='--')
     axs1[2, 0].hlines(omega_bounds[1], t[0], t[-1], color='red', linestyle="--")
     axs1[2, 0].set_ylim([-1 + omega_bounds[0], 1 + omega_bounds[1]])
