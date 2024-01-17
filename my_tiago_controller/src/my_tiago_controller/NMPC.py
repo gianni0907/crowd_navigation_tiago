@@ -200,7 +200,8 @@ class NMPC:
         ny = self.nq + self.nu
         ny_e = self.nq
 
-        acados_cost.W_e = scipy.linalg.block_diag(self.hparams.terminal_factor * Q_mat, R_mat)
+        acados_cost.W_e = scipy.linalg.block_diag(self.hparams.terminal_factor_p * Q_mat,
+                                                  self.hparams.terminal_factor_v * R_mat)
         acados_cost.W = scipy.linalg.block_diag(Q_mat, R_mat, S_mat)
 
         Vx = np.zeros((ny, self.nq))

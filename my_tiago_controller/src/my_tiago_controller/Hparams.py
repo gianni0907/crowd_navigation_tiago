@@ -4,7 +4,7 @@ from my_tiago_controller.utils import *
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    controller_file = 'test_controller.json'
+    controller_file = 'test_controller_past.json'
     prediction_file = 'test_predictor.json'
 
     # Specify whether to use gazebo or real robot
@@ -20,8 +20,8 @@ class Hparams:
     relative_laser_pos = np.array([0.2012 - b, -0.0009])
 
     # NMPC parameters
-    controller_frequency = 40.0 # [Hz]
-    dt = 2.0 / controller_frequency # [s]
+    controller_frequency = 20.0 # [Hz]
+    dt = 1.0 / controller_frequency # [s]
     N_horizon = 20
 
     # Driving and steering acceleration limits
@@ -75,10 +75,11 @@ class Hparams:
 
     # Cost function weights
     p_weight = 1e2 # position weights
-    v_weight = 1e4 # driving velocity weight
-    omega_weight = 1e0 # steering velocity weight
-    u_weight = 1e0 # input weights
-    terminal_factor = 7e1 # factor for the terminal state
+    v_weight = 5e1 # driving velocity weight
+    omega_weight = 1e-3 # steering velocity weight
+    u_weight = 1e1 # input weights
+    terminal_factor_p = 1e1 # factor for the terminal position weights
+    terminal_factor_v = 1e3 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
     rho_cbf = 0.4 # the radius of the circle around the robot center

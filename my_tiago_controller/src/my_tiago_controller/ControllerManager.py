@@ -290,12 +290,14 @@ class ControllerManager:
         output_dict['gamma_bound'] = self.hparams.gamma_bound
         output_dict['gamma_actor'] = self.hparams.gamma_actor
         output_dict['frequency'] = self.hparams.controller_frequency
+        output_dict['dt'] = self.hparams.dt
         output_dict['N_horizon'] = self.hparams.N_horizon
         output_dict['position_weight'] = self.hparams.p_weight
         output_dict['v_weight'] = self.hparams.v_weight
         output_dict['omega_weight'] = self.hparams.omega_weight
         output_dict['input_weight'] = self.hparams.u_weight
-        output_dict['terminal_factor'] = self.hparams.terminal_factor
+        output_dict['terminal_factor_p'] = self.hparams.terminal_factor_p
+        output_dict['terminal_factor_v'] = self.hparams.terminal_factor_v
         output_dict['offset_b'] = self.hparams.b
         
         # log the data in a .json file
