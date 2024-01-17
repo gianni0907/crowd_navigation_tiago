@@ -4,7 +4,7 @@ from my_tiago_controller.utils import *
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    controller_file = 'test_controller_past.json'
+    controller_file = 'test_controller.json'
     prediction_file = 'test_predictor.json'
 
     # Specify whether to use gazebo or real robot
