@@ -8,10 +8,10 @@ class Hparams:
     prediction_file = 'test_predictor.json'
 
     # Specify whether to use gazebo or real robot
-    simulation = True
+    simulation = False
 
     # Specify whether to use laser scans data or ground truth
-    fake_sensing = True
+    fake_sensing = False
 
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
@@ -21,8 +21,8 @@ class Hparams:
 
     # NMPC parameters
     controller_frequency = 18.0 # [Hz]
-    dt = 1.0 / controller_frequency # [s]
-    N_horizon = 20
+    dt = 2.0 / controller_frequency # [s]
+    N_horizon = 10
 
     # Driving and steering acceleration limits
     driving_acc_max = 0.5 # [m/s^2]
@@ -50,10 +50,11 @@ class Hparams:
 
     # Set n points to be the vertexes of the admitted region
     n_points = 4
-    vertexes = np.array([Position(-6.0, 6.0),
-                         Position(-6.0, -6.0),
-                         Position(6.0, -6.0),
-                         Position(6.0, 6.0)])
+    vertexes = np.array([Position(9.0, -5.0),
+                         Position(2.8, -4.5),
+                         Position(2.8, -6.7),
+                         Position(9.0, -7.0)])
+
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
         normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
@@ -75,27 +76,27 @@ class Hparams:
 
     # Cost function weights
     p_weight = 1e2 # position weights
-    v_weight = 1e2 # driving velocity weight
-    omega_weight = 1e-3 # steering velocity weight
-    u_weight = 5e0 # input weights
+    v_weight = 5e0 # driving velocity weight
+    omega_weight = 1e-5 # steering velocity weight
+    u_weight = 1e1 # input weights
     terminal_factor_p = 1e1 # factor for the terminal position weights
-    terminal_factor_v = 5e2 # factor for the terminal velocities (v and omega) weights
+    terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
-    rho_cbf = 0.4 # the radius of the circle around the robot center
-    ds_cbf = 0.5 # safety clearance
+    rho_cbf = 0.3 # the radius of the circle around the robot center
+    ds_cbf = 0.2 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
-    gamma_bound = 0.5 # in (0,1], hyperparameter for the h function associated to bounds
+    gamma_bound = 0.3 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_actors = 5 # number of actors
+    n_actors = 2 # number of actors
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
-        n_clusters = 3 # number of clusters
+        n_clusters = 2 # number of clusters
 
     # Parameters for the crowd prediction
     if n_actors > 0:
         nullstate = np.array([-30, -30, 0.0, 0.0])
-        innovation_threshold = 1
+        innovation_threshold = 0.5
         matching_threshold = 0.1
         max_pred_time = dt * N_horizon

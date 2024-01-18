@@ -18,16 +18,15 @@ import sensor_msgs.msg
 import my_tiago_msgs.srv
 import my_tiago_msgs.msg
 
-def data_clustering(scans, tiago_state, angle_min, angle_incr):
+def data_clustering(scans, tiago_state, range_min, angle_min, angle_incr):
     scans_xy_abs = []
     scans_polar = []
     for element in scans:
-        if element[1] != np.inf:
+        if element[1] != np.inf and element[1] >= range_min:
             scans_polar.append(element)
             scans_xy_abs.append(polar2absolute(element, tiago_state, angle_min, angle_incr))
-
     if len(scans_xy_abs) != 0:
-        k_means = DBSCAN(eps=1, min_samples=2)
+        k_means = DBSCAN(eps=0.5, min_samples=2)
         clusters = k_means.fit_predict(np.array(scans_xy_abs))
         dynamic_n_clusters = max(clusters) + 1
         if(min(clusters) == -1):
@@ -198,6 +197,7 @@ class CrowdPredictionManager:
             else:
                 angle_min = self.laser_scan.angle_min
                 angle_increment = self.laser_scan.angle_increment
+                range_min = self.laser_scan.range_min
                 offset = 20
 
                 scanlist = []
@@ -205,12 +205,13 @@ class CrowdPredictionManager:
                     scanlist.append((idx, value))
 
                 # Delete the first and last 20 laser scan ranges (wrong measurements?)
-                scanlist = np.delete(scanlist, range(offset), 0)
-                scanlist = np.delete(scanlist, range(len(scanlist) - offset, len(scanlist)), 0)
+                # scanlist = np.delete(scanlist, range(offset), 0)
+                # scanlist = np.delete(scanlist, range(len(scanlist) - offset, len(scanlist)), 0)
 
                 # Perform data clustering
                 actors_polar_position = data_clustering(scanlist,
                                                         self.robot_state,
+                                                        range_min,
                                                         angle_min,
                                                         angle_increment)
                 for (i, dist) in enumerate(actors_polar_position):

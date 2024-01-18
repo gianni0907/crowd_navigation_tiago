@@ -95,7 +95,6 @@ def plot_results(filename=None):
     plt.savefig(save_time_path)
     plt.show()
 
-
     # Plot the elapsed time for each iteration of the crowd prediction module (if there are actors)
     if n_actors > 0:
         if os.path.exists(log_predictor):
