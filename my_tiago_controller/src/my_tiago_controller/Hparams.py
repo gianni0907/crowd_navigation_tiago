@@ -11,7 +11,7 @@ class Hparams:
     simulation = True
 
     # Specify whether to use laser scans data or ground truth
-    fake_sensing = False
+    fake_sensing = True
 
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
@@ -20,7 +20,7 @@ class Hparams:
     relative_laser_pos = np.array([0.2012 - b, -0.0009])
 
     # NMPC parameters
-    controller_frequency = 20.0 # [Hz]
+    controller_frequency = 18.0 # [Hz]
     dt = 1.0 / controller_frequency # [s]
     N_horizon = 20
 
@@ -75,11 +75,11 @@ class Hparams:
 
     # Cost function weights
     p_weight = 1e2 # position weights
-    v_weight = 5e1 # driving velocity weight
+    v_weight = 1e2 # driving velocity weight
     omega_weight = 1e-3 # steering velocity weight
-    u_weight = 1e1 # input weights
+    u_weight = 5e0 # input weights
     terminal_factor_p = 1e1 # factor for the terminal position weights
-    terminal_factor_v = 1e3 # factor for the terminal velocities (v and omega) weights
+    terminal_factor_v = 5e2 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
     rho_cbf = 0.4 # the radius of the circle around the robot center
