@@ -41,17 +41,9 @@ def plot_results(filename=None):
         raise Exception(
             f"Specified file not found"
         )
-    if os.path.exists(log_predictor):
-        with open(log_predictor, 'r') as file:
-            predictor = json.load(file)
-    else:
-        raise Exception(
-            f"Specified file not found"
-        )
 
     # Setup all the data
     iteration_time = np.array(data['cpu_time'])
-    iter_time_predictor = np.array(predictor['cpu_time'])
     states = np.array(data['states'])
     configurations = states[:, :3]
     robot_center = np.empty((configurations.shape[0], 2))
@@ -103,8 +95,17 @@ def plot_results(filename=None):
     plt.savefig(save_time_path)
     plt.show()
 
-    # Plot the elapsed time for each iteration (predictor)
+
+    # Plot the elapsed time for each iteration of the crowd prediction module (if there are actors)
     if n_actors > 0:
+        if os.path.exists(log_predictor):
+            with open(log_predictor, 'r') as file:
+                predictor = json.load(file)
+        else:
+            raise Exception(
+                f"Specified file not found"
+            )
+        iter_time_predictor = np.array(predictor['cpu_time'])
         plt.figure(figsize=(16,4))
         plt.step(iter_time_predictor[:, 1], iter_time_predictor[:, 0])
         plt.grid(True)
