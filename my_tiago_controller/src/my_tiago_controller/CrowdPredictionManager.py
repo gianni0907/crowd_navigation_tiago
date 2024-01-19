@@ -19,12 +19,28 @@ import my_tiago_msgs.srv
 import my_tiago_msgs.msg
 
 def data_clustering(scans, tiago_state, range_min, angle_min, angle_incr):
+    n_edges = Hparams.n_points
+    vertexes = Hparams.vertexes
+    normals = Hparams.normals
     scans_xy_abs = []
     scans_polar = []
     for element in scans:
+        outside = False
         if element[1] != np.inf and element[1] >= range_min:
-            scans_polar.append(element)
-            scans_xy_abs.append(polar2absolute(element, tiago_state, angle_min, angle_incr))
+            scan_abs = polar2absolute(element, tiago_state, angle_min, angle_incr)
+            for i in range(n_edges - 1):
+                vertex = np.array([vertexes[i + 1].x, vertexes[i + 1].y])
+                if np.dot(normals[i], scan_abs - vertex) < 0.0:
+                    outside = True
+                    break
+            if not outside:
+                vertex = np.array([vertexes[0].x, vertexes[0].y])
+                if np.dot(normals[n_edges - 1], scan_abs - vertex) < 0.0:
+                    outside = True
+            if not outside:
+                scans_polar.append(element)
+                scans_xy_abs.append(scan_abs)
+
     if len(scans_xy_abs) != 0:
         k_means = DBSCAN(eps=0.5, min_samples=2)
         clusters = k_means.fit_predict(np.array(scans_xy_abs))
@@ -205,8 +221,8 @@ class CrowdPredictionManager:
                     scanlist.append((idx, value))
 
                 # Delete the first and last 20 laser scan ranges (wrong measurements?)
-                # scanlist = np.delete(scanlist, range(offset), 0)
-                # scanlist = np.delete(scanlist, range(len(scanlist) - offset, len(scanlist)), 0)
+                scanlist = np.delete(scanlist, range(offset), 0)
+                scanlist = np.delete(scanlist, range(len(scanlist) - offset, len(scanlist)), 0)
 
                 # Perform data clustering
                 actors_polar_position = data_clustering(scanlist,

@@ -8,7 +8,7 @@ class Hparams:
     prediction_file = 'test_predictor.json'
 
     # Specify whether to use gazebo or real robot
-    simulation = False
+    simulation = True
 
     # Specify whether to use laser scans data or ground truth
     fake_sensing = False
@@ -50,10 +50,10 @@ class Hparams:
 
     # Set n points to be the vertexes of the admitted region
     n_points = 4
-    vertexes = np.array([Position(9.0, -5.0),
-                         Position(2.8, -4.5),
-                         Position(2.8, -6.7),
-                         Position(9.0, -7.0)])
+    vertexes = np.array([Position(-1.0, 0.5),
+                         Position(-1.0, -8.4),
+                         Position(8.0, -8.4),
+                         Position(8.0, 0.5)])
 
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
@@ -75,12 +75,20 @@ class Hparams:
     error_tol = 0.05
 
     # Cost function weights
-    p_weight = 1e2 # position weights
-    v_weight = 5e0 # driving velocity weight
-    omega_weight = 1e-5 # steering velocity weight
-    u_weight = 1e1 # input weights
-    terminal_factor_p = 1e1 # factor for the terminal position weights
-    terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
+    if simulation:
+        p_weight = 1e2 # position weights
+        v_weight = 5e0 # driving velocity weight
+        omega_weight = 1e-5 # steering velocity weight
+        u_weight = 1e1 # input weights
+        terminal_factor_p = 1e1 # factor for the terminal position weights
+        terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
+    else:
+        p_weight = 1e2 # position weights
+        v_weight = 5e0 # driving velocity weight
+        omega_weight = 1e-5 # steering velocity weight
+        u_weight = 1e1 # input weights
+        terminal_factor_p = 1e1 # factor for the terminal position weights
+        terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
     rho_cbf = 0.3 # the radius of the circle around the robot center
