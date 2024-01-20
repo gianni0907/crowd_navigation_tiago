@@ -17,105 +17,107 @@ def plot_results(filename=None):
         )
 
     # Specify saving plots directory
-    save_plots_dir = '/tmp/crowd_navigation_tiago/plots'
-    if not os.path.exists(save_plots_dir):
-        os.makedirs(save_plots_dir)
+    plots_savedir = '/tmp/crowd_navigation_tiago/plots'
+    if not os.path.exists(plots_savedir):
+        os.makedirs(plots_savedir)
 
     # Specify saving animations directory
-    save_sim_dir = '/tmp/crowd_navigation_tiago/simulations'
-    if not os.path.exists(save_sim_dir):
-        os.makedirs(save_sim_dir)
+    simulation_savedir = '/tmp/crowd_navigation_tiago/simulations'
+    if not os.path.exists(simulation_savedir):
+        os.makedirs(simulation_savedir)
 
-    log_path = os.path.join(log_dir, filename + '.json')
-    log_predictor = os.path.join(log_dir, 'test_predictor.json')
-    save_profiles1_path = os.path.join(save_plots_dir, filename + '_profiles1.png')
-    save_profiles2_path = os.path.join(save_plots_dir, filename + '_profiles2.png')
-    save_time_path = os.path.join(save_plots_dir, filename + '_time.png')
-    save_time_predictor_path = os.path.join(save_plots_dir, filename + '_time_predictor.png')
-    save_sim_path = os.path.join(save_sim_dir, filename + '_simulation.mp4')
+    log_controller = os.path.join(log_dir, filename + '_controller.json')
+    log_predictor = os.path.join(log_dir, filename + '_predictor.json')
+    profiles1_savepath = os.path.join(plots_savedir, filename + '_profiles1.png')
+    profiles2_savepath = os.path.join(plots_savedir, filename + '_profiles2.png')
+    time_savepath = os.path.join(plots_savedir, filename + '_ctrl_time.png')
+    scans_savepath = os.path.join(plots_savedir, filename + '_scans.jpeg')
+    simulation_savepath = os.path.join(simulation_savedir, filename + '_simulation.mp4')
 
-    if os.path.exists(log_path):
-        with open(log_path, 'r') as file:
-            data = json.load(file)
+    # Open the controller log file
+    if os.path.exists(log_controller):
+        with open(log_controller, 'r') as file:
+            controller_dict = json.load(file)
     else:
         raise Exception(
             f"Specified file not found"
         )
 
-    # Setup all the data
-    iteration_time = np.array(data['cpu_time'])
-    states = np.array(data['states'])
+    # Extract the controller data
+    iteration_time = np.array(controller_dict['cpu_time'])
+    states = np.array(controller_dict['states'])
     configurations = states[:, :3]
     robot_center = np.empty((configurations.shape[0], 2))
-    b = data['offset_b']
+    b = controller_dict['offset_b']
     for i in range(configurations.shape[0]):
         robot_center[i, 0] = configurations[i, 0] - b * math.cos(configurations[i, 2])
         robot_center[i, 1] = configurations[i, 1] - b * math.sin(configurations[i, 2])
     
     driving_velocities = states[:, 3]
     steering_velocities = states[:, 4]
-    robot_predictions = np.array(data['robot_predictions'])
-    inputs = np.array(data['wheels_accelerations'])
-    wheels_velocities = np.array(data['wheels_velocities'])
-    velocities = np.array(data['velocities'])
-    targets = np.array(data['targets'])
+    robot_predictions = np.array(controller_dict['robot_predictions'])
+    inputs = np.array(controller_dict['wheels_accelerations'])
+    wheels_velocities = np.array(controller_dict['wheels_velocities'])
+    velocities = np.array(controller_dict['velocities'])
+    targets = np.array(controller_dict['targets'])
     errors = targets[:, :2] - configurations[:, :2]
-    n_edges = data['n_edges']
-    boundary_vertexes = np.array(data['boundary_vertexes'])
-    input_bounds = np.array(data['input_bounds'])
-    v_bounds = np.array(data['v_bounds'])
-    omega_bounds = np.array(data['omega_bounds'])
-    wheels_vel_bounds = np.array(data['wheels_vel_bounds'])
+    n_edges = controller_dict['n_edges']
+    boundary_vertexes = np.array(controller_dict['boundary_vertexes'])
+    input_bounds = np.array(controller_dict['input_bounds'])
+    v_bounds = np.array(controller_dict['v_bounds'])
+    omega_bounds = np.array(controller_dict['omega_bounds'])
+    wheels_vel_bounds = np.array(controller_dict['wheels_vel_bounds'])
 
-    n_actors = data['n_actors']
-    n_clusters = data['n_clusters']
-    simulation = data['simulation']
+    n_actors = controller_dict['n_actors']
+    n_clusters = controller_dict['n_clusters']
+    simulation = controller_dict['simulation']
     if n_actors > 0:
-        fake_sensing = data['fake_sensing']
-        actors_predictions = np.array(data['actors_predictions'])
+        fake_sensing = controller_dict['fake_sensing']
+        actors_predictions = np.array(controller_dict['actors_predictions'])
         if simulation and not fake_sensing:
-            actors_groundtruth = np.array(data['actors_gt'])
+            actors_groundtruth = np.array(controller_dict['actors_gt'])
         
-    rho_cbf = data['rho_cbf']
-    ds_cbf = data['ds_cbf']
-    frequency = data['frequency']
+    rho_cbf = controller_dict['rho_cbf']
+    ds_cbf = controller_dict['ds_cbf']
+    frequency = controller_dict['frequency']
     shooting_nodes = inputs.shape[0]
     t = inputs[:, 2]
 
-    # Plot the elapsed time for each iteration
-    plt.figure(figsize=(16,4))
-    plt.step(t, iteration_time[:, 0])
-    plt.grid(True)
-    plt.hlines(1 / frequency, t[0], t[-1], color='red', linestyle='--')
-    plt.xlim(t[0], t[-1])
-    plt.title('Elapsed time per iteration')
-    plt.xlabel('$t \quad [s]$')
-    plt.ylabel('$iteration \quad time \quad [s]$')
-    plt.tight_layout()
-    plt.savefig(save_time_path)
-    plt.show()
-
-    # Plot the elapsed time for each iteration of the crowd prediction module (if there are actors)
+    # If the prediction module is present, open the predictor log file
     if n_actors > 0:
         if os.path.exists(log_predictor):
             with open(log_predictor, 'r') as file:
-                predictor = json.load(file)
+                predictor_dict = json.load(file)
         else:
             raise Exception(
                 f"Specified file not found"
             )
-        iter_time_predictor = np.array(predictor['cpu_time'])
-        plt.figure(figsize=(16,4))
-        plt.step(iter_time_predictor[:, 1], iter_time_predictor[:, 0])
-        plt.grid(True)
-        plt.hlines(1 / frequency, iter_time_predictor[0, 1], iter_time_predictor[-1, 1], color='red', linestyle='--')
-        plt.xlim(iter_time_predictor[0, 1], iter_time_predictor[-1, 1])
-        plt.title('Elapsed time per iteration (predictor)')
-        plt.xlabel('$t \quad [s]$')
-        plt.ylabel('$iteration \quad time \quad [s]$')
-        plt.tight_layout()
-        plt.savefig(save_time_predictor_path)
-        plt.show()
+        # Extract the predictor data
+        predictor_time = np.array(predictor_dict['cpu_time'])
+        laser_scans = np.array(predictor_dict['laser_scans'])
+
+    # Plot the elapsed time for each controller/predictor iteration respectively (if prediction module is present)
+    fig, axs = plt.subplots(2, 1, figsize=(16, 8))
+    
+    axs[0].step(t, iteration_time[:, 0])
+    axs[0].set_title('Elapsed time per controller iteration')
+    axs[0].set_xlabel('$t \quad [s]$')
+    axs[0].set_ylabel('$iteration \quad time \quad [s]$')
+    axs[0].hlines(1 / frequency, t[0], t[-1], color='red', linestyle='--')
+    axs[0].set_xlim([t[0], t[-1]])
+    axs[0].grid(True)
+
+    if n_actors > 0:
+        axs[1].step(predictor_time[:, 1], predictor_time[:, 0])
+        axs[1].set_title('Elapsed time per predictor iteration')
+        axs[1].set_xlabel('$t \quad [s]$')
+        axs[1].set_ylabel('$iteration \quad time \quad [s]$')
+        axs[1].hlines(1 / frequency, predictor_time[0, 1], predictor_time[-1, 1], color='red', linestyle='--')
+        axs[1].set_xlim(predictor_time[0, 1], predictor_time[-1, 1])
+        axs[1].grid(True)
+
+    fig.tight_layout()
+    fig.savefig(time_savepath)
 
     # Figure profiles1
     profiles1_fig, axs1 = plt.subplots(3, 2, figsize=(16, 8))
@@ -183,9 +185,8 @@ def plot_results(filename=None):
     axs1[2, 1].set_xlim([t[0], t[-1]])
     axs1[2, 1].grid(True)
     
-    plt.tight_layout()
-    plt.savefig(save_profiles1_path)
-    plt.show()
+    profiles1_fig.tight_layout()
+    profiles1_fig.savefig(profiles1_savepath)
 
     # Figure profiles2
     plot2_fig, axs2 = plt.subplots(3, 1, figsize=(16, 8))
@@ -223,9 +224,8 @@ def plot_results(filename=None):
     axs2[2].set_xlim([t[0], t[-1]])
     axs2[2].grid(True)
 
-    plt.tight_layout()
-    plt.savefig(save_profiles2_path)
-    plt.show()
+    plot2_fig.tight_layout()
+    plot2_fig.savefig(profiles2_savepath)
 
     # Figure to plot simulation
     sim_fig = plt.figure(figsize=(16, 8))
@@ -412,13 +412,12 @@ def plot_results(filename=None):
                                   blit=False,
                                   interval=1/frequency*1000,
                                   repeat=False)
-    plt.tight_layout()
-    # sim_animation.save(save_sim_path, writer='ffmpeg', fps=frequency, dpi=80)
+    sim_fig.tight_layout()
+    # sim_animation.save(simulation_savepath, writer='ffmpeg', fps=frequency, dpi=80)
     # print("Simulation saved")
+    
     plt.show()
-    return
 
 def main():
     filename = rospy.get_param('/filename')
     plot_results(filename)
-    return
