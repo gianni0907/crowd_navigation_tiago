@@ -13,6 +13,9 @@ class Hparams:
     # Specify whether to use laser scans data or ground truth
     fake_sensing = False
 
+    # Specify whether to process measurement with KFs
+    use_kalman = True
+
     # Kinematic parameters
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]

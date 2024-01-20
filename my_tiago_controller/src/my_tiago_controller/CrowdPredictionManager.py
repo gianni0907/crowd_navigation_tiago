@@ -303,7 +303,8 @@ class CrowdPredictionManager:
             rospy.logwarn("No actors available")
             return
         
-        fsms = [FSM(self.hparams) for _ in range(self.n_clusters)]
+        if self.hparams.use_kalman:
+            fsms = [FSM(self.hparams) for _ in range(self.n_clusters)]
 
         while not rospy.is_shutdown():
             start_time = time.time()
@@ -338,65 +339,86 @@ class CrowdPredictionManager:
             # update the actors position (based on fake or real sensing)
             self.update_actors_position()
 
-            # Perform data association
-            # predict next positions according to fsms
-            predicted_positions = np.zeros((self.hparams.n_clusters, 2))
-            associated_clusters = []
+            if self.hparams.use_kalman:
+                # Perform data association
+                # predict next positions according to fsms
+                curr_predicted_positions = np.zeros((self.hparams.n_clusters, 2))
+                associated_clusters = []
 
-            for (i, fsm) in enumerate(fsms):
-                if fsm.next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
-                    predicted_state = self.propagate_state(fsm.current_estimate, 1)[0]
-                elif fsm.next_state is FSMStates.START:
-                    predicted_state = fsm.current_estimate
+                for (i, fsm) in enumerate(fsms):
+                    if fsm.next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
+                        predicted_state = self.propagate_state(fsm.current_estimate, 1)[0]
+                    elif fsm.next_state is FSMStates.START:
+                        predicted_state = fsm.current_estimate
+                    else:
+                        predicted_state = self.hparams.nullstate
+                    curr_predicted_positions[i] = predicted_state[:2]
+                
+                # compute pairwise distance between predicted positions and positions from clusters
+                if self.actors_position.shape[0] > 0:
+                    distances = cdist(curr_predicted_positions, self.actors_position)
                 else:
-                    predicted_state = self.hparams.nullstate
-                predicted_positions[i] = predicted_state[:2]
-            
-            # compute pairwise distance between predicted positions and positions from clusters
-            if self.actors_position.shape[0] > 0:
-                distances = cdist(predicted_positions, self.actors_position)
+                    distances = None
+
+                # match each fsm to the closest cluster centroid
+                for (i, fsm) in enumerate(fsms):
+                    fsm_state = fsm.next_state
+                    
+                    if self.hparams.log:
+                        self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
+                                                                        FSMStates.print(fsm_state),
+                                                                        start_time])
+
+                    # find the closest available cluster to the fsm's prediction
+                    min_dist = np.inf
+                    cluster = None
+                    if distances is not None:
+                        for j in range(distances.shape[1]):
+                            if j in associated_clusters:
+                                continue
+                            distance = distances[i, j]
+                            if distance < min_dist:
+                                min_dist = distance
+                                cluster = j
+                    if cluster is not None:
+                        measure = self.actors_position[cluster]
+                        fsm.update(start_time, measure)
+                        associated_clusters.append(cluster)
+                    else:
+                        measure = np.array([0.0, 0.0])
+                        fsm.update(start_time, measure)
+
+                    current_estimate = fsm.current_estimate
+                    predictions = self.propagate_state(current_estimate, self.N_horizon)
+                    predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
+                    predicted_velocities = [Velocity(0.0, 0.0) for _ in range(self.N_horizon)]
+                    for j in range(self.N_horizon):
+                        predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
+                        predicted_velocities[j] = Velocity(predictions[j][2], predictions[j][3])
+                    
+                    crowd_motion_prediction.append(
+                            MotionPrediction(predicted_positions, predicted_velocities)
+                    )
             else:
-                distances = None
+                for i in range(self.hparams.n_clusters):
+                    if any(coord != 0.0 for coord in self.actors_position[i]):
+                        current_state = np.array([self.actors_position[i, 0],
+                                                  self.actors_position[i, 1],
+                                                  0.0,
+                                                  0.0])
+                    else:
+                        current_state = self.hparams.nullstate
 
-            # match each fsm to the closest cluster centroid
-            for (i, fsm) in enumerate(fsms):
-                fsm_state = fsm.next_state
+                    predictions = self.propagate_state(current_state, self.N_horizon)
+                    predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
+                    predicted_velocities = [Velocity(0.0, 0.0) for _ in range(self.N_horizon)]
+                    for j in range(self.N_horizon):
+                        predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
+                        predicted_velocities[j] = Velocity(predictions[j][2], predictions[j][3])
                 
-                if self.hparams.log:
-                    self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
-                                                                     FSMStates.print(fsm_state),
-                                                                     start_time])
-
-                # find the closest available cluster to the fsm's prediction
-                min_dist = np.inf
-                cluster = None
-                if distances is not None:
-                    for j in range(distances.shape[1]):
-                        if j in associated_clusters:
-                            continue
-                        distance = distances[i, j]
-                        if distance < min_dist:
-                            min_dist = distance
-                            cluster = j
-                if cluster is not None:
-                    measure = self.actors_position[cluster]
-                    fsm.update(start_time, measure)
-                    associated_clusters.append(cluster)
-                else:
-                    measure = np.array([0.0, 0.0])
-                    fsm.update(start_time, measure)
-
-                current_estimate = fsm.current_estimate
-                predictions = self.propagate_state(current_estimate, self.N_horizon)
-                predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
-                predicted_velocities = [Velocity(0.0, 0.0) for _ in range(self.N_horizon)]
-                for j in range(self.N_horizon):
-                    predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
-                    predicted_velocities[j] = Velocity(predictions[j][2], predictions[j][3])
-                
-                crowd_motion_prediction.append(
+                    crowd_motion_prediction.append(
                         MotionPrediction(predicted_positions, predicted_velocities)
-                )
+                    )
 
             crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(start_time),
                                                                            'map',
