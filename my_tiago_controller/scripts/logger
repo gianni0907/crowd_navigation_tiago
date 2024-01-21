@@ -1,5 +1,0 @@
-#!/usr/bin/env python3
-
-import my_tiago_controller.Logger as Logger
-if __name__ == '__main__':
-    Logger.main()

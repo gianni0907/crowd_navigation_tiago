@@ -27,7 +27,6 @@ include_directories(
 
 catkin_install_python(PROGRAMS
   scripts/nmpc_controller
-  scripts/logger
   scripts/plotter
   scripts/send_desired_target_position
   scripts/send_actors_trajectory
