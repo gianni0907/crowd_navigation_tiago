@@ -128,9 +128,9 @@ class NMPC:
         # Define the safe set wrt the configuration bounds
         robot_position = np.array([x, y])
         for i in range(self.n_edges - 1):
-            vertex = np.array([self.vertexes[i + 1].x, self.vertexes[i + 1].y])
+            vertex = self.vertexes[i + 1]
             h[i] = np.dot(self.normals[i], robot_position - vertex) - self.hparams.rho_cbf
-        vertex = np.array([self.vertexes[0].x, self.vertexes[0].y])
+        vertex = self.vertexes[0]
         h[self.n_edges - 1] = np.dot(self.normals[self.n_edges - 1], robot_position - vertex) - self.hparams.rho_cbf
 
         # Consider the robot distance from actors, if actors are present

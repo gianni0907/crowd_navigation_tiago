@@ -18,54 +18,6 @@ import sensor_msgs.msg
 import my_tiago_msgs.srv
 import my_tiago_msgs.msg
 
-def data_clustering(scans, tiago_state, range_min, angle_min, angle_incr):
-    n_edges = Hparams.n_points
-    vertexes = Hparams.vertexes
-    normals = Hparams.normals
-    scans_xy_abs = []
-    scans_polar = []
-    for element in scans:
-        outside = False
-        if element[1] != np.inf and element[1] >= range_min:
-            scan_abs = polar2absolute(element, tiago_state, angle_min, angle_incr)
-            for i in range(n_edges - 1):
-                vertex = np.array([vertexes[i + 1].x, vertexes[i + 1].y])
-                if np.dot(normals[i], scan_abs - vertex) < 0.0:
-                    outside = True
-                    break
-            if not outside:
-                vertex = np.array([vertexes[0].x, vertexes[0].y])
-                if np.dot(normals[n_edges - 1], scan_abs - vertex) < 0.0:
-                    outside = True
-            if not outside:
-                scans_polar.append(element)
-                scans_xy_abs.append(scan_abs)
-
-    if len(scans_xy_abs) != 0:
-        k_means = DBSCAN(eps=0.5, min_samples=2)
-        clusters = k_means.fit_predict(np.array(scans_xy_abs))
-        dynamic_n_clusters = max(clusters) + 1
-        if(min(clusters) == -1):
-            print("Noisy samples")
-        
-        polar_core_points = np.zeros((dynamic_n_clusters, 2))
-
-        for cluster_i in range(dynamic_n_clusters):
-            min_distance = np.inf
-            for id, (idx_scan, polar_scan) in zip(clusters, enumerate(scans_polar)):
-                if id == cluster_i:
-                    if polar_scan[1] < min_distance:
-                        min_distance = polar_scan[1]
-                        polar_core_points[cluster_i] = scans_polar[idx_scan]
-
-        polar_core_points = polar_core_points.tolist()        
-        polar_core_points.sort(key = lambda x: x[1], reverse = False)
-        polar_core_points = np.array(polar_core_points[0:Hparams.n_clusters])
-    else:
-        polar_core_points = np.array([])
-
-    return polar_core_points
-
 def z_rotation(angle, point2d):
     R = np.array([[math.cos(angle), - math.sin(angle), 0.0],
                   [math.sin(angle), math.cos(angle), 0.0],
@@ -87,6 +39,63 @@ def polar2absolute(scan, state, angle_min, angle_incr):
     xy_relative = polar2relative(scan, angle_min, angle_incr)
     xy_absolute = z_rotation(state.theta, xy_relative) + np.array([state.x, state.y])
     return xy_absolute
+
+def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
+    n_edges = Hparams.n_points
+    vertexes = Hparams.vertexes
+    normals = Hparams.normals
+    absolute_scans = []
+    polar_scans = []
+
+    # Delete the first and last 20 laser scan ranges (wrong measurements?)
+    offset = 20
+    scans = np.delete(scans, range(offset), 0)
+    scans = np.delete(scans, range(len(scans) - offset, len(scans)), 0)
+
+    for idx, value in enumerate(scans):
+        outside = False
+        if value != np.inf and value >= range_min:
+            absolute_scan = polar2absolute((idx + offset, value), tiago_state, angle_min, angle_incr)
+            for i in range(n_edges - 1):
+                vertex = vertexes[i + 1]
+                if np.dot(normals[i], absolute_scan - vertex) < 0.0:
+                    outside = True
+                    break
+            if not outside:
+                vertex = vertexes[0]
+                if np.dot(normals[n_edges - 1], absolute_scan - vertex) < 0.0:
+                    outside = True
+            if not outside:
+                polar_scans.append((idx + offset, value))
+                absolute_scans.append(absolute_scan.tolist())
+
+    return absolute_scans, polar_scans
+
+def data_clustering(absolute_scans, polar_scans):
+    if len(absolute_scans) != 0:
+        k_means = DBSCAN(eps=0.5, min_samples=2)
+        clusters = k_means.fit_predict(np.array(absolute_scans))
+        dynamic_n_clusters = max(clusters) + 1
+        if(min(clusters) == -1):
+            print("Noisy samples")
+        
+        polar_core_points = np.zeros((dynamic_n_clusters, 2))
+
+        for cluster_i in range(dynamic_n_clusters):
+            min_distance = np.inf
+            for id, (idx_scan, polar_scan) in zip(clusters, enumerate(polar_scans)):
+                if id == cluster_i:
+                    if polar_scan[1] < min_distance:
+                        min_distance = polar_scan[1]
+                        polar_core_points[cluster_i] = polar_scans[idx_scan]
+
+        polar_core_points = polar_core_points.tolist()        
+        polar_core_points.sort(key = lambda x: x[1], reverse = False)
+        polar_core_points = np.array(polar_core_points[0:Hparams.n_clusters])
+    else:
+        polar_core_points = np.array([])
+
+    return polar_core_points
 
 class CrowdPredictionManager:
     '''
@@ -114,14 +123,18 @@ class CrowdPredictionManager:
         self.n_clusters = self.hparams.n_clusters
         self.actors_position = np.zeros((self.hparams.n_clusters, 2))
 
-        self.kalman_infos = {}
-        kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_clusters)]
-        self.kalman_infos = {key: list() for key in kalman_names}
-        self.time_history = []
-
         self.N_horizon = self.hparams.N_horizon
         self.frequency = self.hparams.controller_frequency
         self.dt = self.hparams.dt
+
+        # Set variables to store data  
+        if self.hparams.log:
+            self.kalman_infos = {}
+            kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_clusters)]
+            self.kalman_infos = {key: list() for key in kalman_names}
+            self.time_history = []
+            self.scans_history = []
+            self.robot_state_history = []
 
         # Setup reference frames:
         self.map_frame = 'map'
@@ -214,28 +227,26 @@ class CrowdPredictionManager:
                 angle_min = self.laser_scan.angle_min
                 angle_increment = self.laser_scan.angle_increment
                 range_min = self.laser_scan.range_min
-                offset = 20
 
-                scanlist = []
-                for idx, value in enumerate(self.laser_scan.ranges):
-                    scanlist.append((idx, value))
-
-                # Delete the first and last 20 laser scan ranges (wrong measurements?)
-                scanlist = np.delete(scanlist, range(offset), 0)
-                scanlist = np.delete(scanlist, range(len(scanlist) - offset, len(scanlist)), 0)
-
+                # Perform data preprocessing
+                self.absolute_scans = []
+                self.polar_scans = []
+                self.absolute_scans, self.polar_scans = data_preprocessing(self.laser_scan.ranges,
+                                                                           self.robot_state,
+                                                                           range_min,
+                                                                           angle_min,
+                                                                           angle_increment)
+                
                 # Perform data clustering
-                actors_polar_position = data_clustering(scanlist,
-                                                        self.robot_state,
-                                                        range_min,
-                                                        angle_min,
-                                                        angle_increment)
+                actors_polar_position = data_clustering(self.absolute_scans,
+                                                        self.polar_scans)
+                
                 for (i, dist) in enumerate(actors_polar_position):
                     actors_position[i] = polar2absolute(actors_polar_position[i],
                                                         self.robot_state,
                                                         angle_min,
                                                         angle_increment)
-
+                    
             self.data_lock.acquire()
             self.actors_position = actors_position
             self.data_lock.release()
@@ -282,7 +293,9 @@ class CrowdPredictionManager:
     def log_values(self):
         output_dict = {}
         output_dict['kfs'] = self.kalman_infos
+        output_dict['robot_states'] = self.robot_state_history
         output_dict['cpu_time'] = self.time_history
+        output_dict['laser_scans'] = self.scans_history
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -319,10 +332,6 @@ class CrowdPredictionManager:
                     rate.sleep()
                     continue
             
-            self.data_lock.acquire()
-            self.update_state()
-            self.data_lock.release()
-            
             if self.hparams.fake_sensing and self.status == Status.READY:
                 rospy.logwarn("Missing fake sensing info")
                 rate.sleep()
@@ -333,30 +342,47 @@ class CrowdPredictionManager:
                 rate.sleep()
                 continue
 
+            self.data_lock.acquire()
+            self.update_state()
+            self.data_lock.release()
+
             # Reset crowd_motion_prediction message
             crowd_motion_prediction = CrowdMotionPrediction()
             
-            # update the actors position (based on fake or real sensing)
+            # Update the actors position (based on fake or real sensing)
             self.update_actors_position()
+            
+            # Saving data for plots
+            if self.hparams.log:
+                self.robot_state_history.append([
+                    self.robot_state.x,
+                    self.robot_state.y,
+                    self.robot_state.theta,
+                    self.robot_state.v,
+                    self.robot_state.omega,
+                    start_time
+                ])
+                if not self.hparams.fake_sensing:
+                    self.scans_history.append(self.absolute_scans)
 
             if self.hparams.use_kalman:
                 # Perform data association
                 # predict next positions according to fsms
-                curr_predicted_positions = np.zeros((self.hparams.n_clusters, 2))
+                next_predicted_positions = np.zeros((self.hparams.n_clusters, 2))
                 associated_clusters = []
 
                 for (i, fsm) in enumerate(fsms):
                     if fsm.next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
-                        predicted_state = self.propagate_state(fsm.current_estimate, 1)[0]
+                        predicted_state = self.propagate_state(fsm.current_estimate, 2)[1]
                     elif fsm.next_state is FSMStates.START:
                         predicted_state = fsm.current_estimate
                     else:
                         predicted_state = self.hparams.nullstate
-                    curr_predicted_positions[i] = predicted_state[:2]
+                    next_predicted_positions[i] = predicted_state[:2]
                 
                 # compute pairwise distance between predicted positions and positions from clusters
                 if self.actors_position.shape[0] > 0:
-                    distances = cdist(curr_predicted_positions, self.actors_position)
+                    distances = cdist(next_predicted_positions, self.actors_position)
                 else:
                     distances = None
 
@@ -366,8 +392,8 @@ class CrowdPredictionManager:
                     
                     if self.hparams.log:
                         self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
-                                                                        FSMStates.print(fsm_state),
-                                                                        start_time])
+                                                                         FSMStates.print(fsm_state),
+                                                                         start_time])
 
                     # find the closest available cluster to the fsm's prediction
                     min_dist = np.inf
@@ -426,9 +452,10 @@ class CrowdPredictionManager:
             crowd_motion_prediction_stamped_msg = CrowdMotionPredictionStamped.to_message(crowd_motion_prediction_stamped)
             self.crowd_motion_prediction_publisher.publish(crowd_motion_prediction_stamped_msg)
             
-            end_time = time.time()
-            deltat = end_time - start_time
-            self.time_history.append([deltat, start_time])
+            if self.hparams.log:
+                end_time = time.time()
+                deltat = end_time - start_time
+                self.time_history.append([deltat, start_time])
 
             rate.sleep()
 

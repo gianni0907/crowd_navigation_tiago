@@ -55,10 +55,10 @@ class Hparams:
 
     # Set n points to be the vertexes of the admitted region
     n_points = 4
-    vertexes = np.array([Position(-1.0, 0.5),
-                         Position(-1.0, -8.4),
-                         Position(8.0, -8.4),
-                         Position(8.0, 0.5)])
+    vertexes = np.array([[-1.0, 0.5],
+                         [-1.0, -8.4],
+                         [8.0, -8.4],
+                         [8.0, 0.5]])
 
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):

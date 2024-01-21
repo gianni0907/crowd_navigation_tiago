@@ -22,17 +22,17 @@ def plot_results(filename=None):
         os.makedirs(plots_savedir)
 
     # Specify saving animations directory
-    simulation_savedir = '/tmp/crowd_navigation_tiago/simulations'
-    if not os.path.exists(simulation_savedir):
-        os.makedirs(simulation_savedir)
+    animation_savedir = '/tmp/crowd_navigation_tiago/animations'
+    if not os.path.exists(animation_savedir):
+        os.makedirs(animation_savedir)
 
     log_controller = os.path.join(log_dir, filename + '_controller.json')
     log_predictor = os.path.join(log_dir, filename + '_predictor.json')
     profiles1_savepath = os.path.join(plots_savedir, filename + '_profiles1.png')
     profiles2_savepath = os.path.join(plots_savedir, filename + '_profiles2.png')
-    time_savepath = os.path.join(plots_savedir, filename + '_ctrl_time.png')
-    scans_savepath = os.path.join(plots_savedir, filename + '_scans.jpeg')
-    simulation_savepath = os.path.join(simulation_savedir, filename + '_simulation.mp4')
+    time_savepath = os.path.join(plots_savedir, filename + '_time.png')
+    scans_savepath = os.path.join(animation_savedir, filename + '_scans.mp4')
+    world_savepath = os.path.join(animation_savedir, filename + '_world.mp4')
 
     # Open the controller log file
     if os.path.exists(log_controller):
@@ -94,9 +94,11 @@ def plot_results(filename=None):
             )
         # Extract the predictor data
         predictor_time = np.array(predictor_dict['cpu_time'])
-        laser_scans = np.array(predictor_dict['laser_scans'])
+        laser_scans = predictor_dict['laser_scans']
+        robot_states = np.array(predictor_dict['robot_states'])
+        robot_config = robot_states[:, :3]
 
-    # Plot the elapsed time for each controller/predictor iteration respectively (if prediction module is present)
+    # Figure elapsed time per iteration (controller and predictor if prediction module is present)
     fig, axs = plt.subplots(2, 1, figsize=(16, 8))
     
     axs[0].step(t, iteration_time[:, 0])
@@ -227,8 +229,10 @@ def plot_results(filename=None):
     plot2_fig.tight_layout()
     plot2_fig.savefig(profiles2_savepath)
 
-    # Figure to plot simulation
-    sim_fig = plt.figure(figsize=(16, 8))
+    plt.show()
+
+    # Figure to plot world animation
+    world_fig = plt.figure(figsize=(16, 8))
     gs = gridspec.GridSpec(3,2)
     ax_big = plt.subplot(gs[:, 0])
     ax1 = plt.subplot(gs[0, 1])
@@ -282,7 +286,7 @@ def plot_results(filename=None):
     line, = ax_big.plot(x_values, y_values, color='red', linestyle='--')
     boundary_line.append(line)
 
-    ax_big.set_title('Simulation')
+    ax_big.set_title('TIAGo World')
     ax_big.set_xlabel("$x \quad [m]$")
     ax_big.set_ylabel('$y \quad [m]$')
     ax_big.set_aspect('equal', adjustable='box')
@@ -316,8 +320,8 @@ def plot_results(filename=None):
     ax3.set_xlim([t[0], t[-1]])
     ax3.grid(True)
 
-    # init and update function for the animation of simulation
-    def init_sim():
+    # init and update function for the world animation
+    def init_world():
         robot.set_offsets(robot_center[0, :])
         controlled_pt.set_offsets(configurations[0, :2])
         robot_clearance.set_center(configurations[0, :2])
@@ -355,9 +359,9 @@ def plot_results(filename=None):
         else:
             return robot, robot_clearance, robot_label, goal, goal_label
 
-    def update_sim(frame):
+    def update_world(frame):
         if frame == shooting_nodes - 1:
-            sim_animation.event_source.stop()
+            world_animation.event_source.stop()
         
         robot_prediction = robot_predictions[frame, :, :]
         current_target = targets[frame, :]
@@ -406,17 +410,89 @@ def plot_results(filename=None):
             return robot, robot_clearance, robot_label, goal, goal_label, \
                    ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line
 
-    sim_animation = FuncAnimation(sim_fig, update_sim,
-                                  frames=shooting_nodes,
-                                  init_func=init_sim,
-                                  blit=False,
-                                  interval=1/frequency*1000,
-                                  repeat=False)
-    sim_fig.tight_layout()
-    # sim_animation.save(simulation_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-    # print("Simulation saved")
+    world_animation = FuncAnimation(world_fig, update_world,
+                                    frames=shooting_nodes,
+                                    init_func=init_world,
+                                    blit=False,
+                                    interval=1/frequency*100,
+                                    repeat=False)
+    world_fig.tight_layout()
+    # world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+    # print("World animation saved")
     
     plt.show()
+
+    # Figure to plot scans animation
+    if n_actors > 0 and not fake_sensing:
+        scans_fig = plt.figure(figsize=(8, 8))
+        gs = gridspec.GridSpec(1,1)
+        ax = plt.subplot(gs[0, 0])
+
+        robot = ax.scatter([], [], s=100.0, marker='o',label='TIAGo', facecolors='none', edgecolors='blue')
+        controlled_pt = ax.scatter([], [], marker='.', color='blue')
+        robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
+        robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='blue')
+        points, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
+        boundary_line = []
+        for i in range(n_edges - 1):
+            x_values = [boundary_vertexes[i, 0], boundary_vertexes [i + 1, 0]]
+            y_values = [boundary_vertexes[i, 1], boundary_vertexes [i + 1, 1]]
+            line, = ax.plot(x_values, y_values, color='red', linestyle='--')
+            boundary_line.append(line)
+        x_values = [boundary_vertexes[n_edges - 1, 0], boundary_vertexes [0, 0]]
+        y_values = [boundary_vertexes[n_edges - 1, 1], boundary_vertexes [0, 1]]
+        line, = ax.plot(x_values, y_values, color='red', linestyle='--')
+        boundary_line.append(line)
+
+        ax.set_title('TIAGo Scans')
+        ax.set_xlabel("$x \quad [m]$")
+        ax.set_ylabel('$y \quad [m]$')
+        ax.set_aspect('equal', adjustable='box')
+        ax.grid(True)
+
+        shooting_nodes = robot_config.shape[0]
+        robot_center = np.empty((robot_config.shape[0], 2))
+        for i in range(robot_config.shape[0]):
+            robot_center[i, 0] = robot_config[i, 0] - b * math.cos(robot_config[i, 2])
+            robot_center[i, 1] = robot_config[i, 1] - b * math.sin(robot_config[i, 2])
+
+        # init and update function for the world animation
+        def init_scans():
+            robot.set_offsets(robot_center[0, :])
+            controlled_pt.set_offsets(robot_config[0, :2])
+            robot_clearance.set_center(robot_config[0, :2])
+            robot_clearance.set_radius(rho_cbf)
+            ax.add_patch(robot_clearance)
+            robot_label.set_position(robot_center[0])
+        
+            return robot, robot_clearance, robot_label
+
+        def update_scans(frame):
+            if frame == shooting_nodes - 1:
+                scans_animation.event_source.stop()
+
+            robot.set_offsets(robot_center[frame, :])
+            controlled_pt.set_offsets(robot_config[frame, :2])
+            robot_clearance.set_center(robot_config[frame, :2])
+            robot_label.set_position(robot_center[frame, :])
+            current_scans = np.array(laser_scans[frame])
+            if current_scans.shape[0] > 0:
+                points.set_data(current_scans[:, 0], current_scans[:, 1])
+            else:
+                points.set_data([], [])
+            return robot, robot_clearance, robot_label, points
+
+        scans_animation = FuncAnimation(scans_fig, update_scans,
+                                        frames=shooting_nodes,
+                                        init_func=init_scans,
+                                        blit=False,
+                                        interval=1/frequency*500,
+                                        repeat=False)
+        scans_fig.tight_layout()
+        # scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+        # print("Scans animation saved")
+        
+        plt.show()
 
 def main():
     filename = rospy.get_param('/filename')

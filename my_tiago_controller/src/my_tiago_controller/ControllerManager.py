@@ -277,7 +277,7 @@ class ControllerManager:
                 output_dict['actors_gt'] = self.actors_gt_history
 
         for i in range(self.hparams.n_points):
-            self.boundary_vertexes.append([self.hparams.vertexes[i].x, self.hparams.vertexes[i].y])
+            self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
         output_dict['n_edges'] = self.hparams.n_points
         output_dict['boundary_vertexes'] = self.boundary_vertexes   
         output_dict['input_bounds'] = [self.hparams.alpha_min, self.hparams.alpha_max]
