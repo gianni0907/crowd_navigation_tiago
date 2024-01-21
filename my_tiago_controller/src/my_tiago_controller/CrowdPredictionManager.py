@@ -40,12 +40,30 @@ def polar2absolute(scan, state, angle_min, angle_incr):
     xy_absolute = z_rotation(state.theta, xy_relative) + np.array([state.x, state.y])
     return xy_absolute
 
+def moving_average(polar_scans):
+    smoothed_scans = []
+    window_size = 5
+
+    for i, (idx, value) in enumerate(polar_scans):
+        # Compute indices for the moving window
+        start_idx = np.max([0, i - window_size // 2])
+        end_idx = np.min([len(polar_scans), i + window_size // 2 + 1])
+
+        # Extract the values within the moving window
+        window_values = np.array(polar_scans[start_idx : end_idx])
+
+        average_value = np.sum(window_values[:, 1]) / window_values.shape[0]
+        smoothed_scans.append((idx, average_value))
+
+    return smoothed_scans
+
 def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
     n_edges = Hparams.n_points
     vertexes = Hparams.vertexes
     normals = Hparams.normals
-    absolute_scans = []
     polar_scans = []
+    smoothed_scans = []
+    absolute_scans = []
 
     # Delete the first and last 20 laser scan ranges (wrong measurements?)
     offset = 20
@@ -67,9 +85,12 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
                     outside = True
             if not outside:
                 polar_scans.append((idx + offset, value))
-                absolute_scans.append(absolute_scan.tolist())
+                # absolute_scans.append(absolute_scan.tolist())
+    smoothed_scans = moving_average(polar_scans)
+    for scan in smoothed_scans:
+        absolute_scans.append(polar2absolute(scan, tiago_state, angle_min, angle_incr).tolist())
 
-    return absolute_scans, polar_scans
+    return absolute_scans, smoothed_scans
 
 def data_clustering(absolute_scans, polar_scans):
     if len(absolute_scans) != 0:

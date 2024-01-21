@@ -5,7 +5,7 @@ class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
     if log:
-        filename = 'test'
+        filename = 'smoothed'
         controller_file = filename + '_controller.json'
         prediction_file = filename + '_predictor.json'
 
@@ -56,8 +56,8 @@ class Hparams:
     # Set n points to be the vertexes of the admitted region
     n_points = 4
     vertexes = np.array([[-1.0, 0.5],
-                         [-1.0, -8.4],
-                         [8.0, -8.4],
+                         [-1.0, -1.4],
+                         [8.0, -1.4],
                          [8.0, 0.5]])
 
     normals = np.zeros((n_points, 2))

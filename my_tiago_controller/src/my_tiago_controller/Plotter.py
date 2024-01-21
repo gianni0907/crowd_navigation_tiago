@@ -417,8 +417,8 @@ def plot_results(filename=None):
                                     interval=1/frequency*100,
                                     repeat=False)
     world_fig.tight_layout()
-    # world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-    # print("World animation saved")
+    world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+    print("World animation saved")
     
     plt.show()
 
@@ -489,8 +489,8 @@ def plot_results(filename=None):
                                         interval=1/frequency*500,
                                         repeat=False)
         scans_fig.tight_layout()
-        # scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-        # print("Scans animation saved")
+        scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+        print("Scans animation saved")
         
         plt.show()
 
