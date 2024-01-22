@@ -155,6 +155,7 @@ class CrowdPredictionManager:
             self.kalman_infos = {key: list() for key in kalman_names}
             self.time_history = []
             self.scans_history = []
+            self.actors_history = []
             self.robot_state_history = []
 
         # Setup reference frames:
@@ -317,6 +318,7 @@ class CrowdPredictionManager:
         output_dict['robot_states'] = self.robot_state_history
         output_dict['cpu_time'] = self.time_history
         output_dict['laser_scans'] = self.scans_history
+        output_dict['actors_position'] = self.actors_history
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -383,6 +385,7 @@ class CrowdPredictionManager:
                     self.robot_state.omega,
                     start_time
                 ])
+                self.actors_history.append(self.actors_position.tolist())
                 if not self.hparams.fake_sensing:
                     self.scans_history.append(self.absolute_scans)
 

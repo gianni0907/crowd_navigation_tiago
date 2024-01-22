@@ -95,6 +95,7 @@ def plot_results(filename=None):
         # Extract the predictor data
         predictor_time = np.array(predictor_dict['cpu_time'])
         laser_scans = predictor_dict['laser_scans']
+        actors_position = np.array(predictor_dict['actors_position'])
         robot_states = np.array(predictor_dict['robot_states'])
         robot_config = robot_states[:, :3]
 
@@ -432,7 +433,12 @@ def plot_results(filename=None):
         controlled_pt = ax.scatter([], [], marker='.', color='blue')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
         robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='blue')
-        points, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
+        scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
+        core_points = []
+        for i in range(n_clusters):
+            point, = ax.plot([], [], color='orange', marker='x', linestyle='', label='actor')
+            core_points.append(point)
+
         boundary_line = []
         for i in range(n_edges - 1):
             x_values = [boundary_vertexes[i, 0], boundary_vertexes [i + 1, 0]]
@@ -477,10 +483,17 @@ def plot_results(filename=None):
             robot_label.set_position(robot_center[frame, :])
             current_scans = np.array(laser_scans[frame])
             if current_scans.shape[0] > 0:
-                points.set_data(current_scans[:, 0], current_scans[:, 1])
+                scans.set_data(current_scans[:, 0], current_scans[:, 1])
+                for i in range(n_clusters):
+                    actor_position = actors_position[frame, i, :]
+                    if any(coord != 0.0 for coord in actor_position):
+                        core_points[i].set_data(actor_position[0], actor_position[1])
             else:
-                points.set_data([], [])
-            return robot, robot_clearance, robot_label, points
+                scans.set_data([], [])
+                for i in range(n_clusters):
+                    core_points[i].set_data([], [])
+
+            return robot, robot_clearance, robot_label, scans, core_points
 
         scans_animation = FuncAnimation(scans_fig, update_scans,
                                         frames=shooting_nodes,
