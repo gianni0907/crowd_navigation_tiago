@@ -85,7 +85,6 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
                     outside = True
             if not outside:
                 polar_scans.append((idx + offset, value))
-                # absolute_scans.append(absolute_scan.tolist())
     smoothed_scans = moving_average(polar_scans)
     for scan in smoothed_scans:
         absolute_scans.append(polar2absolute(scan, tiago_state, angle_min, angle_incr).tolist())
