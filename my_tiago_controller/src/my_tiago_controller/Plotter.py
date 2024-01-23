@@ -83,6 +83,7 @@ def plot_results(filename=None):
     ds_cbf = controller_dict['ds_cbf']
     frequency = controller_dict['frequency']
     shooting_nodes = inputs.shape[0]
+    base_radius = 0.27
     t = inputs[:, 2]
 
     # If the prediction module is present, open the predictor log file
@@ -251,10 +252,10 @@ def plot_results(filename=None):
     ax2 = plt.subplot(gs[1, 1])
     ax3 = plt.subplot(gs[2, 1])
 
-    robot = ax_big.scatter([], [], s=100.0, marker='o',label='TIAGo', facecolors='none', edgecolors='blue')
+    robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='b', label='TIAGo')
     controlled_pt = ax_big.scatter([], [], marker='.', color='blue')
     robot_label = ax_big.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
-    robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='blue')
+    robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='r')
     goal = ax_big.scatter([], [], s=80.0, marker='*', label='goal', color='magenta', alpha=0.7)
     goal_label = ax_big.text(np.nan, np.nan, goal.get_label(), fontsize=8, ha='left', va='bottom')
     if n_actors > 0:
@@ -334,9 +335,11 @@ def plot_results(filename=None):
 
     # init and update function for the world animation
     def init_world():
-        robot.set_offsets(robot_center[0, :])
+        robot.set_center(robot_center[0])
+        robot.set_radius(base_radius)
+        ax_big.add_patch(robot)
         controlled_pt.set_offsets(configurations[0, :2])
-        robot_clearance.set_center(configurations[0, :2])
+        robot_clearance.set_center(robot_center[0])
         robot_clearance.set_radius(rho_cbf)
         ax_big.add_patch(robot_clearance)
         robot_label.set_position(robot_center[0])
@@ -387,10 +390,10 @@ def plot_results(filename=None):
         traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
         robot_pred_line.set_data(robot_prediction[0, :], robot_prediction[1, :])
 
-        robot.set_offsets(robot_center[frame, :])
+        robot.set_center(robot_center[frame])
         controlled_pt.set_offsets(configurations[frame, :2])
-        robot_clearance.set_center(configurations[frame, :2])
-        robot_label.set_position(robot_center[frame, :])
+        robot_clearance.set_center(robot_center[frame])
+        robot_label.set_position(robot_center[frame])
         goal.set_offsets(current_target[:2])
         goal_label.set_position(current_target)
 
@@ -440,13 +443,13 @@ def plot_results(filename=None):
         gs = gridspec.GridSpec(1,1)
         ax = plt.subplot(gs[0, 0])
 
-        robot = ax.scatter([], [], s=100.0, marker='o',label='TIAGo', facecolors='none', edgecolors='blue')
+        robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='b', label='TIAGo')
         controlled_pt = ax.scatter([], [], marker='.', color='blue')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
-        robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='blue')
+        robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='r')
         scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
-        fov_min, = ax.plot([], [], color='cyan', alpha=0.3)
-        fov_max, = ax.plot([], [], color='cyan', alpha=0.3)
+        fov_min, = ax.plot([], [], color='cyan', alpha=0.7)
+        fov_max, = ax.plot([], [], color='cyan', alpha=0.7)
         core_points = []
         for i in range(n_clusters):
             point, = ax.plot([], [], color='orange', marker='x', linestyle='', label='actor')
@@ -477,9 +480,11 @@ def plot_results(filename=None):
 
         # init and update function for the world animation
         def init_scans():
-            robot.set_offsets(robot_center[0, :])
+            robot.set_center(robot_center[0])
+            robot.set_radius(base_radius)
+            ax.add_patch(robot)
             controlled_pt.set_offsets(robot_config[0, :2])
-            robot_clearance.set_center(robot_config[0, :2])
+            robot_clearance.set_center(robot_center[0])
             robot_clearance.set_radius(rho_cbf)
             ax.add_patch(robot_clearance)
             robot_label.set_position(robot_center[0])
@@ -490,10 +495,10 @@ def plot_results(filename=None):
             if frame == shooting_nodes - 1:
                 scans_animation.event_source.stop()
 
-            robot.set_offsets(robot_center[frame, :])
+            robot.set_center(robot_center[frame])
             controlled_pt.set_offsets(robot_config[frame, :2])
-            robot_clearance.set_center(robot_config[frame, :2])
-            robot_label.set_position(robot_center[frame, :])
+            robot_clearance.set_center(robot_center[frame])
+            robot_label.set_position(robot_center[frame])
             current_scans = np.array(laser_scans[frame])
 
             theta = robot_config[frame, 2]

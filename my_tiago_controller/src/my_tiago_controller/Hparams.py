@@ -96,7 +96,7 @@ class Hparams:
         terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
-    rho_cbf = 0.3 # the radius of the circle around the robot center
+    rho_cbf = 0.35 # the radius of the circle around the robot center
     ds_cbf = 0.2 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.3 # in (0,1], hyperparameter for the h function associated to bounds
