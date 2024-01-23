@@ -194,7 +194,7 @@ class ControllerManager:
                         p.x,
                         p.y,
                         math.atan2(2.0 * (q.w * q.z + q.x * q.y),
-                                1.0 - 2.0 * (q.y**2 + q.z**2))
+                                   1.0 - 2.0 * (q.y**2 + q.z**2))
                     )
                     actors_configuration[actor_idx - 1] = actor_configuration
 

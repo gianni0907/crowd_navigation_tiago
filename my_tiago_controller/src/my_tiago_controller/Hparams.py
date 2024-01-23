@@ -101,11 +101,11 @@ class Hparams:
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.3 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_actors = 5 # number of actors
+    n_actors = 3 # number of actors
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
-        n_clusters = 3 # number of clusters
+        n_clusters = 2 # number of clusters
 
     # Parameters for the crowd prediction
     if n_actors > 0:

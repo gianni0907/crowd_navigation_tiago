@@ -8,6 +8,8 @@ import matplotlib.gridspec as gridspec
 from matplotlib.patches import Circle
 from  matplotlib.animation import FuncAnimation
 
+from my_tiago_controller.utils import *
+
 def plot_results(filename=None):
     # Specify logging directory
     log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -98,6 +100,15 @@ def plot_results(filename=None):
         actors_position = np.array(predictor_dict['actors_position'])
         robot_states = np.array(predictor_dict['robot_states'])
         robot_config = robot_states[:, :3]
+        angle_min = predictor_dict['angle_min']
+        angle_max = predictor_dict['angle_max']
+        range_min = predictor_dict['range_min']
+        range_max = predictor_dict['range_max']
+        laser_position = np.array(predictor_dict['laser_relative_pos'])
+        p_lr = z_rotation(angle_min, np.array([range_min, 0.0]))
+        p_ur = z_rotation(angle_min, np.array([range_max, 0.0]))
+        p_ll = z_rotation(angle_max, np.array([range_min, 0.0]))
+        p_ul = z_rotation(angle_max, np.array([range_max, 0.0]))        
 
     # Figure elapsed time per iteration (controller and predictor if prediction module is present)
     fig, axs = plt.subplots(2, 1, figsize=(16, 8))
@@ -434,6 +445,8 @@ def plot_results(filename=None):
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
         robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='blue')
         scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
+        fov_min, = ax.plot([], [], color='cyan', alpha=0.3)
+        fov_max, = ax.plot([], [], color='cyan', alpha=0.3)
         core_points = []
         for i in range(n_clusters):
             point, = ax.plot([], [], color='orange', marker='x', linestyle='', label='actor')
@@ -482,6 +495,20 @@ def plot_results(filename=None):
             robot_clearance.set_center(robot_config[frame, :2])
             robot_label.set_position(robot_center[frame, :])
             current_scans = np.array(laser_scans[frame])
+
+            theta = robot_config[frame, 2]
+            current_laser_pos = robot_config[frame, :2] + z_rotation(theta, laser_position)
+            current_p_lr = current_laser_pos + z_rotation(theta, p_lr)
+            current_p_ur = current_laser_pos + z_rotation(theta, p_ur)
+            current_p_ll = current_laser_pos + z_rotation(theta, p_ll)
+            current_p_ul = current_laser_pos + z_rotation(theta, p_ul)
+            x_min = [current_p_lr[0], current_p_ur[0]]
+            y_min = [current_p_lr[1], current_p_ur[1]]
+            x_max = [current_p_ll[0], current_p_ul[0]]
+            y_max = [current_p_ll[1], current_p_ul[1]]
+            fov_min.set_data(x_min, y_min)
+            fov_max.set_data(x_max, y_max)
+
             if current_scans.shape[0] > 0:
                 scans.set_data(current_scans[:, 0], current_scans[:, 1])
                 for i in range(n_clusters):

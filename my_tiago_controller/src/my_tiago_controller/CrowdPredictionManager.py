@@ -318,6 +318,11 @@ class CrowdPredictionManager:
         output_dict['cpu_time'] = self.time_history
         output_dict['laser_scans'] = self.scans_history
         output_dict['actors_position'] = self.actors_history
+        output_dict['angle_min'] = self.laser_scan.angle_min
+        output_dict['angle_max'] = self.laser_scan.angle_max
+        output_dict['range_min'] = self.laser_scan.range_min
+        output_dict['range_max'] = self.laser_scan.range_max
+        output_dict['laser_relative_pos'] = self.hparams.relative_laser_pos.tolist()
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'

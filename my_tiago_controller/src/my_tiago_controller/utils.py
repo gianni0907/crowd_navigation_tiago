@@ -199,7 +199,15 @@ def integrate(f, x0, u, dt, integration_method='RK4'):
         return RK4(f, x0, u, dt)
     else:
         return Euler(f, x0, u, dt)
-    
+
+def z_rotation(angle, point2d):
+    R = np.array([[math.cos(angle), - math.sin(angle), 0.0],
+                  [math.sin(angle), math.cos(angle), 0.0],
+                  [0.0, 0.0, 1.0]])
+    point3d = np.array([point2d[0], point2d[1], 0.0])
+    rotated_point2d = np.matmul(R, point3d)[:2]
+    return rotated_point2d
+
 # Wrap angle to [-pi, pi):
 def wrap_angle(theta):
     return math.atan2(math.sin(theta), math.cos(theta))
