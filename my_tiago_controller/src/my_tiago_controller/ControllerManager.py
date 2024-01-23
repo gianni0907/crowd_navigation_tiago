@@ -299,7 +299,8 @@ class ControllerManager:
         output_dict['terminal_factor_p'] = self.hparams.terminal_factor_p
         output_dict['terminal_factor_v'] = self.hparams.terminal_factor_v
         output_dict['offset_b'] = self.hparams.b
-        
+        output_dict['base_radius'] = self.hparams.base_radius
+
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
         filename = self.hparams.controller_file

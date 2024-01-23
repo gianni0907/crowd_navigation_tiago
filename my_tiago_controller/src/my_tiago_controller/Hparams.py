@@ -19,6 +19,7 @@ class Hparams:
     use_kalman = True
 
     # Kinematic parameters
+    base_radius = 0.27 # [m]
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
     b = 0.1 # [m]
@@ -96,8 +97,8 @@ class Hparams:
         terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
-    rho_cbf = 0.35 # the radius of the circle around the robot center
-    ds_cbf = 0.2 # safety clearance
+    rho_cbf = base_radius + b + 0.05 # the radius of the circle around the robot center
+    ds_cbf = 0.1 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.3 # in (0,1], hyperparameter for the h function associated to bounds
     
@@ -113,3 +114,4 @@ class Hparams:
         innovation_threshold = 0.5
         matching_threshold = 0.1
         max_pred_time = dt * N_horizon
+        offset = 20

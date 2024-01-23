@@ -82,8 +82,8 @@ def plot_results(filename=None):
     rho_cbf = controller_dict['rho_cbf']
     ds_cbf = controller_dict['ds_cbf']
     frequency = controller_dict['frequency']
+    base_radius = controller_dict['base_radius']
     shooting_nodes = inputs.shape[0]
-    base_radius = 0.27
     t = inputs[:, 2]
 
     # If the prediction module is present, open the predictor log file
@@ -101,8 +101,10 @@ def plot_results(filename=None):
         actors_position = np.array(predictor_dict['actors_position'])
         robot_states = np.array(predictor_dict['robot_states'])
         robot_config = robot_states[:, :3]
-        angle_min = predictor_dict['angle_min']
-        angle_max = predictor_dict['angle_max']
+        angle_inc = predictor_dict['angle_inc']
+        offset = predictor_dict['laser_offset']
+        angle_min = predictor_dict['angle_min'] + angle_inc * offset
+        angle_max = predictor_dict['angle_max'] - angle_inc * offset
         range_min = predictor_dict['range_min']
         range_max = predictor_dict['range_max']
         laser_position = np.array(predictor_dict['laser_relative_pos'])
@@ -259,6 +261,8 @@ def plot_results(filename=None):
     goal = ax_big.scatter([], [], s=80.0, marker='*', label='goal', color='magenta', alpha=0.7)
     goal_label = ax_big.text(np.nan, np.nan, goal.get_label(), fontsize=8, ha='left', va='bottom')
     if n_actors > 0:
+        fov_min, = ax_big.plot([], [], color='cyan', alpha=0.7)
+        fov_max, = ax_big.plot([], [], color='cyan', alpha=0.7)
         actors = []
         actors_label = []
         actors_clearance = []
@@ -276,8 +280,8 @@ def plot_results(filename=None):
 
         if simulation and not fake_sensing:
             for i in range(n_actors):
-                actors_gt.append(ax_big.scatter([], [], marker='.', label='actor{}'.format(i+1), color='cyan', alpha=0.7))
-                actors_gt_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='cyan'))
+                actors_gt.append(ax_big.scatter([], [], marker='.', label='actor{}'.format(i+1), color='k', alpha=0.4))
+                actors_gt_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', alpha=0.4))
                 actors_gt_label.append(ax_big.text(np.nan, np.nan, actors_gt[i].get_label(), fontsize=8, ha='left', va='bottom'))
     
     traj_line, = ax_big.plot([], [], color='blue', label='trajectory')
@@ -398,6 +402,18 @@ def plot_results(filename=None):
         goal_label.set_position(current_target)
 
         if n_actors > 0:
+            theta = configurations[frame, 2]
+            current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_position)
+            current_p_lr = current_laser_pos + z_rotation(theta, p_lr)
+            current_p_ur = current_laser_pos + z_rotation(theta, p_ur)
+            current_p_ll = current_laser_pos + z_rotation(theta, p_ll)
+            current_p_ul = current_laser_pos + z_rotation(theta, p_ul)
+            x_min = [current_p_lr[0], current_p_ur[0]]
+            y_min = [current_p_lr[1], current_p_ur[1]]
+            x_max = [current_p_ll[0], current_p_ul[0]]
+            y_max = [current_p_ll[1], current_p_ul[1]]
+            fov_min.set_data(x_min, y_min)
+            fov_max.set_data(x_max, y_max)
             for i in range(n_clusters):
                 actor_prediction = actors_predictions[frame, i, :, :]
                 actor_position = actor_prediction[: , 0]
@@ -414,12 +430,14 @@ def plot_results(filename=None):
                     actors_gt_label[i].set_position(actor_gt_position)
 
                 return robot, robot_clearance, robot_label, goal, goal_label, \
-                       ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line, \
+                       ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
+                       traj_line, robot_pred_line, fov_min, fov_max, \
                        actors, actors_clearance, actors_label, actors_pred_line, \
                        actors_gt, actors_gt_clearance, actors_gt_label
             else:
                 return robot, robot_clearance, robot_label, goal, goal_label, \
-                       ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line, \
+                       ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
+                       traj_line, robot_pred_line, fov_min, fov_max, \
                        actors, actors_clearance, actors_label, actors_pred_line
         else:
             return robot, robot_clearance, robot_label, goal, goal_label, \
@@ -447,12 +465,12 @@ def plot_results(filename=None):
         controlled_pt = ax.scatter([], [], marker='.', color='blue')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
         robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='r')
-        scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
+        scans, = ax.plot([], [], color='magenta', marker=',', linestyle='', label='scans')
         fov_min, = ax.plot([], [], color='cyan', alpha=0.7)
         fov_max, = ax.plot([], [], color='cyan', alpha=0.7)
         core_points = []
         for i in range(n_clusters):
-            point, = ax.plot([], [], color='orange', marker='x', linestyle='', label='actor')
+            point, = ax.plot([], [], color='orange', marker='.', linestyle='', label='actor')
             core_points.append(point)
 
         boundary_line = []
@@ -520,6 +538,9 @@ def plot_results(filename=None):
                     actor_position = actors_position[frame, i, :]
                     if any(coord != 0.0 for coord in actor_position):
                         core_points[i].set_data(actor_position[0], actor_position[1])
+                    else:
+                        for i in range(n_clusters):
+                            core_points[i].set_data([], [])
             else:
                 scans.set_data([], [])
                 for i in range(n_clusters):

@@ -66,7 +66,7 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
     absolute_scans = []
 
     # Delete the first and last 20 laser scan ranges (wrong measurements?)
-    offset = 20
+    offset = Hparams.offset = 20
     scans = np.delete(scans, range(offset), 0)
     scans = np.delete(scans, range(len(scans) - offset, len(scans)), 0)
 
@@ -320,6 +320,8 @@ class CrowdPredictionManager:
         output_dict['actors_position'] = self.actors_history
         output_dict['angle_min'] = self.laser_scan.angle_min
         output_dict['angle_max'] = self.laser_scan.angle_max
+        output_dict['angle_inc'] = self.laser_scan.angle_increment
+        output_dict['laser_offset'] = self.hparams.offset
         output_dict['range_min'] = self.laser_scan.range_min
         output_dict['range_max'] = self.laser_scan.range_max
         output_dict['laser_relative_pos'] = self.hparams.relative_laser_pos.tolist()
