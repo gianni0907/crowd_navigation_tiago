@@ -343,7 +343,7 @@ def plot_results(filename=None):
         robot.set_radius(base_radius)
         ax_big.add_patch(robot)
         controlled_pt.set_offsets(configurations[0, :2])
-        robot_clearance.set_center(robot_center[0])
+        robot_clearance.set_center(configurations[0, :2])
         robot_clearance.set_radius(rho_cbf)
         ax_big.add_patch(robot_clearance)
         robot_label.set_position(robot_center[0])
@@ -396,7 +396,7 @@ def plot_results(filename=None):
 
         robot.set_center(robot_center[frame])
         controlled_pt.set_offsets(configurations[frame, :2])
-        robot_clearance.set_center(robot_center[frame])
+        robot_clearance.set_center(configurations[frame, :2])
         robot_label.set_position(robot_center[frame])
         goal.set_offsets(current_target[:2])
         goal_label.set_position(current_target)
@@ -502,7 +502,7 @@ def plot_results(filename=None):
             robot.set_radius(base_radius)
             ax.add_patch(robot)
             controlled_pt.set_offsets(robot_config[0, :2])
-            robot_clearance.set_center(robot_center[0])
+            robot_clearance.set_center(robot_config[0, :2])
             robot_clearance.set_radius(rho_cbf)
             ax.add_patch(robot_clearance)
             robot_label.set_position(robot_center[0])
@@ -515,7 +515,7 @@ def plot_results(filename=None):
 
             robot.set_center(robot_center[frame])
             controlled_pt.set_offsets(robot_config[frame, :2])
-            robot_clearance.set_center(robot_center[frame])
+            robot_clearance.set_center(robot_config[frame, :2])
             robot_label.set_position(robot_center[frame])
             current_scans = np.array(laser_scans[frame])
 
