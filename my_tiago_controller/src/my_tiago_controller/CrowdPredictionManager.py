@@ -85,11 +85,9 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
                     outside = True
             if not outside:
                 polar_scans.append((idx + offset, value))
-    smoothed_scans = moving_average(polar_scans)
-    for scan in smoothed_scans:
-        absolute_scans.append(polar2absolute(scan, tiago_state, angle_min, angle_incr).tolist())
+                absolute_scans.append(absolute_scan.tolist())
 
-    return absolute_scans, smoothed_scans
+    return absolute_scans, polar_scans
 
 def data_clustering(absolute_scans, polar_scans):
     if len(absolute_scans) != 0:
@@ -98,16 +96,21 @@ def data_clustering(absolute_scans, polar_scans):
         dynamic_n_clusters = max(clusters) + 1
         if(min(clusters) == -1):
             print("Noisy samples")
-        
+        print(clusters)
         polar_core_points = np.zeros((dynamic_n_clusters, 2))
-
+        
         for cluster_i in range(dynamic_n_clusters):
-            min_distance = np.inf
-            for id, (idx_scan, polar_scan) in zip(clusters, enumerate(polar_scans)):
+            cluster_scans = []
+            for id, scan in zip(clusters, polar_scans):
                 if id == cluster_i:
-                    if polar_scan[1] < min_distance:
-                        min_distance = polar_scan[1]
-                        polar_core_points[cluster_i] = polar_scans[idx_scan]
+                    cluster_scans.append(scan)
+
+            smoothed_scans = moving_average(cluster_scans)
+            min_distance = np.inf
+            for idx, scan in enumerate(smoothed_scans):            
+                if scan[1] < min_distance:
+                    min_distance = scan[1]
+                    polar_core_points[cluster_i] = smoothed_scans[idx]
 
         polar_core_points = polar_core_points.tolist()        
         polar_core_points.sort(key = lambda x: x[1], reverse = False)
