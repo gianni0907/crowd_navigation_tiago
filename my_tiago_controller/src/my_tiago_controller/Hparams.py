@@ -83,10 +83,10 @@ class Hparams:
     # Cost function weights
     if simulation:
         p_weight = 1e2 # position weights
-        v_weight = 5e0 # driving velocity weight
+        v_weight = 8e1 # driving velocity weight
         omega_weight = 1e-5 # steering velocity weight
         u_weight = 1e1 # input weights
-        terminal_factor_p = 1e1 # factor for the terminal position weights
+        terminal_factor_p = 8e0 # factor for the terminal position weights
         terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
     else:
         p_weight = 1e2 # position weights
@@ -98,9 +98,9 @@ class Hparams:
 
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.05 # the radius of the circle around the robot center
-    ds_cbf = 0.1 # safety clearance
+    ds_cbf = 0.15 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
-    gamma_bound = 0.3 # in (0,1], hyperparameter for the h function associated to bounds
+    gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
     n_actors = 3 # number of actors
     if n_actors == 0 or fake_sensing:
@@ -114,4 +114,7 @@ class Hparams:
         innovation_threshold = 0.5
         matching_threshold = 0.1
         max_pred_time = dt * N_horizon
-        offset = 20
+        if simulation:
+            offset = 20
+        else:
+            offset = 0

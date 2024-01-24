@@ -96,7 +96,6 @@ def data_clustering(absolute_scans, polar_scans):
         dynamic_n_clusters = max(clusters) + 1
         if(min(clusters) == -1):
             print("Noisy samples")
-        print(clusters)
         polar_core_points = np.zeros((dynamic_n_clusters, 2))
         
         for cluster_i in range(dynamic_n_clusters):

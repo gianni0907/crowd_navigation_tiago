@@ -105,7 +105,7 @@ class ControllerManager:
             self.robot_prediction_history = []
             self.wheels_vel_history = []
             self.wheels_acc_history = []
-            self.velocity_history = []
+            self.commands_history = []
             self.target_history = []
             self.actors_prediction_history = []
             self.actors_gt_history = []
@@ -263,7 +263,7 @@ class ControllerManager:
         output_dict['robot_predictions'] = self.robot_prediction_history
         output_dict['wheels_velocities'] = self.wheels_vel_history
         output_dict['wheels_accelerations'] = self.wheels_acc_history
-        output_dict['velocities'] = self.velocity_history
+        output_dict['commanded_velocities'] = self.commands_history
         output_dict['targets'] = self.target_history
         output_dict['cpu_time'] = self.time_history
 
@@ -284,6 +284,8 @@ class ControllerManager:
         output_dict['v_bounds'] = [self.hparams.driving_vel_min, self.hparams.driving_vel_max]
         output_dict['omega_bounds'] = [self.hparams.steering_vel_max_neg, self.hparams.steering_vel_max]
         output_dict['wheels_vel_bounds'] = [self.hparams.w_max_neg, self.hparams.w_max]
+        output_dict['vdot_bounds'] = [self.hparams.driving_acc_min, self.hparams.driving_acc_max]
+        output_dict['omegadot_bounds'] = [self.hparams.steering_acc_max_neg, self.hparams.steering_acc_max]
 
         output_dict['rho_cbf'] = self.hparams.rho_cbf
         output_dict['ds_cbf'] = self.hparams.ds_cbf
@@ -300,6 +302,8 @@ class ControllerManager:
         output_dict['terminal_factor_v'] = self.hparams.terminal_factor_v
         output_dict['offset_b'] = self.hparams.b
         output_dict['base_radius'] = self.hparams.base_radius
+        output_dict['wheel_radius'] = self.hparams.wheel_radius
+        output_dict['wheel_separation'] = self.hparams.wheel_separation
 
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
@@ -390,7 +394,7 @@ class ControllerManager:
                     continue
 
             self.update()
-            v, omega = self.publish_command()
+            v_cmd, omega_cmd = self.publish_command()
             
             # Saving data for plots
             if self.hparams.log and (self.sensing or self.hparams.n_actors == 0):
@@ -412,7 +416,7 @@ class ControllerManager:
                     self.control_input[self.hparams.l_wheel_idx],
                     start_time
                 ])
-                self.velocity_history.append([v, omega, start_time])
+                self.commands_history.append([v_cmd, omega_cmd, start_time])
                 self.target_history.append([
                     self.target_position[self.hparams.x_idx],
                     self.target_position[self.hparams.y_idx],
