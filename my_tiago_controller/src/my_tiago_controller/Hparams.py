@@ -56,11 +56,17 @@ class Hparams:
 
     # Set n points to be the vertexes of the admitted region
     n_points = 4
-    vertexes = np.array([[-6.0, 6.0],
-                         [-6.0, -6.0],
-                         [6.0, -6.0],
-                         [6.0, 6.0]])
-
+    if simulation:
+        vertexes = np.array([[4.4, -5.2],
+                             [4.3, -7.4],
+                             [10.7, -7.6],
+                             [10.6, -5.4]])
+    else:
+        vertexes = np.array([[-6.0, 6.0],
+                             [-6.0, -6.0],
+                             [6.0, -6.0],
+                             [6.0, 6.0]])
+        
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
         normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
@@ -117,4 +123,4 @@ class Hparams:
         if simulation:
             offset = 20
         else:
-            offset = 0
+            offset = 10

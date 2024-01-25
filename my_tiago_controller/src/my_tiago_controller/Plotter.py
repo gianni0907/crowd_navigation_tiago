@@ -145,7 +145,7 @@ def plot_results(filename=None):
     fig.savefig(time_savepath)
 
     # Configuration figure
-    config_fig, config_ax = plt.subplots(4, 1, figsize=(16, 12))
+    config_fig, config_ax = plt.subplots(4, 1, figsize=(16, 8))
 
     config_ax[0].plot(t, configurations[:, 0], label='$x$')
     config_ax[0].plot(t, targets[:, 0], label='$x_g$')
@@ -474,8 +474,8 @@ def plot_results(filename=None):
                                     interval=1/frequency*100,
                                     repeat=False)
     world_fig.tight_layout()
-    world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-    print("World animation saved")
+    # world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+    # print("World animation saved")
     
     plt.show()
 
@@ -578,8 +578,8 @@ def plot_results(filename=None):
                                         interval=1/frequency*500,
                                         repeat=False)
         scans_fig.tight_layout()
-        scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-        print("Scans animation saved")
+        # scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+        # print("Scans animation saved")
         
         plt.show()
 
