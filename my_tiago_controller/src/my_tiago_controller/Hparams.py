@@ -97,8 +97,8 @@ class Hparams:
         terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
-    rho_cbf = base_radius + b + 0.05 # the radius of the circle around the robot center
-    ds_cbf = 0.15 # safety clearance
+    rho_cbf = base_radius + b + 0.02 # the radius of the circle around the robot center
+    ds_cbf = 0.1 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
@@ -106,7 +106,7 @@ class Hparams:
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
-        n_clusters = 2 # number of clusters
+        n_clusters = 3 # number of clusters
 
     # Parameters for the crowd prediction
     if n_actors > 0:

@@ -489,7 +489,7 @@ def plot_results(filename=None):
         controlled_pt = ax.scatter([], [], marker='.', color='blue')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
         robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='r')
-        scans, = ax.plot([], [], color='magenta', marker=',', linestyle='', label='scans')
+        scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
         fov_min, = ax.plot([], [], color='cyan', alpha=0.7)
         fov_max, = ax.plot([], [], color='cyan', alpha=0.7)
         core_points = []
@@ -563,8 +563,7 @@ def plot_results(filename=None):
                     if any(coord != 0.0 for coord in actor_position):
                         core_points[i].set_data(actor_position[0], actor_position[1])
                     else:
-                        for i in range(n_clusters):
-                            core_points[i].set_data([], [])
+                        core_points[i].set_data([], [])
             else:
                 scans.set_data([], [])
                 for i in range(n_clusters):

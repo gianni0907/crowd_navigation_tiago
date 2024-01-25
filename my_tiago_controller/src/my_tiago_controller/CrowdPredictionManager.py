@@ -62,11 +62,10 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
     vertexes = Hparams.vertexes
     normals = Hparams.normals
     polar_scans = []
-    smoothed_scans = []
     absolute_scans = []
 
     # Delete the first and last 20 laser scan ranges (wrong measurements?)
-    offset = Hparams.offset = 20
+    offset = Hparams.offset
     scans = np.delete(scans, range(offset), 0)
     scans = np.delete(scans, range(len(scans) - offset, len(scans)), 0)
 
