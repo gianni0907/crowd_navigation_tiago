@@ -252,6 +252,12 @@ class NMPC:
                                           self.hparams.w_max,
                                           self.hparams.driving_acc_max,
                                           self.hparams.steering_acc_max])
+        
+        acados_constraints.lg_e = np.array([self.hparams.w_max_neg,
+                                          self.hparams.w_max_neg])
+        acados_constraints.ug_e = np.array([self.hparams.w_max,
+                                          self.hparams.w_max])
+        acados_constraints.C_e = C_mat[:2, :]
 
         # Nonlinear constraints (CBFs) (for both actors and configuration bounds):
         if self.n_actors > 0:
