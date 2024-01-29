@@ -154,7 +154,8 @@ class CrowdPredictionManager:
             kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_clusters)]
             self.kalman_infos = {key: list() for key in kalman_names}
             self.time_history = []
-            self.scans_history = []
+            if not self.hparams.fake_sensing:
+                self.scans_history = []
             self.actors_history = []
             self.robot_state_history = []
 
@@ -317,15 +318,16 @@ class CrowdPredictionManager:
         output_dict['kfs'] = self.kalman_infos
         output_dict['robot_states'] = self.robot_state_history
         output_dict['cpu_time'] = self.time_history
-        output_dict['laser_scans'] = self.scans_history
         output_dict['actors_position'] = self.actors_history
-        output_dict['angle_min'] = self.laser_scan.angle_min
-        output_dict['angle_max'] = self.laser_scan.angle_max
-        output_dict['angle_inc'] = self.laser_scan.angle_increment
-        output_dict['laser_offset'] = self.hparams.offset
-        output_dict['range_min'] = self.laser_scan.range_min
-        output_dict['range_max'] = self.laser_scan.range_max
-        output_dict['laser_relative_pos'] = self.hparams.relative_laser_pos.tolist()
+        if not self.hparams.fake_sensing:
+            output_dict['laser_scans'] = self.scans_history
+            output_dict['angle_min'] = self.laser_scan.angle_min
+            output_dict['angle_max'] = self.laser_scan.angle_max
+            output_dict['angle_inc'] = self.laser_scan.angle_increment
+            output_dict['laser_offset'] = self.hparams.offset
+            output_dict['range_min'] = self.laser_scan.range_min
+            output_dict['range_max'] = self.laser_scan.range_max
+            output_dict['laser_relative_pos'] = self.hparams.relative_laser_pos.tolist()
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
