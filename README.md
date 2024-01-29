@@ -10,12 +10,14 @@ Accomplished task: TIAGo robot navigation to a desired target position in an env
     given a desired target position, at each iteration, read the crowd motion prediction message and the current robot configuration and run the NMPC. The extended kinematic model of the TIAGo robot is considered, with wheels angular accelerations as control inputs. The moving humans avoidance is realized introducing nonlinear constraints defined by discrete-time Control Barrier Functions (CBFs) in the NMPC model of the Acados solver. CBFs constraints are also adopted to ensure the permanence of the robot within a predefined region.
 
 ## Usage
-To run the Gazebo simulation:
+To run the Gazebo simulation (if `simulation=True`):
 ```bash
 roslaunch labrob_tiago_gazebo tiago_gazebo.launch public_sim:=true end_effector:=pal-gripper world:=WORLD
 ```
-Note that as `WORLD` it is suggested to use the ones in the `worlds` directory of the repository, since they've been modified in order to create more challenging scenario (please copy them in the `labrob_gazebo_worlds/worlds` directory). Of course, depending on the chosen `WORLD`, modify also the  `n_actors` variable specified in `my_tiago_controller/src/my_tiago_controller/Hparams.py`.
+Note that as `WORLD` it is suggested to use the ones in the `worlds` directory of the repository, since they have been modified in order to create more challenging scenario (please copy them in the `labrob_gazebo_worlds/worlds` directory). Of course, depending on the chosen `WORLD`, modify also the  `n_actors` variable specified in `my_tiago_controller/src/my_tiago_controller/Hparams.py`.
 Note if `fake_sensing=True` the selected `WORLD` is not relevant, hence running Gazebo with an empty world is suggested (do not specify any `world`).
+
+If `simulation=False`, before running the controller module, make sure the real robot is within the admissible region defined by `vertexes` in `my_tiago_controller/src/my_tiago_controller/Hparams.py`.
 
 To run the NMPC controller module:
 ```bash
@@ -26,6 +28,11 @@ When the node is shutdown, relevant data are logged in a `.json` file located in
 To run the Crowd Prediction module:
 ```bash
 roslaunch my_tiago_controller crowd_prediction.launch
+```
+
+It is also possible to run the two modules simultaneously:
+```bash
+roslaunch my_tiago_controller crowd_navigation.launch
 ```
 
 If `fake_sensing=True`, to generate and send the actors trajectory:
