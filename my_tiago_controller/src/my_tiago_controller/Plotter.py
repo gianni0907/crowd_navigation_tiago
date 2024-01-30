@@ -278,8 +278,8 @@ def plot_results(filename=None):
     ax2 = plt.subplot(gs[1, 1])
     ax3 = plt.subplot(gs[2, 1])
 
-    robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='b', label='TIAGo')
-    controlled_pt = ax_big.scatter([], [], marker='.', color='blue')
+    robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
+    controlled_pt = ax_big.scatter([], [], marker='.', color='k')
     robot_label = ax_big.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
     robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='r')
     goal = ax_big.scatter([], [], s=80.0, marker='*', label='goal', color='magenta', alpha=0.7)
@@ -474,8 +474,8 @@ def plot_results(filename=None):
                                     interval=1/frequency*100,
                                     repeat=False)
     world_fig.tight_layout()
-    # world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-    # print("World animation saved")
+    world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+    print("World animation saved")
     
     plt.show()
 
@@ -485,8 +485,8 @@ def plot_results(filename=None):
         gs = gridspec.GridSpec(1,1)
         ax = plt.subplot(gs[0, 0])
 
-        robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='b', label='TIAGo')
-        controlled_pt = ax.scatter([], [], marker='.', color='blue')
+        robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
+        controlled_pt = ax.scatter([], [], marker='.', color='k')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
         robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='r')
         scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
@@ -494,7 +494,7 @@ def plot_results(filename=None):
         fov_max, = ax.plot([], [], color='cyan', alpha=0.7)
         core_points = []
         for i in range(n_clusters):
-            point, = ax.plot([], [], color='orange', marker='.', linestyle='', label='actor')
+            point, = ax.plot([], [], color='b', marker='.', linestyle='', label='actor')
             core_points.append(point)
 
         boundary_line = []
@@ -578,8 +578,8 @@ def plot_results(filename=None):
                                         interval=1/frequency*500,
                                         repeat=False)
         scans_fig.tight_layout()
-        # scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-        # print("Scans animation saved")
+        scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+        print("Scans animation saved")
         
         plt.show()
 

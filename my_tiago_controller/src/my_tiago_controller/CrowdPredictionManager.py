@@ -73,15 +73,11 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
         outside = False
         if value != np.inf and value >= range_min:
             absolute_scan = polar2absolute((idx + offset, value), tiago_state, angle_min, angle_incr)
-            for i in range(n_edges - 1):
-                vertex = vertexes[i + 1]
+            for i in range(n_edges):
+                vertex = vertexes[i]
                 if np.dot(normals[i], absolute_scan - vertex) < 0.0:
                     outside = True
                     break
-            if not outside:
-                vertex = vertexes[0]
-                if np.dot(normals[n_edges - 1], absolute_scan - vertex) < 0.0:
-                    outside = True
             if not outside:
                 polar_scans.append((idx + offset, value))
                 absolute_scans.append(absolute_scan.tolist())
@@ -90,7 +86,7 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
 
 def data_clustering(absolute_scans, polar_scans):
     if len(absolute_scans) != 0:
-        k_means = DBSCAN(eps=0.3, min_samples=8)
+        k_means = DBSCAN(eps=0.6, min_samples=5)
         clusters = k_means.fit_predict(np.array(absolute_scans))
         dynamic_n_clusters = max(clusters) + 1
         if(min(clusters) == -1):
