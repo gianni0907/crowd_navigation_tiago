@@ -84,6 +84,7 @@ def plot_results(filename=None):
     simulation = controller_dict['simulation']
     if n_actors > 0:
         fake_sensing = controller_dict['fake_sensing']
+        use_kalman = controller_dict['use_kalman']
         actors_predictions = np.array(controller_dict['actors_predictions'])
         if simulation and not fake_sensing:
             actors_groundtruth = np.array(controller_dict['actors_gt'])
@@ -106,21 +107,24 @@ def plot_results(filename=None):
             )
         # Extract the predictor data
         predictor_time = np.array(predictor_dict['cpu_time'])
-        laser_scans = predictor_dict['laser_scans']
-        actors_position = np.array(predictor_dict['actors_position'])
+        core_points = np.array(predictor_dict['core_points'])
         robot_states = np.array(predictor_dict['robot_states'])
         robot_config = robot_states[:, :3]
-        angle_inc = predictor_dict['angle_inc']
-        offset = predictor_dict['laser_offset']
-        angle_min = predictor_dict['angle_min'] + angle_inc * offset
-        angle_max = predictor_dict['angle_max'] - angle_inc * offset
-        range_min = predictor_dict['range_min']
-        range_max = predictor_dict['range_max']
-        laser_position = np.array(predictor_dict['laser_relative_pos'])
-        p_lr = z_rotation(angle_min, np.array([range_min, 0.0]))
-        p_ur = z_rotation(angle_min, np.array([range_max, 0.0]))
-        p_ll = z_rotation(angle_max, np.array([range_min, 0.0]))
-        p_ul = z_rotation(angle_max, np.array([range_max, 0.0]))        
+        if use_kalman:
+            fsm_estimates = np.array(predictor_dict['fsm_estimates'])
+        if not fake_sensing:
+            laser_scans = predictor_dict['laser_scans']
+            angle_inc = predictor_dict['angle_inc']
+            offset = predictor_dict['laser_offset']
+            angle_min = predictor_dict['angle_min'] + angle_inc * offset
+            angle_max = predictor_dict['angle_max'] - angle_inc * offset
+            range_min = predictor_dict['range_min']
+            range_max = predictor_dict['range_max']
+            laser_position = np.array(predictor_dict['laser_relative_pos'])
+            p_lr = z_rotation(angle_min, np.array([range_min, 0.0]))
+            p_ur = z_rotation(angle_min, np.array([range_max, 0.0]))
+            p_ll = z_rotation(angle_max, np.array([range_min, 0.0]))
+            p_ul = z_rotation(angle_max, np.array([range_max, 0.0]))        
 
     # Figure elapsed time per iteration (controller and predictor if prediction module is present)
     fig, axs = plt.subplots(2, 1, figsize=(16, 8))
@@ -286,8 +290,9 @@ def plot_results(filename=None):
     goal = ax_big.scatter([], [], s=80.0, marker='*', label='goal', color='magenta', alpha=0.7)
     goal_label = ax_big.text(np.nan, np.nan, goal.get_label(), fontsize=8, ha='left', va='bottom')
     if n_actors > 0:
-        fov_min, = ax_big.plot([], [], color='cyan', alpha=0.7)
-        fov_max, = ax_big.plot([], [], color='cyan', alpha=0.7)
+        if not fake_sensing:
+            fov_min, = ax_big.plot([], [], color='cyan', alpha=0.7)
+            fov_max, = ax_big.plot([], [], color='cyan', alpha=0.7)
         actors = []
         actors_label = []
         actors_clearance = []
@@ -427,18 +432,19 @@ def plot_results(filename=None):
         goal_label.set_position(current_target)
 
         if n_actors > 0:
-            theta = configurations[frame, 2]
-            current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_position)
-            current_p_lr = current_laser_pos + z_rotation(theta, p_lr)
-            current_p_ur = current_laser_pos + z_rotation(theta, p_ur)
-            current_p_ll = current_laser_pos + z_rotation(theta, p_ll)
-            current_p_ul = current_laser_pos + z_rotation(theta, p_ul)
-            x_min = [current_p_lr[0], current_p_ur[0]]
-            y_min = [current_p_lr[1], current_p_ur[1]]
-            x_max = [current_p_ll[0], current_p_ul[0]]
-            y_max = [current_p_ll[1], current_p_ul[1]]
-            fov_min.set_data(x_min, y_min)
-            fov_max.set_data(x_max, y_max)
+            if not fake_sensing:
+                theta = configurations[frame, 2]
+                current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_position)
+                current_p_lr = current_laser_pos + z_rotation(theta, p_lr)
+                current_p_ur = current_laser_pos + z_rotation(theta, p_ur)
+                current_p_ll = current_laser_pos + z_rotation(theta, p_ll)
+                current_p_ul = current_laser_pos + z_rotation(theta, p_ul)
+                x_min = [current_p_lr[0], current_p_ur[0]]
+                y_min = [current_p_lr[1], current_p_ur[1]]
+                x_max = [current_p_ll[0], current_p_ul[0]]
+                y_max = [current_p_ll[1], current_p_ul[1]]
+                fov_min.set_data(x_min, y_min)
+                fov_max.set_data(x_max, y_max)
             for i in range(n_clusters):
                 actor_prediction = actors_predictions[frame, i, :, :]
                 actor_position = actor_prediction[: , 0]
@@ -462,7 +468,7 @@ def plot_results(filename=None):
             else:
                 return robot, robot_clearance, robot_label, goal, goal_label, \
                        ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
-                       traj_line, robot_pred_line, fov_min, fov_max, \
+                       traj_line, robot_pred_line, \
                        actors, actors_clearance, actors_label, actors_pred_line
         else:
             return robot, robot_clearance, robot_label, goal, goal_label, \
@@ -494,10 +500,10 @@ def plot_results(filename=None):
         scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
         fov_min, = ax.plot([], [], color='cyan', alpha=0.7)
         fov_max, = ax.plot([], [], color='cyan', alpha=0.7)
-        core_points = []
+        core_points_position = []
         for i in range(n_clusters):
             point, = ax.plot([], [], color='b', marker='.', linestyle='', label='actor')
-            core_points.append(point)
+            core_points_position.append(point)
 
         boundary_line = []
         for i in range(n_edges - 1):
@@ -561,17 +567,17 @@ def plot_results(filename=None):
             if current_scans.shape[0] > 0:
                 scans.set_data(current_scans[:, 0], current_scans[:, 1])
                 for i in range(n_clusters):
-                    actor_position = actors_position[frame, i, :]
-                    if any(coord != 0.0 for coord in actor_position):
-                        core_points[i].set_data(actor_position[0], actor_position[1])
+                    core_point = core_points[frame, i, :]
+                    if any(coord != 0.0 for coord in core_point):
+                        core_points_position[i].set_data(core_point[0], core_point[1])
                     else:
-                        core_points[i].set_data([], [])
+                        core_points_position[i].set_data([], [])
             else:
                 scans.set_data([], [])
                 for i in range(n_clusters):
-                    core_points[i].set_data([], [])
+                    core_points_position[i].set_data([], [])
 
-            return robot, robot_clearance, robot_label, scans, core_points
+            return robot, robot_clearance, robot_label, scans, core_points_position
 
         scans_animation = FuncAnimation(scans_fig, update_scans,
                                         frames=shooting_nodes,

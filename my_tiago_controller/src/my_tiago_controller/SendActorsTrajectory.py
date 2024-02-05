@@ -44,7 +44,7 @@ def main():
                             Position(3.5, 4.0),
                             Position(-4.0, -1.0),
                             Position(-2.0, 5.0)]) # final position of the actors
-    n_steps = 300 # number of steps to go from init to final positions (and vice-versa)
+    n_steps = 150 # number of steps to go from init to final positions (and vice-versa)
     trajectories = CrowdMotionPrediction()
 
     for i in range(n_actors):

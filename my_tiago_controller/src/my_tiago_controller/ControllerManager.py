@@ -273,6 +273,7 @@ class ControllerManager:
         if self.hparams.n_actors > 0:        
             output_dict['actors_predictions'] = self.actors_prediction_history
             output_dict['fake_sensing'] = self.hparams.fake_sensing
+            output_dict['use_kalman'] = self.hparams.use_kalman
             if self.hparams.simulation and not self.hparams.fake_sensing:
                 output_dict['actors_gt'] = self.actors_gt_history
 
@@ -440,11 +441,11 @@ class ControllerManager:
                     self.actors_prediction_history.append(predicted_trajectory.tolist())
 
                     if self.hparams.simulation and not self.hparams.fake_sensing:
-                        gt_trajectory = np.zeros((self.hparams.n_actors, 2))
+                        actors_position_gt = np.zeros((self.hparams.n_actors, 2))
                         for i in range(self.hparams.n_actors):
-                            gt_trajectory[i, 0] = self.actors_configuration[i].x
-                            gt_trajectory[i, 1] = self.actors_configuration[i].y
-                        self.actors_gt_history.append(gt_trajectory.tolist())
+                            actors_position_gt[i, 0] = self.actors_configuration[i].x
+                            actors_position_gt[i, 1] = self.actors_configuration[i].y
+                        self.actors_gt_history.append(actors_position_gt.tolist())
 
                 end_time = time.time()        
                 deltat = end_time - start_time
