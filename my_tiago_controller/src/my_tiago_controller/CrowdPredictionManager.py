@@ -337,12 +337,13 @@ class CrowdPredictionManager:
 
     def run(self):
         rate = rospy.Rate(self.frequency)
-        if self.hparams.log:
-            rospy.on_shutdown(self.log_values)
 
         if self.n_actors == 0:
             rospy.logwarn("No actors available")
             return
+        
+        if self.hparams.log:
+            rospy.on_shutdown(self.log_values)
         
         if self.hparams.use_kalman:
             fsms = [FSM(self.hparams) for _ in range(self.n_clusters)]

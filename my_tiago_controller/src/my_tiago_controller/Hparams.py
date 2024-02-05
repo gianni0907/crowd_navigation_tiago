@@ -29,6 +29,7 @@ class Hparams:
     controller_frequency = 18.0 # [Hz]
     dt = 2.0 / controller_frequency # [s]
     N_horizon = 10
+    unbounded = 1000
 
     # Driving and steering acceleration limits
     driving_acc_max = 0.5 # [m/s^2]
@@ -51,7 +52,7 @@ class Hparams:
     steering_vel_max_neg = - steering_vel_max
     
     # Wheels velocity limits
-    w_max = 1.05 * driving_vel_max / wheel_radius # [rad/s], 10.1523
+    w_max = driving_vel_max / wheel_radius # [rad/s], 10.1523
     w_max_neg = - w_max
 
     # Set n points to be the vertexes of the admitted region

@@ -11,6 +11,7 @@ from  matplotlib.animation import FuncAnimation
 from my_tiago_controller.utils import *
 
 def plot_results(filename=None):
+    save_video = False
     # Specify logging directory
     log_dir = '/tmp/crowd_navigation_tiago/data'
     if not os.path.exists(log_dir):
@@ -474,8 +475,9 @@ def plot_results(filename=None):
                                     interval=1/frequency*100,
                                     repeat=False)
     world_fig.tight_layout()
-    world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-    print("World animation saved")
+    if save_video:
+        world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+        print("World animation saved")
     
     plt.show()
 
@@ -578,8 +580,9 @@ def plot_results(filename=None):
                                         interval=1/frequency*500,
                                         repeat=False)
         scans_fig.tight_layout()
-        scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-        print("Scans animation saved")
+        if save_video:
+            scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+            print("Scans animation saved")
         
         plt.show()
 
