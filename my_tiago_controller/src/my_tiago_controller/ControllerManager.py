@@ -185,6 +185,7 @@ class ControllerManager:
     def gazebo_model_states_callback(self, msg):
         if self.hparams.simulation and not self.hparams.fake_sensing:
             actors_configuration = np.empty(self.hparams.n_actors, dtype=Configuration)
+            idx = 0
             for actor_name in self.actors_name:
                 if actor_name in msg.name:
                     actor_idx = msg.name.index(actor_name)
@@ -196,8 +197,8 @@ class ControllerManager:
                         math.atan2(2.0 * (q.w * q.z + q.x * q.y),
                                    1.0 - 2.0 * (q.y**2 + q.z**2))
                     )
-                    actors_configuration[actor_idx - 1] = actor_configuration
-
+                    actors_configuration[idx] = actor_configuration
+                    idx += 1
             self.data_lock.acquire()
             self.actors_configuration = actors_configuration
             self.data_lock.release()

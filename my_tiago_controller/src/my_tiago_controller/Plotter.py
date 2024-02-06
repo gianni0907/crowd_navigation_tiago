@@ -9,6 +9,7 @@ from matplotlib.patches import Circle
 from  matplotlib.animation import FuncAnimation
 
 from my_tiago_controller.utils import *
+from my_tiago_controller.FSMStates import *
 
 def plot_results(filename=None):
     save_video = False
@@ -35,6 +36,7 @@ def plot_results(filename=None):
     velocity_savepath = os.path.join(plots_savedir, filename + '_velocities.png')
     acceleration_savepath = os.path.join(plots_savedir, filename + '_accelerations.png')
     time_savepath = os.path.join(plots_savedir, filename + '_time.png')
+    kalman_savepath = os.path.join(plots_savedir, filename + '_kalman.png')
     scans_savepath = os.path.join(animation_savedir, filename + '_scans.mp4')
     world_savepath = os.path.join(animation_savedir, filename + '_world.mp4')
 
@@ -106,6 +108,7 @@ def plot_results(filename=None):
                 f"Specified file not found"
             )
         # Extract the predictor data
+        kfs_info = predictor_dict['kfs']
         predictor_time = np.array(predictor_dict['cpu_time'])
         core_points = np.array(predictor_dict['core_points'])
         robot_states = np.array(predictor_dict['robot_states'])
@@ -272,6 +275,68 @@ def plot_results(filename=None):
 
     acc_fig.tight_layout()
     acc_fig.savefig(acceleration_savepath)
+
+    # Kalman filters figure
+    if n_actors > 0 and use_kalman:
+        plot = False
+        active = False
+        plot_start_idx = 0
+        active_start_idx = 0
+        n_kfs = fsm_estimates.shape[1]
+        t_predictor = predictor_time[:, 1]
+        colors = ['b', 'orange', 'g', 'r', 'c', 'purple', 'brown']
+        kfs_fig, kfs_ax = plt.subplots(3, n_kfs, figsize=(16, 8))
+        for i in range(n_kfs):
+            distances = np.linalg.norm(robot_config[:, :2] - fsm_estimates[:, i, :2], axis=1)
+            for j, time in enumerate(t_predictor):
+                if kfs_info[f'KF_{i + 1}'][j][0] == 'FSMStates.ACTIVE':
+                    if not active:
+                        active = True
+                        active_start_idx = j
+                else:
+                    if active:
+                        active = False
+                        kfs_ax[0,i].fill_between(t_predictor, -1, 8,
+                                                 where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                 color='gray', alpha='0.2')
+                        kfs_ax[1,i].fill_between(t_predictor, -0.1 + np.min(fsm_estimates[:, i, 2]), 0.1 + np.max(fsm_estimates[:, i, 2]),
+                                                 where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                 color='gray', alpha='0.2')
+                        kfs_ax[2,i].fill_between(t_predictor, -0.1 + np.min(fsm_estimates[:, i, 3]), 0.1 + np.max(fsm_estimates[:, i, 3]),
+                                                 where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                 color='gray', alpha='0.2')
+                
+                if all(pos == -30 for pos in fsm_estimates[j, i, :2]):
+                    if not plot:
+                        kfs_ax[0, i].plot(t_predictor[plot_start_idx : j], distances[plot_start_idx : j], color=colors[i], label='$\hat{d}$')
+                        kfs_ax[1, i].plot(t_predictor[plot_start_idx : j], fsm_estimates[plot_start_idx : j, i, 2], color=colors[i], label='$\hat{\dot{p}}_x$')
+                        kfs_ax[2, i].plot(t_predictor[plot_start_idx : j], fsm_estimates[plot_start_idx : j, i, 3], color=colors[i], label='$\hat{\dot{p}}_y$')          
+                        plot = True
+                else:
+                    if plot:
+                        plot_start_idx = j
+                        plot = False
+
+            kfs_ax[0, i].set_title(f'KF-{i + 1}')
+            kfs_ax[0, i].set_xlabel("$t \quad [s]$")
+            kfs_ax[0, i].set_ylabel('$\hat{d} \quad [m]$')
+            kfs_ax[0, i].hlines(rho_cbf + ds_cbf, t_predictor[0], t_predictor[-1], color='red', linestyle='--')
+            kfs_ax[1, i].set_xlabel("$t \quad [s]$")
+            kfs_ax[1, i].set_ylabel('$\hat{\dot{p}}_x \quad [m/s]$')
+            kfs_ax[2, i].set_xlabel("$t \quad [s]$")
+            kfs_ax[2, i].set_ylabel('$\hat{\dot{p}}_y \quad [m/s]$')
+            kfs_ax[0, i].set_xlim([t_predictor[0], t_predictor[-1]])
+            kfs_ax[1, i].set_xlim([t_predictor[0], t_predictor[-1]])
+            kfs_ax[2, i].set_xlim([t_predictor[0], t_predictor[-1]])
+            kfs_ax[1, i].set_ylim([-1, 8])
+            kfs_ax[1, i].set_ylim([-0.1 + np.min(fsm_estimates[:, i, 2]), 0.1 + np.max(fsm_estimates[:, i, 2])])
+            kfs_ax[2, i].set_ylim([-0.1 + np.min(fsm_estimates[:, i, 3]), 0.1 + np.max(fsm_estimates[:, i, 3])])
+            kfs_ax[0, i].grid(True)
+            kfs_ax[1, i].grid(True) 
+            kfs_ax[2, i].grid(True)
+
+        kfs_fig.tight_layout()
+        kfs_fig.savefig(kalman_savepath)
 
     plt.show()
 
