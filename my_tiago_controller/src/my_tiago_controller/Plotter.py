@@ -328,7 +328,7 @@ def plot_results(filename=None):
             kfs_ax[0, i].set_xlim([t_predictor[0], t_predictor[-1]])
             kfs_ax[1, i].set_xlim([t_predictor[0], t_predictor[-1]])
             kfs_ax[2, i].set_xlim([t_predictor[0], t_predictor[-1]])
-            kfs_ax[1, i].set_ylim([-1, 8])
+            kfs_ax[0, i].set_ylim([-1, 8])
             kfs_ax[1, i].set_ylim([-0.1 + np.min(fsm_estimates[:, i, 2]), 0.1 + np.max(fsm_estimates[:, i, 2])])
             kfs_ax[2, i].set_ylim([-0.1 + np.min(fsm_estimates[:, i, 3]), 0.1 + np.max(fsm_estimates[:, i, 3])])
             kfs_ax[0, i].grid(True)

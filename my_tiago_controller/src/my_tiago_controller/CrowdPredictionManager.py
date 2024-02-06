@@ -85,8 +85,10 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
     return absolute_scans, polar_scans
 
 def data_clustering(absolute_scans, polar_scans):
+    eps = Hparams.eps
+    min_samples = Hparams.min_samples
     if len(absolute_scans) != 0:
-        k_means = DBSCAN(eps=0.6, min_samples=5)
+        k_means = DBSCAN(eps=eps, min_samples=min_samples)
         clusters = k_means.fit_predict(np.array(absolute_scans))
         dynamic_n_clusters = max(clusters) + 1
         if(min(clusters) == -1):

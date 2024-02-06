@@ -26,7 +26,7 @@ class Hparams:
     relative_laser_pos = np.array([0.2012 - b, -0.0009])
 
     # NMPC parameters
-    controller_frequency = 18.0 # [Hz]
+    controller_frequency = 20.0 # [Hz]
     dt = 2.0 / controller_frequency # [s]
     N_horizon = 10
     unbounded = 1000
@@ -116,6 +116,9 @@ class Hparams:
 
     # Parameters for the crowd prediction
     if n_actors > 0:
+        # Clustering hyperparams
+        eps = 0.6
+        min_samples = 5
         nullpos = -30
         nullstate = np.array([nullpos, nullpos, 0.0, 0.0])
         innovation_threshold = 0.5
