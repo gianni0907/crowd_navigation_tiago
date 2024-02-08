@@ -32,7 +32,7 @@ class Hparams:
     unbounded = 1000
 
     # Driving and steering acceleration limits
-    driving_acc_max = 0.5 # [m/s^2]
+    driving_acc_max = 1.0 # [m/s^2]
     driving_acc_min = - driving_acc_max
     steering_acc_max = 1.05 # [rad/s^2]
     steering_acc_max_neg = - steering_acc_max
@@ -63,10 +63,10 @@ class Hparams:
                              [6.0, -6.0],
                              [6.0, 6.0]])
     else:
-        vertexes = np.array([[4.4, -5.2],
-                             [4.3, -7.4],
-                             [10.7, -7.6],
-                             [10.6, -5.4]])
+        vertexes = np.array([[-0.6, 0.4],
+                             [-0.6, -1.9],
+                             [5.8, -1.9],
+                             [5.8, 0.4]])
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
         normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
@@ -98,9 +98,9 @@ class Hparams:
         p_weight = 1e2 # position weights
         v_weight = 5e0 # driving velocity weight
         omega_weight = 1e-5 # steering velocity weight
-        u_weight = 1e1 # input weights
+        u_weight = 2e1 # input weights
         terminal_factor_p = 1e1 # factor for the terminal position weights
-        terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
+        terminal_factor_v = 5e1 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.02 # the radius of the circle around the robot center
@@ -116,9 +116,6 @@ class Hparams:
 
     # Parameters for the crowd prediction
     if n_actors > 0:
-        # Clustering hyperparams
-        eps = 0.6
-        min_samples = 5
         nullpos = -30
         nullstate = np.array([nullpos, nullpos, 0.0, 0.0])
         innovation_threshold = 0.5
@@ -128,3 +125,8 @@ class Hparams:
             offset = 20
         else:
             offset = 10
+        # Clustering hparams
+        eps = 0.2
+        min_samples = 8
+        # Data processing hparams
+        avg_win_size = 5

@@ -42,7 +42,7 @@ def polar2absolute(scan, state, angle_min, angle_incr):
 
 def moving_average(polar_scans):
     smoothed_scans = []
-    window_size = 5
+    window_size = Hparams.avg_win_size
 
     for i, (idx, value) in enumerate(polar_scans):
         # Compute indices for the moving window
@@ -91,8 +91,8 @@ def data_clustering(absolute_scans, polar_scans):
         k_means = DBSCAN(eps=eps, min_samples=min_samples)
         clusters = k_means.fit_predict(np.array(absolute_scans))
         dynamic_n_clusters = max(clusters) + 1
-        if(min(clusters) == -1):
-            print("Noisy samples")
+        # if(min(clusters) == -1):
+        #     print("Noisy samples")
         polar_core_points = np.zeros((dynamic_n_clusters, 2))
         
         for cluster_i in range(dynamic_n_clusters):
@@ -330,6 +330,9 @@ class CrowdPredictionManager:
             output_dict['range_min'] = self.laser_scan.range_min
             output_dict['range_max'] = self.laser_scan.range_max
             output_dict['laser_relative_pos'] = self.hparams.relative_laser_pos.tolist()
+            output_dict['min_samples'] = self.hparams.min_samples
+            output_dict['epsilon'] = self.hparams.eps
+            output_dict['win_size'] = self.hparams.avg_win_size
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
