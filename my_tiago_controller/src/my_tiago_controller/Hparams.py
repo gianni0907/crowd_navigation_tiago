@@ -26,7 +26,7 @@ class Hparams:
     relative_laser_pos = np.array([0.2012 - b, -0.0009])
 
     # NMPC parameters
-    controller_frequency = 20.0 # [Hz]
+    controller_frequency = 18.0 # [Hz]
     dt = 2.0 / controller_frequency # [s]
     N_horizon = 10
     unbounded = 1000
@@ -38,7 +38,7 @@ class Hparams:
     steering_acc_max_neg = - steering_acc_max
 
     # Wheels acceleration limits
-    alpha_max = driving_acc_max / wheel_radius # [rad/s^2], 5.0761
+    alpha_max = driving_acc_max / wheel_radius # 10.1523 [rad/s^2]
     alpha_min = - alpha_max
 
     # Velocity bounds reduction in case of real_robot
@@ -52,7 +52,7 @@ class Hparams:
     steering_vel_max_neg = - steering_vel_max
     
     # Wheels velocity limits
-    w_max = driving_vel_max / wheel_radius # [rad/s], 10.1523
+    w_max = driving_vel_max / wheel_radius # 10.1523 [rad/s]
     w_max_neg = - w_max
 
     # Set n points to be the vertexes of the admitted region
@@ -126,7 +126,7 @@ class Hparams:
         else:
             offset = 10
         # Clustering hparams
-        eps = 0.2
+        eps = 0.3
         min_samples = 8
         # Data processing hparams
         avg_win_size = 5
