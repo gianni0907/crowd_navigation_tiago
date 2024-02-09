@@ -34,7 +34,7 @@ class FSM():
             self.previous_estimate = self.hparams.nullstate
             estimate = self.current_estimate
             
-        if any(meas != 0.0 for meas in measure):
+        if measure is not None:
             estimate = np.array([measure[0], measure[1], 0.0, 0.0])
             self.next_state = FSMStates.START
         else:
@@ -44,7 +44,7 @@ class FSM():
         return estimate
     
     def start_state(self, time, measure):
-        if any(meas != 0.0 for meas in measure):
+        if measure is not None:
             if np.linalg.norm(measure - self.previous_estimate[:2]) < self.matching_threshold:
                 # dt = time - self.last_valid_measurement[1]
                 # print(f"dt={dt} at instant {time}")
@@ -69,7 +69,7 @@ class FSM():
         return estimate
     
     def active_state(self, time, measure):
-        if any(meas != 0.0 for meas in measure):
+        if measure is not None:
             self.kalman_f.predict(time)
             _, innovation = self.kalman_f.correct(measure)
             if np.linalg.norm(innovation) < self.innovation_threshold:
@@ -89,7 +89,7 @@ class FSM():
         return estimate
     
     def hold_state(self, time, measure):
-        if any(meas != 0.0 for meas in measure):
+        if measure is not None:
             estimate = self.previous_estimate
             self.next_state = FSMStates.ACTIVE
         else:
@@ -116,7 +116,7 @@ class FSM():
         elif self.state == FSMStates.HOLD:
             self.current_estimate = self.hold_state(time, measure)
 
-        if any(meas != 0.0 for meas in measure):
+        if measure is not None:
             self.last_valid_measurement = (measure, time)
 
         return self.current_estimate

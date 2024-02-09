@@ -18,14 +18,6 @@ import sensor_msgs.msg
 import my_tiago_msgs.srv
 import my_tiago_msgs.msg
 
-def z_rotation(angle, point2d):
-    R = np.array([[math.cos(angle), - math.sin(angle), 0.0],
-                  [math.sin(angle), math.cos(angle), 0.0],
-                  [0.0, 0.0, 1.0]])
-    point3d = np.array([point2d[0], point2d[1], 0.0])
-    rotated_point2d = np.matmul(R, point3d)[:2]
-    return rotated_point2d
-
 def polar2relative(scan, angle_min, angle_incr):
     relative_laser_pos = Hparams.relative_laser_pos
     idx = scan[0]
@@ -40,31 +32,27 @@ def polar2absolute(scan, state, angle_min, angle_incr):
     xy_absolute = z_rotation(state.theta, xy_relative) + np.array([state.x, state.y])
     return xy_absolute
 
-def moving_average(polar_scans):
-    smoothed_scans = []
+def moving_average(points):
+    smoothed_points = []
     window_size = Hparams.avg_win_size
 
-    for i, (idx, value) in enumerate(polar_scans):
+    for i, point in enumerate(points):
         # Compute indices for the moving window
         start_idx = np.max([0, i - window_size // 2])
-        end_idx = np.min([len(polar_scans), i + window_size // 2 + 1])
+        end_idx = np.min([len(points), i + window_size // 2 + 1])
 
-        # Extract the values within the moving window
-        window_values = np.array(polar_scans[start_idx : end_idx])
+        average_point = np.sum(points[start_idx : end_idx], 0) / window_size
+        smoothed_points.append(average_point)
 
-        average_value = np.sum(window_values[:, 1]) / window_values.shape[0]
-        smoothed_scans.append((idx, average_value))
-
-    return smoothed_scans
+    return smoothed_points
 
 def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
     n_edges = Hparams.n_points
     vertexes = Hparams.vertexes
     normals = Hparams.normals
-    polar_scans = []
     absolute_scans = []
 
-    # Delete the first and last 20 laser scan ranges (wrong measurements?)
+    # Delete the first and last 'offset' laser scan ranges (wrong measurements?)
     offset = Hparams.offset
     scans = np.delete(scans, range(offset), 0)
     scans = np.delete(scans, range(len(scans) - offset, len(scans)), 0)
@@ -79,42 +67,41 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
                     outside = True
                     break
             if not outside:
-                polar_scans.append((idx + offset, value))
                 absolute_scans.append(absolute_scan.tolist())
 
-    return absolute_scans, polar_scans
+    return absolute_scans
 
-def data_clustering(absolute_scans, polar_scans):
+def data_clustering(absolute_scans, tiago_state):
+    robot_position = tiago_state.get_state()[:2]
     eps = Hparams.eps
     min_samples = Hparams.min_samples
     if len(absolute_scans) != 0:
         k_means = DBSCAN(eps=eps, min_samples=min_samples)
         clusters = k_means.fit_predict(np.array(absolute_scans))
         dynamic_n_clusters = max(clusters) + 1
-        # if(min(clusters) == -1):
-        #     print("Noisy samples")
-        polar_core_points = np.zeros((dynamic_n_clusters, 2))
-        
-        for cluster_i in range(dynamic_n_clusters):
-            cluster_scans = []
-            for id, scan in zip(clusters, polar_scans):
-                if id == cluster_i:
-                    cluster_scans.append(scan)
+        core_points = np.zeros((dynamic_n_clusters, 2))
+        cluster_points = np.array(dynamic_n_clusters)
+        cluster_points[:] = [[] for _ in range(dynamic_n_clusters)]
 
-            smoothed_scans = moving_average(cluster_scans)
+        for id, point in zip(clusters, absolute_scans):
+            if id != -1:
+                cluster_points[id].append(point)
+
+        for i in range(dynamic_n_clusters):
+            smoothed_points = moving_average(cluster_points[i])
             min_distance = np.inf
-            for idx, scan in enumerate(smoothed_scans):            
-                if scan[1] < min_distance:
-                    min_distance = scan[1]
-                    polar_core_points[cluster_i] = smoothed_scans[idx]
+            for point in (smoothed_points):
+                distance = euclidean_distance(point, robot_position)          
+                if distance < min_distance:
+                    min_distance = distance
+                    core_points[i] = point
 
-        polar_core_points = polar_core_points.tolist()        
-        polar_core_points.sort(key = lambda x: x[1], reverse = False)
-        polar_core_points = np.array(polar_core_points[0:Hparams.n_clusters])
+        core_points, _ = sort_by_distance(core_points, robot_position)
+        core_points = core_points[Hparams.n_clusters]
     else:
-        polar_core_points = np.array([])
+        core_points = np.array([])
 
-    return polar_core_points
+    return core_points
 
 class CrowdPredictionManager:
     '''
@@ -253,22 +240,15 @@ class CrowdPredictionManager:
 
                 # Perform data preprocessing
                 self.absolute_scans = []
-                self.polar_scans = []
-                self.absolute_scans, self.polar_scans = data_preprocessing(self.laser_scan.ranges,
-                                                                           self.robot_state,
-                                                                           range_min,
-                                                                           angle_min,
-                                                                           angle_increment)
-                
+                self.absolute_scans = data_preprocessing(self.laser_scan.ranges,
+                                                         self.robot_state,
+                                                         range_min,
+                                                         angle_min,
+                                                         angle_increment)
+
                 # Perform data clustering
-                core_points_polar = data_clustering(self.absolute_scans,
-                                                    self.polar_scans)
-                
-                for (i, dist) in enumerate(core_points_polar):
-                    core_points[i] = polar2absolute(core_points_polar[i],
-                                                    self.robot_state,
-                                                    angle_min,
-                                                    angle_increment)
+                core_points = data_clustering(self.absolute_scans,
+                                              self.robot_state)
                     
             self.data_lock.acquire()
             self.core_points = core_points
@@ -436,7 +416,7 @@ class CrowdPredictionManager:
                         fsm.update(start_time, measure)
                         associated_clusters.append(cluster)
                     else:
-                        measure = np.array([0.0, 0.0])
+                        measure = None
                         fsm.update(start_time, measure)
 
                     current_estimate = fsm.current_estimate
@@ -453,15 +433,15 @@ class CrowdPredictionManager:
                     )
             else:
                 for i in range(self.hparams.n_clusters):
-                    if any(coord != 0.0 for coord in self.core_points[i]):
-                        current_state = np.array([self.core_points[i, 0],
+                    if i < self.core_points.shape[0]:
+                        current_estimate = np.array([self.core_points[i, 0],
                                                   self.core_points[i, 1],
                                                   0.0,
                                                   0.0])
                     else:
-                        current_state = self.hparams.nullstate
+                        current_estimate = self.hparams.nullstate
 
-                    predictions = self.propagate_state(current_state, self.N_horizon)
+                    predictions = self.propagate_state(current_estimate, self.N_horizon)
                     predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
                     predicted_velocities = [Velocity(0.0, 0.0) for _ in range(self.N_horizon)]
                     for j in range(self.N_horizon):

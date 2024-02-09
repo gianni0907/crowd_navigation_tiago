@@ -208,6 +208,16 @@ def z_rotation(angle, point2d):
     rotated_point2d = np.matmul(R, point3d)[:2]
     return rotated_point2d
 
+def euclidean_distance(p1, p2):
+    return np.linalg.norm(p1 - p2)
+
+def sort_by_distance(points, reference_point):
+    distances = np.array([euclidean_distance(point, reference_point) for point in points])
+    sorted_indices = np.argsort(distances)
+    sorted_points = points[sorted_indices]
+    sorted_distances = distances[sorted_indices]
+    return sorted_points, sorted_distances
+
 # Wrap angle to [-pi, pi):
 def wrap_angle(theta):
     return math.atan2(math.sin(theta), math.cos(theta))

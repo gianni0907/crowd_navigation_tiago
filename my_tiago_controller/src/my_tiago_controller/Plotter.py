@@ -10,6 +10,7 @@ from  matplotlib.animation import FuncAnimation
 
 from my_tiago_controller.utils import *
 from my_tiago_controller.FSMStates import *
+from my_tiago_controller.Hparams import *
 
 def plot_results(filename=None):
     save_video = False
@@ -110,9 +111,9 @@ def plot_results(filename=None):
         # Extract the predictor data
         kfs_info = predictor_dict['kfs']
         predictor_time = np.array(predictor_dict['cpu_time'])
-        core_points = np.array(predictor_dict['core_points'])
         robot_states = np.array(predictor_dict['robot_states'])
         robot_config = robot_states[:, :3]
+        core_points = predictor_dict['core_points']
         if use_kalman:
             fsm_estimates = np.array(predictor_dict['fsm_estimates'])
         if not fake_sensing:
@@ -278,15 +279,15 @@ def plot_results(filename=None):
 
     # Kalman filters figure
     if n_actors > 0 and use_kalman:
-        plot = False
-        active = False
-        plot_start_idx = 0
-        active_start_idx = 0
         n_kfs = fsm_estimates.shape[1]
         t_predictor = predictor_time[:, 1]
         colors = ['b', 'orange', 'g', 'r', 'c', 'purple', 'brown']
         kfs_fig, kfs_ax = plt.subplots(3, n_kfs, figsize=(16, 8))
         for i in range(n_kfs):
+            plot = True
+            active = False
+            plot_start_idx = 0
+            active_start_idx = 0
             distances = np.linalg.norm(robot_config[:, :2] - fsm_estimates[:, i, :2], axis=1)
             for j, time in enumerate(t_predictor):
                 if kfs_info[f'KF_{i + 1}'][j][0] == 'FSMStates.ACTIVE':
@@ -296,17 +297,17 @@ def plot_results(filename=None):
                 else:
                     if active:
                         active = False
-                        kfs_ax[0,i].fill_between(t_predictor, -1, 8,
-                                                 where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                 color='gray', alpha='0.2')
-                        kfs_ax[1,i].fill_between(t_predictor, -0.1 + np.min(fsm_estimates[:, i, 2]), 0.1 + np.max(fsm_estimates[:, i, 2]),
-                                                 where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                 color='gray', alpha='0.2')
-                        kfs_ax[2,i].fill_between(t_predictor, -0.1 + np.min(fsm_estimates[:, i, 3]), 0.1 + np.max(fsm_estimates[:, i, 3]),
-                                                 where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                 color='gray', alpha='0.2')
+                        kfs_ax[0, i].fill_between(t_predictor, -1, 8,
+                                                  where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                  color='gray', alpha='0.1')
+                        kfs_ax[1, i].fill_between(t_predictor, -0.1 + np.min(fsm_estimates[:, i, 2]), 0.1 + np.max(fsm_estimates[:, i, 2]),
+                                                  where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                  color='gray', alpha='0.1')
+                        kfs_ax[2, i].fill_between(t_predictor, -0.1 + np.min(fsm_estimates[:, i, 3]), 0.1 + np.max(fsm_estimates[:, i, 3]),
+                                                  where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                  color='gray', alpha='0.1')
                 
-                if all(pos == -30 for pos in fsm_estimates[j, i, :2]):
+                if all(pos == Hparams.nullpos for pos in fsm_estimates[j, i, :2]):
                     if not plot:
                         kfs_ax[0, i].plot(t_predictor[plot_start_idx : j], distances[plot_start_idx : j], color=colors[i], label='$\hat{d}$')
                         kfs_ax[1, i].plot(t_predictor[plot_start_idx : j], fsm_estimates[plot_start_idx : j, i, 2], color=colors[i], label='$\hat{\dot{p}}_x$')
@@ -316,6 +317,21 @@ def plot_results(filename=None):
                     if plot:
                         plot_start_idx = j
                         plot = False
+
+            if active:
+                kfs_ax[0, i].fill_between(t_predictor, -1, 8,
+                                          where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
+                                          color='gray', alpha='0.1')
+                kfs_ax[1, i].fill_between(t_predictor, -0.1 + np.min(fsm_estimates[:, i, 2]), 0.1 + np.max(fsm_estimates[:, i, 2]),
+                                          where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
+                                          color='gray', alpha='0.1')
+                kfs_ax[2, i].fill_between(t_predictor, -0.1 + np.min(fsm_estimates[:, i, 3]), 0.1 + np.max(fsm_estimates[:, i, 3]),
+                                          where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
+                                          color='gray', alpha='0.1')
+            if not plot:
+                kfs_ax[0, i].plot(t_predictor[plot_start_idx:], distances[plot_start_idx:], color=colors[i], label='$\hat{d}$')
+                kfs_ax[1, i].plot(t_predictor[plot_start_idx:], fsm_estimates[plot_start_idx:, i, 2], color=colors[i], label='$\hat{\dot{p}}_x$')
+                kfs_ax[2, i].plot(t_predictor[plot_start_idx:], fsm_estimates[plot_start_idx:, i, 3], color=colors[i], label='$\hat{\dot{p}}_y$')
 
             kfs_ax[0, i].set_title(f'KF-{i + 1}')
             kfs_ax[0, i].set_xlabel("$t \quad [s]$")
@@ -565,10 +581,7 @@ def plot_results(filename=None):
         scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
         fov_min, = ax.plot([], [], color='cyan', alpha=0.7)
         fov_max, = ax.plot([], [], color='cyan', alpha=0.7)
-        core_points_position = []
-        for i in range(n_clusters):
-            point, = ax.plot([], [], color='b', marker='.', linestyle='', label='actor')
-            core_points_position.append(point)
+        core_points_position = ax.plot([], [], color='b', marker='.', linestyle='', label='actor')
 
         boundary_line = []
         for i in range(n_edges - 1):
@@ -615,6 +628,7 @@ def plot_results(filename=None):
             robot_clearance.set_center(robot_config[frame, :2])
             robot_label.set_position(robot_center[frame])
             current_scans = np.array(laser_scans[frame])
+            current_core_points = np.array(core_points[frame])
 
             theta = robot_config[frame, 2]
             current_laser_pos = robot_config[frame, :2] + z_rotation(theta, laser_position)
@@ -631,16 +645,13 @@ def plot_results(filename=None):
 
             if current_scans.shape[0] > 0:
                 scans.set_data(current_scans[:, 0], current_scans[:, 1])
-                for i in range(n_clusters):
-                    core_point = core_points[frame, i, :]
-                    if any(coord != 0.0 for coord in core_point):
-                        core_points_position[i].set_data(core_point[0], core_point[1])
-                    else:
-                        core_points_position[i].set_data([], [])
+                if current_core_points.shape[0] > 0:
+                    core_points_position.set_data(current_core_points[:, 0], current_core_points[:, 1])
+                else:
+                    core_points_position.set_data([], [])
             else:
                 scans.set_data([], [])
-                for i in range(n_clusters):
-                    core_points_position[i].set_data([], [])
+                core_points_position[i].set_data([], [])
 
             return robot, robot_clearance, robot_label, scans, core_points_position
 

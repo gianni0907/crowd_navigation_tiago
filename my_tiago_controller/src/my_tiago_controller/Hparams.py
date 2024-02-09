@@ -127,6 +127,6 @@ class Hparams:
             offset = 10
         # Clustering hparams
         eps = 0.3
-        min_samples = 8
+        min_samples = 5
         # Data processing hparams
         avg_win_size = 5
