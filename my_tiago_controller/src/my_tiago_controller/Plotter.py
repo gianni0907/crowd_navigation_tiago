@@ -581,7 +581,7 @@ def plot_results(filename=None):
         scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
         fov_min, = ax.plot([], [], color='cyan', alpha=0.7)
         fov_max, = ax.plot([], [], color='cyan', alpha=0.7)
-        core_points_position = ax.plot([], [], color='b', marker='.', linestyle='', label='actor')
+        core_points_position, = ax.plot([], [], color='b', marker='.', linestyle='', label='actor')
 
         boundary_line = []
         for i in range(n_edges - 1):
@@ -651,7 +651,7 @@ def plot_results(filename=None):
                     core_points_position.set_data([], [])
             else:
                 scans.set_data([], [])
-                core_points_position[i].set_data([], [])
+                core_points_position.set_data([], [])
 
             return robot, robot_clearance, robot_label, scans, core_points_position
 

@@ -33,17 +33,12 @@ def polar2absolute(scan, state, angle_min, angle_incr):
     return xy_absolute
 
 def moving_average(points):
-    smoothed_points = []
     window_size = Hparams.avg_win_size
+    kernel = np.ones((window_size, 2)) / window_size
 
-    for i, point in enumerate(points):
-        # Compute indices for the moving window
-        start_idx = np.max([0, i - window_size // 2])
-        end_idx = np.min([len(points), i + window_size // 2 + 1])
-
-        average_point = np.sum(points[start_idx : end_idx], 0) / window_size
-        smoothed_points.append(average_point)
-
+    # compute the moving average using convolution
+    smoothed_points = np.convolve(points, kernel, mode='valid')
+    print(smoothed_points)
     return smoothed_points
 
 def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
@@ -80,7 +75,7 @@ def data_clustering(absolute_scans, tiago_state):
         clusters = k_means.fit_predict(np.array(absolute_scans))
         dynamic_n_clusters = max(clusters) + 1
         core_points = np.zeros((dynamic_n_clusters, 2))
-        cluster_points = np.array(dynamic_n_clusters)
+        cluster_points = np.empty(dynamic_n_clusters, dtype=object)
         cluster_points[:] = [[] for _ in range(dynamic_n_clusters)]
 
         for id, point in zip(clusters, absolute_scans):
@@ -97,7 +92,7 @@ def data_clustering(absolute_scans, tiago_state):
                     core_points[i] = point
 
         core_points, _ = sort_by_distance(core_points, robot_position)
-        core_points = core_points[Hparams.n_clusters]
+        core_points = core_points[:Hparams.n_clusters]
     else:
         core_points = np.array([])
 
