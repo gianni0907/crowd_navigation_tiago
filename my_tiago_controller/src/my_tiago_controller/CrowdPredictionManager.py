@@ -6,6 +6,7 @@ import math
 import rospy
 import threading
 import tf2_ros
+import cProfile
 from sklearn.cluster import DBSCAN
 from scipy.spatial.distance import cdist
 
@@ -496,4 +497,10 @@ def main():
     rospy.loginfo('TIAGo crowd prediction module [OK]')
 
     crowd_prediction_manager = CrowdPredictionManager()
-    crowd_prediction_manager.run()
+    prof_filename = '/tmp/crowd_prediction.prof'
+    cProfile.runctx(
+        'crowd_prediction_manager.run()',
+        globals=globals(),
+        locals=locals(),
+        filename=prof_filename
+    )

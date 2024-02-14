@@ -5,6 +5,7 @@ import math
 import os
 import rospy
 import tf2_ros
+import cProfile
 
 import gazebo_msgs.msg
 import geometry_msgs.msg
@@ -461,4 +462,10 @@ def main():
 
     # Build and run controller manager
     controller_manager = ControllerManager()
-    controller_manager.run()
+    prof_filename = '/tmp/controller.prof'
+    cProfile.runctx(
+        'controller_manager.run()',
+        globals=globals(),
+        locals=locals(),
+        filename=prof_filename
+    )
