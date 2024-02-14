@@ -11,7 +11,6 @@ from scipy.spatial.distance import cdist
 
 from my_tiago_controller.utils import *
 from my_tiago_controller.Hparams import *
-from my_tiago_controller.Status import *
 from my_tiago_controller.FSM import *
 
 import sensor_msgs.msg
@@ -32,13 +31,15 @@ def polar2absolute(scan, state, angle_min, angle_incr):
     xy_absolute = z_rotation(state.theta, xy_relative) + np.array([state.x, state.y])
     return xy_absolute
 
-def moving_average(points):
-    window_size = Hparams.avg_win_size
-    kernel = np.ones((window_size, 2)) / window_size
+def moving_average(points, window_size=1):
+    smoothed_points = np.zeros(points.shape)
+    
+    for i in range(points.shape[0]):
+        # Compute indices for the moving window
+        start_idx = np.max([0, i - window_size // 2])
+        end_idx = np.min([points.shape[0], i + window_size // 2 + 1])
+        smoothed_points[i] = np.sum(points[start_idx : end_idx], 0) / (end_idx - start_idx)
 
-    # compute the moving average using convolution
-    smoothed_points = np.convolve(points, kernel, mode='valid')
-    print(smoothed_points)
     return smoothed_points
 
 def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
@@ -68,28 +69,41 @@ def data_preprocessing(scans, tiago_state, range_min, angle_min, angle_incr):
 
 def data_clustering(absolute_scans, tiago_state):
     robot_position = tiago_state.get_state()[:2]
+    selection_mode = Hparams.selection_mode
     eps = Hparams.eps
     min_samples = Hparams.min_samples
+    if selection_mode == SelectionMode.CLOSEST:
+        window_size = Hparams.avg_win_size
+
     if len(absolute_scans) != 0:
         k_means = DBSCAN(eps=eps, min_samples=min_samples)
         clusters = k_means.fit_predict(np.array(absolute_scans))
         dynamic_n_clusters = max(clusters) + 1
         core_points = np.zeros((dynamic_n_clusters, 2))
-        cluster_points = np.empty(dynamic_n_clusters, dtype=object)
-        cluster_points[:] = [[] for _ in range(dynamic_n_clusters)]
 
-        for id, point in zip(clusters, absolute_scans):
-            if id != -1:
-                cluster_points[id].append(point)
+        if selection_mode == SelectionMode.CLOSEST:
+            clusters_points = [[] for _ in range(dynamic_n_clusters)]
 
-        for i in range(dynamic_n_clusters):
-            smoothed_points = moving_average(cluster_points[i])
-            min_distance = np.inf
-            for point in (smoothed_points):
-                distance = euclidean_distance(point, robot_position)          
-                if distance < min_distance:
-                    min_distance = distance
-                    core_points[i] = point
+            for id, point in zip(clusters, absolute_scans):
+                if id != -1:
+                    clusters_points[id].append(point)
+
+            for i in range(dynamic_n_clusters):
+                cluster_points = np.array(clusters_points[i])
+                smoothed_points = moving_average(cluster_points, window_size)
+                min_distance = np.inf
+                for point in (smoothed_points):
+                    distance = euclidean_distance(point, robot_position)          
+                    if distance < min_distance:
+                        min_distance = distance
+                        core_points[i] = point
+        elif selection_mode == SelectionMode.AVERAGE:
+            n_points = np.zeros((dynamic_n_clusters,))       
+
+            for id, point in zip(clusters, absolute_scans):
+                if id != -1:
+                    n_points[id] += 1
+                    core_points[id] = core_points[id] + (point - core_points[id]) / n_points[id]
 
         core_points, _ = sort_by_distance(core_points, robot_position)
         core_points = core_points[:Hparams.n_clusters]
@@ -307,7 +321,8 @@ class CrowdPredictionManager:
             output_dict['laser_relative_pos'] = self.hparams.relative_laser_pos.tolist()
             output_dict['min_samples'] = self.hparams.min_samples
             output_dict['epsilon'] = self.hparams.eps
-            output_dict['win_size'] = self.hparams.avg_win_size
+            if self.hparams.selection_mode == SelectionMode.CLOSEST:
+                output_dict['win_size'] = self.hparams.avg_win_size
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'

@@ -9,7 +9,6 @@ from matplotlib.patches import Circle
 from  matplotlib.animation import FuncAnimation
 
 from my_tiago_controller.utils import *
-from my_tiago_controller.FSMStates import *
 from my_tiago_controller.Hparams import *
 
 def plot_results(filename=None):

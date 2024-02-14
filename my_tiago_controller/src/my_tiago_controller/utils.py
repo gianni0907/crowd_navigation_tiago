@@ -2,6 +2,7 @@ import numpy as np
 import math
 import my_tiago_msgs.msg
 import geometry_msgs.msg
+from enum import Enum
 
 class State:
     def __init__(self, x, y, theta, v, omega):
@@ -183,6 +184,24 @@ class LaserScan:
             msg.intensities
         )
 
+class Status(Enum):
+    WAITING = 0
+    READY = 1
+    MOVING = 2
+
+class SelectionMode(Enum):
+    CLOSEST = 0
+    AVERAGE = 1
+
+class FSMStates(Enum):
+    IDLE = 0
+    START = 1
+    ACTIVE = 2
+    HOLD = 3
+
+    def print(state):
+        return f'{state}'
+    
 def Euler(f, x0, u, dt):
     return x0 + f(x0,u)*dt
 

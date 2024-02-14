@@ -126,7 +126,11 @@ class Hparams:
         else:
             offset = 10
         # Clustering hparams
-        eps = 0.3
-        min_samples = 5
-        # Data processing hparams
-        avg_win_size = 5
+        selection_mode = SelectionMode.CLOSEST
+        if selection_mode == SelectionMode.CLOSEST:
+            eps = 0.3
+            min_samples = 5
+            avg_win_size = 5
+        elif selection_mode == SelectionMode.AVERAGE:
+            eps = 0.3
+            min_samples = 5

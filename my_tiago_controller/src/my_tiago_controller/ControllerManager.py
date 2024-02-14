@@ -14,7 +14,6 @@ from numpy.linalg import *
 
 from my_tiago_controller.Hparams import *
 from my_tiago_controller.NMPC import *
-from my_tiago_controller.Status import *
 from my_tiago_controller.utils import *
 
 import my_tiago_msgs.srv
