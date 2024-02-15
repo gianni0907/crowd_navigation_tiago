@@ -12,7 +12,7 @@ from my_tiago_controller.utils import *
 from my_tiago_controller.Hparams import *
 
 def plot_results(filename=None):
-    save_video = False
+    save_video = Hparams.save_video
     # Specify logging directory
     log_dir = '/tmp/crowd_navigation_tiago/data'
     if not os.path.exists(log_dir):

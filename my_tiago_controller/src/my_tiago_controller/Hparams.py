@@ -4,6 +4,7 @@ from my_tiago_controller.utils import *
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
+    save_video = True
     if log:
         filename = 'test'
         controller_file = filename + '_controller.json'
@@ -104,11 +105,11 @@ class Hparams:
 
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.02 # the radius of the circle around the robot center
-    ds_cbf = 0.1 # safety clearance
+    ds_cbf = 0.5 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_actors = 3 # number of actors
+    n_actors = 5 # number of actors
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
@@ -126,11 +127,11 @@ class Hparams:
         else:
             offset = 10
         # Clustering hparams
-        selection_mode = SelectionMode.CLOSEST
+        selection_mode = SelectionMode.AVERAGE
         if selection_mode == SelectionMode.CLOSEST:
-            eps = 0.3
+            eps = 0.6
             min_samples = 5
             avg_win_size = 5
         elif selection_mode == SelectionMode.AVERAGE:
-            eps = 0.3
+            eps = 0.6
             min_samples = 5
