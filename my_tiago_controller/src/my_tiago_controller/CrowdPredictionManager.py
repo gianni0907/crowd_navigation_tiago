@@ -113,6 +113,78 @@ def data_clustering(absolute_scans, tiago_state):
 
     return core_points
 
+def data_association(estimates, core_points):
+    n_measurements = core_points.shape[0]
+    valid_estimates = []
+    for estimate in estimates:
+        if all(pos != Hparams.nullpos for pos in estimate):
+            valid_estimates.append(estimate)
+
+    valid_estimates = np.array(valid_estimates)
+    n_fsms = valid_estimates.shape[0]
+
+    # Heuristics to consider for the associations: gating, best friend, lonely best friend
+    # heuristics param
+    gating_tau = 1 # maximum distance threshold
+    gamma_threshold = 1e-3 # lonely best friends threshold
+    # consider 2 arrays of dimension [n_measurements] containing the following association info:
+    #   fsm indices
+    #   association value (euclidean distance)
+    fsm_indices = -1 * np.ones(n_measurements, dtype=int)
+    distances = np.ones(n_measurements) * np.inf
+
+    if n_fsms == 0 or n_measurements == 0:
+        return fsm_indices
+
+    D = cdist(core_points, valid_estimates) # [n_measurements x n_fsms] association matrix
+
+    for j in range(n_measurements):
+        # compute row minimum
+        d_ji = np.min(D[j, :])
+        min_idx = np.argmin(D[j, :])
+
+        # gating
+        if (d_ji < gating_tau):
+            fsm_indices[j] = min_idx
+            distances[j] = d_ji
+        else:
+            fsm_indices[j] = -1
+            distances[j] = d_ji
+
+    # best friends
+    for j in range(n_measurements):    
+        proposed_est = fsm_indices[j]
+        d_ji = distances[j]
+        if proposed_est != -1:
+            # compute column minimum
+            col_min = np.min(D[:, proposed_est])
+
+            if d_ji != col_min:
+                fsm_indices[j] = -1
+
+
+    # lonely best friends
+    if n_measurements > 1:
+        for j in range(n_measurements):
+            proposed_est = fsm_indices[j]
+            d_ji = distances[j]
+
+            if proposed_est == -1:
+                continue
+
+            # take second best value of the row
+            ordered_row = np.sort(D[j, :])
+            second_min_row = ordered_row[1]
+
+            # take second best value of the col
+            ordered_col = np.sort(D[:, proposed_est])
+            second_min_col = ordered_col[1]
+
+            # check association ambiguity
+            if (second_min_row - d_ji) < gamma_threshold or (second_min_col - d_ji) < gamma_threshold:
+                fsm_indices[j] = -1
+    
+    return fsm_indices
 class CrowdPredictionManager:
     '''
     From the laser scans input predict the motion of the actors
@@ -140,6 +212,8 @@ class CrowdPredictionManager:
         self.core_points = np.zeros((self.hparams.n_clusters, 2))
         if self.hparams.use_kalman:
             self.estimated_actors_state = np.zeros((self.hparams.n_clusters, 4))
+            self.point2fsm_map = np.ones(self.hparams.n_clusters) * (-1.0)
+            self.fsm2point_map = np.ones(self.hparams.n_clusters) * (-1.0)
 
         self.N_horizon = self.hparams.N_horizon
         self.frequency = self.hparams.controller_frequency
@@ -385,48 +459,41 @@ class CrowdPredictionManager:
                 # Perform data association
                 # predict next positions according to fsms
                 next_predicted_positions = np.zeros((self.hparams.n_clusters, 2))
-                associated_clusters = []
 
                 for (i, fsm) in enumerate(fsms):
-                    if fsm.next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
+                    fsm_next_state = fsm.next_state
+                    if self.hparams.log:
+                        self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
+                                                                         FSMStates.print(fsm_next_state),
+                                                                         start_time])
+                    if fsm_next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
                         predicted_state = self.propagate_state(fsm.current_estimate, 2)[1]
-                    elif fsm.next_state is FSMStates.START:
+                    elif fsm_next_state is FSMStates.START:
                         predicted_state = fsm.current_estimate
                     else:
                         predicted_state = self.hparams.nullstate
                     next_predicted_positions[i] = predicted_state[:2]
                 
-                # compute pairwise distance between predicted positions and positions from clusters
-                if self.core_points.shape[0] > 0:
-                    distances = cdist(next_predicted_positions, self.core_points)
-                else:
-                    distances = None
+                fsm_indices = data_association(next_predicted_positions, self.core_points)
 
-                # match each fsm to the closest cluster centroid
+                # update each fsm based on the associations
                 for (i, fsm) in enumerate(fsms):
-                    fsm_state = fsm.next_state
-                    
-                    if self.hparams.log:
-                        self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
-                                                                         FSMStates.print(fsm_state),
-                                                                         start_time])
-
-                    # find the closest available cluster to the fsm's prediction
-                    min_dist = np.inf
-                    cluster = None
-                    if distances is not None:
-                        for j in range(distances.shape[1]):
-                            if j in associated_clusters:
-                                continue
-                            distance = distances[i, j]
-                            if distance < min_dist:
-                                min_dist = distance
-                                cluster = j
-                    if cluster is not None:
-                        measure = self.core_points[cluster]
-                        fsm.update(start_time, measure)
-                        associated_clusters.append(cluster)
-                    else:
+                    associated = False
+                    for (j,fsm_idx) in enumerate(fsm_indices):
+                        if fsm_idx == i:
+                            measure = self.core_points[j]
+                            fsm.update(start_time, measure)
+                            associated = True
+                            break
+                    if associated == False:
+                        for (k, fsm_idx) in enumerate(fsm_indices):
+                            if fsm_idx == -1:
+                                measure = self.core_points[k]
+                                fsm.update(start_time, measure)
+                                fsm_indices[k] = i
+                                associated = True
+                                break
+                    if associated == False:
                         measure = None
                         fsm.update(start_time, measure)
 
@@ -446,9 +513,9 @@ class CrowdPredictionManager:
                 for i in range(self.hparams.n_clusters):
                     if i < self.core_points.shape[0]:
                         current_estimate = np.array([self.core_points[i, 0],
-                                                  self.core_points[i, 1],
-                                                  0.0,
-                                                  0.0])
+                                                     self.core_points[i, 1],
+                                                     0.0,
+                                                     0.0])
                     else:
                         current_estimate = self.hparams.nullstate
 
