@@ -212,8 +212,6 @@ class CrowdPredictionManager:
         self.core_points = np.zeros((self.hparams.n_clusters, 2))
         if self.hparams.use_kalman:
             self.estimated_actors_state = np.zeros((self.hparams.n_clusters, 4))
-            self.point2fsm_map = np.ones(self.hparams.n_clusters) * (-1.0)
-            self.fsm2point_map = np.ones(self.hparams.n_clusters) * (-1.0)
 
         self.N_horizon = self.hparams.N_horizon
         self.frequency = self.hparams.controller_frequency
