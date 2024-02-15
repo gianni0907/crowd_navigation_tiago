@@ -4,7 +4,7 @@ from my_tiago_controller.utils import *
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    save_video = True
+    save_video = False
     if log:
         filename = 'test'
         controller_file = filename + '_controller.json'

@@ -164,7 +164,7 @@ def data_association(estimates, core_points):
 
 
     # lonely best friends
-    if n_measurements > 1:
+    if n_fsms > 1 and n_measurements > 1:
         for j in range(n_measurements):
             proposed_est = fsm_indices[j]
             d_ji = distances[j]
