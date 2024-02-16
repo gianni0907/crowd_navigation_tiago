@@ -115,13 +115,7 @@ def data_clustering(absolute_scans, tiago_state):
 
 def data_association(estimates, core_points):
     n_measurements = core_points.shape[0]
-    valid_estimates = []
-    for estimate in estimates:
-        if all(pos != Hparams.nullpos for pos in estimate):
-            valid_estimates.append(estimate)
-
-    valid_estimates = np.array(valid_estimates)
-    n_fsms = valid_estimates.shape[0]
+    n_fsms = estimates.shape[0]
 
     # Heuristics to consider for the associations: gating, best friend, lonely best friend
     # heuristics param
@@ -136,7 +130,7 @@ def data_association(estimates, core_points):
     if n_fsms == 0 or n_measurements == 0:
         return fsm_indices
 
-    D = cdist(core_points, valid_estimates) # [n_measurements x n_fsms] association matrix
+    D = cdist(core_points, estimates) # [n_measurements x n_fsms] association matrix
 
     for j in range(n_measurements):
         # compute row minimum
@@ -475,6 +469,7 @@ class CrowdPredictionManager:
                     next_predicted_positions[i] = predicted_state[:2]
                 
                 fsm_indices = data_association(next_predicted_positions, self.core_points)
+                self.associations.append([fsm_indices.tolist(), start_time])
 
                 # update each fsm based on the associations
                 for (i, fsm) in enumerate(fsms):
@@ -483,7 +478,6 @@ class CrowdPredictionManager:
                         if fsm_idx == i:
                             measure = self.core_points[j]
                             fsm.update(start_time, measure)
-                            self.associations.append([i, start_time])
                             associated = True
                             break
                     if associated == False:

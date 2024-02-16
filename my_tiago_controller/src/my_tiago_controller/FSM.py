@@ -90,7 +90,8 @@ class FSM():
     
     def hold_state(self, time, measure):
         if measure is not None:
-            estimate = self.active_state(time, measure)
+            estimate = self.previous_estimate
+            self.next_state = FSMStates.ACTIVE
         else:
             if time <= self.last_valid_measurement[1] + self.T_bar:
                 estimate = self.kalman_f.predict(time)
