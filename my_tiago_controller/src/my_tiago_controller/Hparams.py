@@ -28,8 +28,8 @@ class Hparams:
 
     # NMPC parameters
     controller_frequency = 18.0 # [Hz]
-    dt = 2.0 / controller_frequency # [s]
-    N_horizon = 10
+    dt = 1.0 / controller_frequency # [s]
+    N_horizon = 20
     unbounded = 1000
 
     # Driving and steering acceleration limits

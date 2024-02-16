@@ -356,7 +356,7 @@ class CrowdPredictionManager:
         time = 0
         dt = self.dt
         for i in range(N):
-            time = dt * (i)
+            time = dt * (i + 1)
             predictions[i] = self.predict_next_state(state, time)
 
         return predictions
@@ -461,7 +461,7 @@ class CrowdPredictionManager:
                                                                          FSMStates.print(fsm_next_state),
                                                                          start_time])
                     if fsm_next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
-                        predicted_state = self.propagate_state(fsm.current_estimate, 2)[1]
+                        predicted_state = self.propagate_state(fsm.current_estimate, 1)[0]
                     elif fsm_next_state is FSMStates.START:
                         predicted_state = fsm.current_estimate
                     else:
