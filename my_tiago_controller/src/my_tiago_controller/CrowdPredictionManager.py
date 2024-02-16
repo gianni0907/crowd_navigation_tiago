@@ -222,6 +222,7 @@ class CrowdPredictionManager:
             self.kalman_infos = {}
             kalman_names = ['KF_{}'.format(i + 1) for i in range(self.n_clusters)]
             self.kalman_infos = {key: list() for key in kalman_names}
+            self.associations = []
             self.time_history = []
             if not self.hparams.fake_sensing:
                 self.scans_history = []
@@ -378,6 +379,7 @@ class CrowdPredictionManager:
     def log_values(self):
         output_dict = {}
         output_dict['kfs'] = self.kalman_infos
+        output_dict['associations'] = self.associations
         output_dict['robot_states'] = self.robot_state_history
         output_dict['cpu_time'] = self.time_history
         output_dict['core_points'] = self.core_points_history
@@ -481,6 +483,7 @@ class CrowdPredictionManager:
                         if fsm_idx == i:
                             measure = self.core_points[j]
                             fsm.update(start_time, measure)
+                            self.associations.append([i, start_time])
                             associated = True
                             break
                     if associated == False:

@@ -10,7 +10,7 @@ class Hparams:
         controller_file = filename + '_controller.json'
         prediction_file = filename + '_predictor.json'
 
-    # Specify whether to use gazebo or real robot
+    # Specify whether to use gazebo (simulation = True) or real robot
     simulation = True
 
     # Specify whether to use laser scans data or ground truth

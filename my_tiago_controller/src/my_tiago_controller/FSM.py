@@ -79,8 +79,8 @@ class FSM():
                 print(f"Reset by innovation={innovation}")
                 estimate = np.array([measure[0],
                                      measure[1],
-                                     self.previous_estimate[2],
-                                     self.previous_estimate[3]])
+                                     0.0,
+                                     0.0])
                 self.next_state = FSMStates.START
         else:
             estimate = self.previous_estimate
@@ -90,8 +90,7 @@ class FSM():
     
     def hold_state(self, time, measure):
         if measure is not None:
-            estimate = self.previous_estimate
-            self.next_state = FSMStates.ACTIVE
+            estimate = self.active_state(time, measure)
         else:
             if time <= self.last_valid_measurement[1] + self.T_bar:
                 estimate = self.kalman_f.predict(time)
