@@ -131,8 +131,8 @@ class Hparams:
         selection_mode = SelectionMode.AVERAGE
         if selection_mode == SelectionMode.CLOSEST:
             eps = 0.6
-            min_samples = 5
+            min_samples = 3
             avg_win_size = 5
         elif selection_mode == SelectionMode.AVERAGE:
             eps = 0.6
-            min_samples = 5
+            min_samples = 3
