@@ -57,6 +57,7 @@ class Hparams:
     w_max_neg = - w_max
 
     # Set n points to be the vertexes of the admitted region
+    ### NOTE: define the points in a counter-clockwise order
     n_points = 4
     if simulation:
         vertexes = np.array([[-6.0, 6.0],
