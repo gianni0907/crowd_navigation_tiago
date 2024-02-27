@@ -22,14 +22,16 @@ class FSM():
         self.T_bar = self.hparams.max_pred_time
         self.next_state = FSMStates.IDLE
         self.state = FSMStates.IDLE
-        self.last_valid_measurement = (np.zeros(2), 0)
+        self.last_valid_measure = self.hparams.nullstate[:2]
+        self.last_valid_time = 0
         self.reset = False
 
     def idle_state(self, time, measure):
         if self.reset == True:
             self.reset = False
             self.state = FSMStates.IDLE
-            self.last_valid_measurement = ([0.0, 0.0], time)
+            self.last_valid_measure = self.hparams.nullstate[:2]
+            self.last_valid_time = time
             self.current_estimate = self.hparams.nullstate
             self.previous_estimate = self.hparams.nullstate
             estimate = self.current_estimate
@@ -45,22 +47,13 @@ class FSM():
     
     def start_state(self, time, measure):
         if measure is not None:
-            if np.linalg.norm(measure - self.previous_estimate[:2]) < self.matching_threshold:
-                # dt = time - self.last_valid_measurement[1]
-                # print(f"dt={dt} at instant {time}")
-                estimate = np.array([measure[0],
-                                     measure[1],
-                                     0.0,
-                                     0.0])
-                                    #  (1 / dt) * (measure[0] - self.previous_estimate[0]),
-                                    #  (1 / dt) * (measure[1] - self.previous_estimate[1])])
-                self.next_state = FSMStates.ACTIVE
-                # Kalman Filter initialization
-                self.kalman_f = Kalman(estimate, time, print_info=False)
-            else:
-                rospy.loginfo("Mismatched measure, restarting")
-                estimate = np.array([measure[0], measure[1], 0.0, 0.0])
-                self.next_state = FSMStates.START
+            estimate = np.array([measure[0],
+                                 measure[1],
+                                 0.0,
+                                 0.0])
+            self.next_state = FSMStates.ACTIVE
+            # Kalman Filter initialization
+            self.kalman_f = Kalman(estimate, time, print_info=False)
         else:
             estimate = self.previous_estimate
             self.next_state = FSMStates.IDLE
@@ -83,18 +76,21 @@ class FSM():
                                      0.0])
                 self.next_state = FSMStates.START
         else:
-            estimate = self.previous_estimate
+            self.kalman_f.predict(time)
+            estimate, _ = self.kalman_f.correct(self.last_valid_measure)
             self.next_state = FSMStates.HOLD
 
         return estimate
     
     def hold_state(self, time, measure):
         if measure is not None:
-            estimate = self.previous_estimate
+            self.kalman_f.predict(time)
+            estimate, _ = self.kalman_f.correct(measure)
             self.next_state = FSMStates.ACTIVE
         else:
-            if time <= self.last_valid_measurement[1] + self.T_bar:
-                estimate = self.kalman_f.predict(time)
+            if time <= self.last_valid_time + self.T_bar:
+                self.kalman_f.predict(time)
+                estimate, _ = self.kalman_f.correct(self.last_valid_measure)
                 self.next_state = FSMStates.HOLD
             else:
                 estimate = self.previous_estimate
@@ -117,6 +113,7 @@ class FSM():
             self.current_estimate = self.hold_state(time, measure)
 
         if measure is not None:
-            self.last_valid_measurement = (measure, time)
+            self.last_valid_measure = measure
+            self.last_valid_time = time
 
         return self.current_estimate

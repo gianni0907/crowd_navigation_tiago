@@ -121,7 +121,6 @@ class Hparams:
         nullpos = -30
         nullstate = np.array([nullpos, nullpos, 0.0, 0.0])
         innovation_threshold = 0.5
-        matching_threshold = 0.1
         max_pred_time = dt * N_horizon
         if simulation:
             offset = 20
