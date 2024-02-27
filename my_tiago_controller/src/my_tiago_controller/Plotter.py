@@ -369,6 +369,9 @@ def plot_results(filename=None):
         if not fake_sensing:
             fov = Wedge(np.zeros(1), np.zeros(1), np.zeros(1), np.zeros(1), color='cyan', alpha=0.1)
             if simulation:
+                actors_gt = []
+                actors_gt_label = []
+                actors_gt_clearance = []
                 for i in range(n_actors):
                     actors_gt.append(ax_big.scatter([], [], marker='.', label='actor{}'.format(i+1), color='k', alpha=0.4))
                     actors_gt_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', alpha=0.4))
@@ -378,9 +381,6 @@ def plot_results(filename=None):
         actors_label = []
         actors_clearance = []
         actors_pred_line = []
-        actors_gt = []
-        actors_gt_label = []
-        actors_gt_clearance = []
         for i in range(n_clusters):
             actors.append(ax_big.scatter([], [], marker='.', label='fsm{}'.format(i+1), color='red', alpha=0.7))
             actors_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='red'))
