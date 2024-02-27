@@ -5,7 +5,7 @@ import json
 import os
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from matplotlib.patches import Circle
+from matplotlib.patches import Circle, Wedge
 from  matplotlib.animation import FuncAnimation
 
 from my_tiago_controller.utils import *
@@ -123,11 +123,7 @@ def plot_results(filename=None):
             angle_max = predictor_dict['angle_max'] - angle_inc * offset
             range_min = predictor_dict['range_min']
             range_max = predictor_dict['range_max']
-            laser_position = np.array(predictor_dict['laser_relative_pos'])
-            p_lr = z_rotation(angle_min, np.array([range_min, 0.0]))
-            p_ur = z_rotation(angle_min, np.array([range_max, 0.0]))
-            p_ll = z_rotation(angle_max, np.array([range_min, 0.0]))
-            p_ul = z_rotation(angle_max, np.array([range_max, 0.0]))        
+            laser_position = np.array(predictor_dict['laser_relative_pos'])       
 
     # Figure elapsed time per iteration (controller and predictor if prediction module is present)
     fig, axs = plt.subplots(2, 1, figsize=(16, 8))
@@ -371,8 +367,13 @@ def plot_results(filename=None):
     goal_label = ax_big.text(np.nan, np.nan, goal.get_label(), fontsize=8, ha='left', va='bottom')
     if n_actors > 0:
         if not fake_sensing:
-            fov_min, = ax_big.plot([], [], color='cyan', alpha=0.7)
-            fov_max, = ax_big.plot([], [], color='cyan', alpha=0.7)
+            fov = Wedge(np.zeros(1), np.zeros(1), np.zeros(1), np.zeros(1), color='cyan', alpha=0.1)
+            if simulation:
+                for i in range(n_actors):
+                    actors_gt.append(ax_big.scatter([], [], marker='.', label='actor{}'.format(i+1), color='k', alpha=0.4))
+                    actors_gt_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', alpha=0.4))
+                    actors_gt_label.append(ax_big.text(np.nan, np.nan, actors_gt[i].get_label(), fontsize=8, ha='left', va='bottom'))
+
         actors = []
         actors_label = []
         actors_clearance = []
@@ -380,19 +381,12 @@ def plot_results(filename=None):
         actors_gt = []
         actors_gt_label = []
         actors_gt_clearance = []
-        
         for i in range(n_clusters):
             actors.append(ax_big.scatter([], [], marker='.', label='fsm{}'.format(i+1), color='red', alpha=0.7))
             actors_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='red'))
             actors_label.append(ax_big.text(np.nan, np.nan, actors[i].get_label(), fontsize=8, ha='left', va='bottom'))
             actor_pred_line, = ax_big.plot([], [], color='orange', label='actor prediction')
             actors_pred_line.append(actor_pred_line)
-
-        if simulation and not fake_sensing:
-            for i in range(n_actors):
-                actors_gt.append(ax_big.scatter([], [], marker='.', label='actor{}'.format(i+1), color='k', alpha=0.4))
-                actors_gt_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', alpha=0.4))
-                actors_gt_label.append(ax_big.text(np.nan, np.nan, actors_gt[i].get_label(), fontsize=8, ha='left', va='bottom'))
     
     traj_line, = ax_big.plot([], [], color='blue', label='trajectory')
     robot_pred_line, = ax_big.plot([], [], color='green', label='prediction')
@@ -471,6 +465,7 @@ def plot_results(filename=None):
                 actors_label[i].set_position(actor_position)
 
             if simulation and not fake_sensing:
+                ax_big.add_patch(fov)
                 for i in range(n_actors):
                     actor_gt_position = actors_groundtruth[0, i, :]
                     actors_gt[i].set_offsets(actor_gt_position)
@@ -480,7 +475,7 @@ def plot_results(filename=None):
                     actors_gt_label[i].set_position(actor_gt_position)
 
                 return robot, robot_clearance, robot_label, goal, goal_label, \
-                       actors, actors_clearance, actors_label, \
+                       actors, actors_clearance, actors_label, fov, \
                        actors_gt, actors_gt_clearance, actors_gt_label
             else:
                 return robot, robot_clearance, robot_label, goal, goal_label, \
@@ -512,19 +507,6 @@ def plot_results(filename=None):
         goal_label.set_position(current_target)
 
         if n_actors > 0:
-            if not fake_sensing:
-                theta = configurations[frame, 2]
-                current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_position)
-                current_p_lr = current_laser_pos + z_rotation(theta, p_lr)
-                current_p_ur = current_laser_pos + z_rotation(theta, p_ur)
-                current_p_ll = current_laser_pos + z_rotation(theta, p_ll)
-                current_p_ul = current_laser_pos + z_rotation(theta, p_ul)
-                x_min = [current_p_lr[0], current_p_ur[0]]
-                y_min = [current_p_lr[1], current_p_ur[1]]
-                x_max = [current_p_ll[0], current_p_ul[0]]
-                y_max = [current_p_ll[1], current_p_ul[1]]
-                fov_min.set_data(x_min, y_min)
-                fov_max.set_data(x_max, y_max)
             for i in range(n_clusters):
                 actor_prediction = actors_predictions[frame, i, :, :]
                 actor_position = actor_prediction[: , 0]
@@ -532,19 +514,33 @@ def plot_results(filename=None):
                 actors_clearance[i].set_center(actor_position)
                 actors_label[i].set_position(actor_position)
                 actors_pred_line[i].set_data(actor_prediction[0, :], actor_prediction[1, :])
+                
+            if not fake_sensing:
+                theta = configurations[frame, 2]
+                current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_position)
+                fov.set_center(current_laser_pos)
+                fov.set_radius(range_max)
+                fov.set_theta1((theta + angle_min) * 180 / np.pi)
+                fov.set_theta2((theta + angle_max) * 180 / np.pi)
+                fov.set_width(range_max - range_min) 
 
-            if simulation and not fake_sensing:
-                for i in range(n_actors):
-                    actor_gt_position = actors_groundtruth[frame, i, :]
-                    actors_gt[i].set_offsets(actor_gt_position)
-                    actors_gt_clearance[i].set_center(actor_gt_position)
-                    actors_gt_label[i].set_position(actor_gt_position)
+                if simulation:
+                    for i in range(n_actors):
+                        actor_gt_position = actors_groundtruth[frame, i, :]
+                        actors_gt[i].set_offsets(actor_gt_position)
+                        actors_gt_clearance[i].set_center(actor_gt_position)
+                        actors_gt_label[i].set_position(actor_gt_position)
 
+                    return robot, robot_clearance, robot_label, goal, goal_label, \
+                        ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
+                        traj_line, robot_pred_line, fov, \
+                        actors, actors_clearance, actors_label, actors_pred_line, \
+                        actors_gt, actors_gt_clearance, actors_gt_label
+                
                 return robot, robot_clearance, robot_label, goal, goal_label, \
-                       ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
-                       traj_line, robot_pred_line, fov_min, fov_max, \
-                       actors, actors_clearance, actors_label, actors_pred_line, \
-                       actors_gt, actors_gt_clearance, actors_gt_label
+                        ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
+                        traj_line, robot_pred_line, fov, \
+                        actors, actors_clearance, actors_label, actors_pred_line
             else:
                 return robot, robot_clearance, robot_label, goal, goal_label, \
                        ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
@@ -552,7 +548,8 @@ def plot_results(filename=None):
                        actors, actors_clearance, actors_label, actors_pred_line
         else:
             return robot, robot_clearance, robot_label, goal, goal_label, \
-                   ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, traj_line, robot_pred_line
+                   ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
+                   traj_line, robot_pred_line
 
     world_animation = FuncAnimation(world_fig, update_world,
                                     frames=shooting_nodes,
@@ -577,9 +574,8 @@ def plot_results(filename=None):
         controlled_pt = ax.scatter([], [], marker='.', color='k')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
         robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='r')
-        scans, = ax.plot([], [], color='magenta', marker='.', linestyle='', label='scans')
-        fov_min, = ax.plot([], [], color='cyan', alpha=0.7)
-        fov_max, = ax.plot([], [], color='cyan', alpha=0.7)
+        scans, = ax.plot([], [], color='magenta', marker='.', markersize=3, linestyle='', label='scans')
+        fov = Wedge(np.zeros(1), np.zeros(1), np.zeros(1), np.zeros(1), color='cyan', alpha=0.1)
         core_points_position, = ax.plot([], [], color='b', marker='.', linestyle='', label='actor')
 
         boundary_line = []
@@ -610,13 +606,14 @@ def plot_results(filename=None):
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
             ax.add_patch(robot)
+            ax.add_patch(fov)
             controlled_pt.set_offsets(robot_config[0, :2])
             robot_clearance.set_center(robot_config[0, :2])
             robot_clearance.set_radius(rho_cbf)
             ax.add_patch(robot_clearance)
             robot_label.set_position(robot_center[0])
         
-            return robot, robot_clearance, robot_label
+            return robot, fov, robot_clearance, robot_label
 
         def update_scans(frame):
             if frame == shooting_nodes - 1:
@@ -631,16 +628,11 @@ def plot_results(filename=None):
 
             theta = robot_config[frame, 2]
             current_laser_pos = robot_config[frame, :2] + z_rotation(theta, laser_position)
-            current_p_lr = current_laser_pos + z_rotation(theta, p_lr)
-            current_p_ur = current_laser_pos + z_rotation(theta, p_ur)
-            current_p_ll = current_laser_pos + z_rotation(theta, p_ll)
-            current_p_ul = current_laser_pos + z_rotation(theta, p_ul)
-            x_min = [current_p_lr[0], current_p_ur[0]]
-            y_min = [current_p_lr[1], current_p_ur[1]]
-            x_max = [current_p_ll[0], current_p_ul[0]]
-            y_max = [current_p_ll[1], current_p_ul[1]]
-            fov_min.set_data(x_min, y_min)
-            fov_max.set_data(x_max, y_max)
+            fov.set_center(current_laser_pos)
+            fov.set_radius(range_max)
+            fov.set_theta1((theta + angle_min) * 180 / np.pi)
+            fov.set_theta2((theta + angle_max) * 180 / np.pi)
+            fov.set_width(range_max - range_min)
 
             if current_scans.shape[0] > 0:
                 scans.set_data(current_scans[:, 0], current_scans[:, 1])
@@ -652,7 +644,7 @@ def plot_results(filename=None):
                 scans.set_data([], [])
                 core_points_position.set_data([], [])
 
-            return robot, robot_clearance, robot_label, scans, core_points_position
+            return robot, robot_clearance, robot_label, fov, scans, core_points_position
 
         scans_animation = FuncAnimation(scans_fig, update_scans,
                                         frames=shooting_nodes,
