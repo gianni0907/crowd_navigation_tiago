@@ -16,7 +16,6 @@ class FSM():
         self.current_estimate = self.hparams.nullstate
         self.previous_estimate = self.hparams.nullstate
         self.innovation_threshold = self.hparams.innovation_threshold
-        self.matching_threshold = self.hparams.matching_threshold
         
         self.kalman_f = None
         self.T_bar = self.hparams.max_pred_time
