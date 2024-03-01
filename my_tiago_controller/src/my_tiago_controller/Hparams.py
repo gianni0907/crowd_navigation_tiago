@@ -65,10 +65,10 @@ class Hparams:
                              [6.0, -6.0],
                              [6.0, 6.0]])
     else:
-        vertexes = np.array([[-0.6, 0.4],
-                             [-0.6, -1.9],
-                             [5.8, -1.9],
-                             [5.8, 0.4]])
+        vertexes = np.array([[-3.9, 0.0],
+                             [-3.0, -2.4],
+                             [2.6, -0.2],
+                             [1.8, 2.0]])
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
         normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
@@ -105,12 +105,12 @@ class Hparams:
         terminal_factor_v = 5e1 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
-    rho_cbf = base_radius + b + 0.02 # the radius of the circle around the robot center
-    ds_cbf = 0.5 # safety clearance
+    rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
+    ds_cbf = 0.3 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_actors = 5 # number of actors
+    n_actors = 4 # number of actors
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
