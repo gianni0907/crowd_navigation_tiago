@@ -63,35 +63,24 @@ class Velocity:
         return Velocity(velocity_msg.x, velocity_msg.y)
     
 class MotionPrediction:
-    def __init__(self, positions, velocities):
+    def __init__(self, positions):
         self.positions = positions
-        self.velocities = velocities
     
     @staticmethod
     def to_message(motion_prediction):
         positions_msg = []
-        velocities_msg = []
         for i in range(len(motion_prediction.positions)):
             positions_msg.append(Position.to_message(motion_prediction.positions[i]))
-            velocities_msg.append(Velocity.to_message(motion_prediction.velocities[i]))
 
-        return my_tiago_msgs.msg.MotionPrediction(
-            positions_msg,
-            velocities_msg
-        )
+        return my_tiago_msgs.msg.MotionPrediction(positions_msg)
 
     @staticmethod
     def from_message(motion_prediction_msg):
         positions = []
-        velocities = []
         for i in range(len(motion_prediction_msg.positions)):
             positions.append(Position.from_message(motion_prediction_msg.positions[i]))
-            velocities.append(Velocity.from_message(motion_prediction_msg.velocities[i]))
-
-        return MotionPrediction(
-            positions,
-            velocities
-        )
+            
+        return MotionPrediction(positions)
     
 class CrowdMotionPrediction:
     def __init__(self):

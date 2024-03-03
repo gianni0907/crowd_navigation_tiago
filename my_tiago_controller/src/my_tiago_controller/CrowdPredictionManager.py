@@ -496,13 +496,11 @@ class CrowdPredictionManager:
                     self.estimated_actors_state[i] = current_estimate
                     predictions = self.propagate_state(current_estimate, self.N_horizon)
                     predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
-                    predicted_velocities = [Velocity(0.0, 0.0) for _ in range(self.N_horizon)]
                     for j in range(self.N_horizon):
                         predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
-                        predicted_velocities[j] = Velocity(predictions[j][2], predictions[j][3])
                     
                     crowd_motion_prediction.append(
-                            MotionPrediction(predicted_positions, predicted_velocities)
+                            MotionPrediction(predicted_positions)
                     )
             else:
                 for i in range(self.hparams.n_clusters):
@@ -516,13 +514,11 @@ class CrowdPredictionManager:
 
                     predictions = self.propagate_state(current_estimate, self.N_horizon)
                     predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
-                    predicted_velocities = [Velocity(0.0, 0.0) for _ in range(self.N_horizon)]
                     for j in range(self.N_horizon):
                         predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
-                        predicted_velocities[j] = Velocity(predictions[j][2], predictions[j][3])
                 
                     crowd_motion_prediction.append(
-                        MotionPrediction(predicted_positions, predicted_velocities)
+                        MotionPrediction(predicted_positions)
                     )
 
             crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(start_time),
