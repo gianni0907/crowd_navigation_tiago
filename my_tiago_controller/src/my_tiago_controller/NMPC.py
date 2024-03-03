@@ -347,10 +347,16 @@ class NMPC:
             self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
             actors_state = np.zeros((self.hparams.n_clusters * self.actor_state_size))
             for j in range(self.n_clusters):
-                actors_state[j*self.actor_state_size + 0] = crowd_motion_prediction.motion_predictions[j].positions[k].x
-                actors_state[j*self.actor_state_size + 1] = crowd_motion_prediction.motion_predictions[j].positions[k].y
-                actors_state[j*self.actor_state_size + 2] = crowd_motion_prediction.motion_predictions[j].velocities[k].x
-                actors_state[j*self.actor_state_size + 3] = crowd_motion_prediction.motion_predictions[j].velocities[k].y
+                position = crowd_motion_prediction.motion_predictions[j].positions[k]
+                velocity = Velocity
+                velocity = Velocity(
+                    crowd_motion_prediction.motion_predictions[j].positions[1].x - crowd_motion_prediction.motion_predictions[j].positions[0].x,
+                    crowd_motion_prediction.motion_predictions[j].positions[1].y - crowd_motion_prediction.motion_predictions[j].positions[0].y
+                )
+                actors_state[j*self.actor_state_size + 0] = position.x
+                actors_state[j*self.actor_state_size + 1] = position.y
+                actors_state[j*self.actor_state_size + 2] = velocity.x
+                actors_state[j*self.actor_state_size + 3] = velocity.y
             self.acados_ocp_solver.set(k, 'p', actors_state)
         self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])
 
