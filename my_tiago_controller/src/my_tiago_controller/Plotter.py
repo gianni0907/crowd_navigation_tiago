@@ -367,7 +367,7 @@ def plot_results(filename=None):
     goal_label = ax_big.text(np.nan, np.nan, goal.get_label(), fontsize=8, ha='left', va='bottom')
     if n_actors > 0:
         if not fake_sensing:
-            fov = Wedge(np.zeros(1), np.zeros(1), np.zeros(1), np.zeros(1), color='cyan', alpha=0.1)
+            fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
             if simulation:
                 actors_gt = []
                 actors_gt_label = []
@@ -575,7 +575,7 @@ def plot_results(filename=None):
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=8, ha='left', va='bottom')
         robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='r')
         scans, = ax.plot([], [], color='magenta', marker='.', markersize=3, linestyle='', label='scans')
-        fov = Wedge(np.zeros(1), np.zeros(1), np.zeros(1), np.zeros(1), color='cyan', alpha=0.1)
+        fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
         core_points_position, = ax.plot([], [], color='b', marker='.', linestyle='', label='actor')
 
         boundary_line = []
@@ -601,7 +601,7 @@ def plot_results(filename=None):
             robot_center[i, 0] = robot_config[i, 0] - b * math.cos(robot_config[i, 2])
             robot_center[i, 1] = robot_config[i, 1] - b * math.sin(robot_config[i, 2])
 
-        # init and update function for the world animation
+        # init and update function for the scans animation
         def init_scans():
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
