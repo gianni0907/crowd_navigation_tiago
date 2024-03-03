@@ -348,10 +348,9 @@ class NMPC:
             actors_state = np.zeros((self.hparams.n_clusters * self.actor_state_size))
             for j in range(self.n_clusters):
                 position = crowd_motion_prediction.motion_predictions[j].positions[k]
-                velocity = Velocity
                 velocity = Velocity(
-                    crowd_motion_prediction.motion_predictions[j].positions[1].x - crowd_motion_prediction.motion_predictions[j].positions[0].x,
-                    crowd_motion_prediction.motion_predictions[j].positions[1].y - crowd_motion_prediction.motion_predictions[j].positions[0].y
+                    (crowd_motion_prediction.motion_predictions[j].positions[1].x - crowd_motion_prediction.motion_predictions[j].positions[0].x) / self.dt ,
+                    (crowd_motion_prediction.motion_predictions[j].positions[1].y - crowd_motion_prediction.motion_predictions[j].positions[0].y) / self.dt
                 )
                 actors_state[j*self.actor_state_size + 0] = position.x
                 actors_state[j*self.actor_state_size + 1] = position.y
