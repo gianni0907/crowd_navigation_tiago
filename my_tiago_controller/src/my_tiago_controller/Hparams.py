@@ -6,7 +6,7 @@ class Hparams:
     log = True
     save_video = False
     if log:
-        filename = 'test'
+        filename = 'static_fake'
         controller_file = filename + '_controller.json'
         prediction_file = filename + '_predictor.json'
 
@@ -14,10 +14,10 @@ class Hparams:
     simulation = True
 
     # Specify whether to use laser scans data or ground truth
-    fake_sensing = False
+    fake_sensing = True
 
     # Specify whether to process measurement with KFs
-    use_kalman = True
+    use_kalman = False
 
     # Kinematic parameters
     base_radius = 0.27 # [m]
@@ -60,10 +60,10 @@ class Hparams:
     ### NOTE: define the points in a counter-clockwise order
     n_points = 4
     if simulation:
-        vertexes = np.array([[-6.0, 6.0],
-                             [-6.0, -6.0],
-                             [6.0, -6.0],
-                             [6.0, 6.0]])
+        vertexes = np.array([[-1.0, 2.0],
+                             [-1.0, -4.0],
+                             [5.0, -4.0],
+                             [5.0, 2.0]])
     else:
         vertexes = np.array([[-3.9, 0.0],
                              [-3.0, -2.4],
@@ -106,11 +106,11 @@ class Hparams:
 
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
-    ds_cbf = 0.4 # safety clearance
+    ds_cbf = 0.15 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_actors = 5 # number of actors
+    n_actors = 4 # number of actors
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
