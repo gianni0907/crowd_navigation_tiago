@@ -4,7 +4,7 @@ from my_tiago_controller.utils import *
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    save_video = False
+    save_video = True
     if log:
         filename = 'static_fake'
         controller_file = filename + '_controller.json'
@@ -14,10 +14,10 @@ class Hparams:
     simulation = True
 
     # Specify whether to use laser scans data or ground truth
-    fake_sensing = True
+    fake_sensing = False
 
     # Specify whether to process measurement with KFs
-    use_kalman = False
+    use_kalman = True
 
     # Kinematic parameters
     base_radius = 0.27 # [m]
@@ -27,7 +27,7 @@ class Hparams:
     relative_laser_pos = np.array([0.2012 - b, -0.0009])
 
     # NMPC parameters
-    controller_frequency = 18.0 # [Hz]
+    controller_frequency = 10.0 # [Hz]
     dt = 1.0 / controller_frequency # [s]
     N_horizon = 20
     unbounded = 1000
@@ -60,10 +60,10 @@ class Hparams:
     ### NOTE: define the points in a counter-clockwise order
     n_points = 4
     if simulation:
-        vertexes = np.array([[-1.0, 2.0],
-                             [-1.0, -4.0],
-                             [5.0, -4.0],
-                             [5.0, 2.0]])
+        vertexes = np.array([[-1.0, 11.0],
+                             [-1.0, -1.0],
+                             [11.0, -1.0],
+                             [11.0, 11.0]])
     else:
         vertexes = np.array([[-3.9, 0.0],
                              [-3.0, -2.4],
@@ -86,7 +86,7 @@ class Hparams:
     l_wheel_idx = 1
 
     # Tolerance on the position error
-    error_tol = 0.05
+    error_tol = 0.1
 
     # Cost function weights
     if simulation:
@@ -106,11 +106,11 @@ class Hparams:
 
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
-    ds_cbf = 0.15 # safety clearance
+    ds_cbf = 0.5 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_actors = 4 # number of actors
+    n_actors = 5 # number of actors
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:

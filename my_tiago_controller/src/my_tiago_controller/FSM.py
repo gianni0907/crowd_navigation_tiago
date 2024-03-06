@@ -13,6 +13,7 @@ class FSM():
 
     def __init__(self, hparams):
         self.hparams = hparams
+        self.dt = self.hparams.dt
         self.current_estimate = self.hparams.nullstate
         self.previous_estimate = self.hparams.nullstate
         self.innovation_threshold = self.hparams.innovation_threshold
@@ -68,7 +69,7 @@ class FSM():
                 estimate = self.kalman_f.X_k
                 self.next_state = FSMStates.ACTIVE
             else:
-                print(f"Reset by innovation={innovation}")
+                print(f"Reset by innovation={innovation}, {time}")
                 estimate = np.array([measure[0],
                                      measure[1],
                                      0.0,
@@ -84,8 +85,17 @@ class FSM():
     def hold_state(self, time, measure):
         if measure is not None:
             self.kalman_f.predict(time)
-            estimate, _ = self.kalman_f.correct(measure)
-            self.next_state = FSMStates.ACTIVE
+            _, innovation = self.kalman_f.correct(measure)
+            if np.linalg.norm(innovation) < self.innovation_threshold:
+                estimate = self.kalman_f.X_k
+                self.next_state = FSMStates.ACTIVE
+            else:
+                print(f"Reset by innovation={innovation}, {time}")
+                estimate = np.array([measure[0],
+                                     measure[1],
+                                     0.0,
+                                     0.0])
+                self.next_state = FSMStates.START
         else:
             if time <= self.last_valid_time + self.T_bar:
                 self.kalman_f.predict(time)
