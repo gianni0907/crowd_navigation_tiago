@@ -13,7 +13,6 @@ class FSM():
 
     def __init__(self, hparams):
         self.hparams = hparams
-        self.dt = self.hparams.dt
         self.current_estimate = self.hparams.nullstate
         self.previous_estimate = self.hparams.nullstate
         self.innovation_threshold = self.hparams.innovation_threshold

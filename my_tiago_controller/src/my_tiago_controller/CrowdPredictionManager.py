@@ -222,6 +222,7 @@ class CrowdPredictionManager:
                 self.scans_history = []
             self.core_points_history = []
             self.robot_state_history = []
+            self.core_points_prediction_history = []
             if self.hparams.use_kalman:
                 self.fsm_estimates_history = []
 
@@ -377,6 +378,7 @@ class CrowdPredictionManager:
         output_dict['robot_states'] = self.robot_state_history
         output_dict['cpu_time'] = self.time_history
         output_dict['core_points'] = self.core_points_history
+        output_dict['core_points_predictions'] = self.core_points_prediction_history
         if self.hparams.use_kalman:
             output_dict['fsm_estimates'] = self.fsm_estimates_history
         if not self.hparams.fake_sensing:
@@ -538,6 +540,14 @@ class CrowdPredictionManager:
                     start_time
                 ])
                 self.core_points_history.append(self.core_points.tolist())
+                predicted_trajectory = np.zeros((self.hparams.n_clusters, 2, self.hparams.N_horizon))
+                for i in range(self.hparams.n_clusters):
+                    motion_prediction = crowd_motion_prediction.motion_predictions[i]
+                    for j in range(self.hparams.N_horizon):
+                        predicted_trajectory[i, 0, j] = motion_prediction.positions[j].x
+                        predicted_trajectory[i, 1, j] = motion_prediction.positions[j].y
+                self.core_points_prediction_history.append(predicted_trajectory.tolist())
+
                 if self.hparams.use_kalman:
                     self.fsm_estimates_history.append(self.estimated_actors_state.tolist())
 

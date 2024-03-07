@@ -6,7 +6,7 @@ class Hparams:
     log = True
     save_video = True
     if log:
-        filename = 'static_fake'
+        filename = '2_test_final_5'
         controller_file = filename + '_controller.json'
         prediction_file = filename + '_predictor.json'
 
@@ -60,10 +60,10 @@ class Hparams:
     ### NOTE: define the points in a counter-clockwise order
     n_points = 4
     if simulation:
-        vertexes = np.array([[-1.0, 11.0],
-                             [-1.0, -1.0],
-                             [11.0, -1.0],
-                             [11.0, 11.0]])
+        vertexes = np.array([[-1.5, 11.5],
+                             [-1.5, -1.5],
+                             [11.5, -1.5],
+                             [11.5, 11.5]])
     else:
         vertexes = np.array([[-3.9, 0.0],
                              [-3.0, -2.4],
