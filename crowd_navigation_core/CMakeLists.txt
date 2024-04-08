@@ -1,23 +1,19 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(my_tiago_controller)
+project(crowd_navigation_core)
 
 find_package(catkin REQUIRED COMPONENTS
   rospy
-  geometry_msgs
-  nav_msgs
-  my_tiago_msgs
+  crowd_navigation_msgs
 )
 
 catkin_python_setup()
 
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES my_tiago_controller
+#  LIBRARIES crowd_navigation_core
   CATKIN_DEPENDS
     rospy
-    geometry_msgs
-    nav_msgs
-    my_tiago_msgs
+    crowd_navigation_msgs
 #  DEPENDS system_lib
 )
 include_directories(
@@ -26,10 +22,10 @@ include_directories(
 )
 
 catkin_install_python(PROGRAMS
-  scripts/nmpc_controller
+  scripts/motion_generation
+  scripts/crowd_prediction
   scripts/plotter
   scripts/send_desired_target_position
   scripts/send_actors_trajectory
-  scripts/crowd_prediction
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

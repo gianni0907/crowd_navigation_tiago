@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(my_tiago_msgs)
+project(crowd_navigation_msgs)
 
 find_package(catkin REQUIRED COMPONENTS
   message_generation
   geometry_msgs
   std_msgs
+  nav_msgs
 )
 
 ## Generate messages in the 'msg' folder
@@ -26,7 +27,8 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   geometry_msgs
-  std_msgs  # Or other packages containing msgs
+  std_msgs
+  nav_msgs
 )
 
 catkin_package(
@@ -36,5 +38,6 @@ catkin_package(
     message_runtime
     geometry_msgs
     std_msgs
+    nav_msgs
 #  DEPENDS system_lib
 )

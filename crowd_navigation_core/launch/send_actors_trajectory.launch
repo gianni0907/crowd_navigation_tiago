@@ -1,0 +1,5 @@
+<launch>
+  <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="send_actors_trajectory" name="send_actors_trajectory" output="screen" />
+  </group>
+</launch>

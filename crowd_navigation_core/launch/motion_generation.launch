@@ -1,0 +1,5 @@
+<launch>
+  <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="motion_generation" name="motion_generation" output="screen" />
+  </group>
+</launch>

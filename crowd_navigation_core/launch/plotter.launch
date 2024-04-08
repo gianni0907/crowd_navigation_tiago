@@ -1,0 +1,9 @@
+<launch>
+  <arg name="filename" default="test"/>
+
+  <param name="filename" value="$(arg filename)"/>
+
+  <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="plotter" name="plotter" output="screen" />
+  </group>
+</launch>

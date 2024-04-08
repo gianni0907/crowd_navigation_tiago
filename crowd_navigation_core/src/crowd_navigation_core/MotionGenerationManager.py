@@ -13,13 +13,13 @@ import sensor_msgs.msg
 
 from numpy.linalg import *
 
-from my_tiago_controller.Hparams import *
-from my_tiago_controller.NMPC import *
-from my_tiago_controller.utils import *
+from crowd_navigation_core.Hparams import *
+from crowd_navigation_core.NMPC import *
+from crowd_navigation_core.utils import *
 
-import my_tiago_msgs.srv
+import crowd_navigation_msgs.srv
 
-class ControllerManager:
+class MotionGenerationManager:
     def __init__(self):
         self.data_lock = threading.Lock()
 
@@ -72,7 +72,7 @@ class ControllerManager:
         # Setup ROS Service to set target position:
         self.set_desired_target_position_srv = rospy.Service(
             'SetDesiredTargetPosition',
-            my_tiago_msgs.srv.SetDesiredTargetPosition,
+            crowd_navigation_msgs.srv.SetDesiredTargetPosition,
             self.set_desired_target_position_request
         )
 
@@ -88,7 +88,7 @@ class ControllerManager:
         crowd_prediction_topic = 'crowd_motion_prediction'
         rospy.Subscriber(
             crowd_prediction_topic,
-            my_tiago_msgs.msg.CrowdMotionPredictionStamped,
+            crowd_navigation_msgs.msg.CrowdMotionPredictionStamped,
             self.crowd_motion_prediction_stamped_callback
         )
 
@@ -247,7 +247,7 @@ class ControllerManager:
     def set_desired_target_position_request(self, request):
         if self.status == Status.WAITING:
             rospy.loginfo("Cannot set desired target position, robot is not READY")
-            return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(False)
+            return crowd_navigation_msgs.srv.SetDesiredTargetPositionResponse(False)
         else:
             self.target_position[self.hparams.x_idx] = request.x
             self.target_position[self.hparams.y_idx] = request.y
@@ -256,7 +256,7 @@ class ControllerManager:
                 rospy.loginfo(f"Desired target position successfully set: {self.target_position}")
             elif self.status == Status.MOVING:
                 rospy.loginfo(f"Desired target position successfully changed: {self.target_position}")
-            return my_tiago_msgs.srv.SetDesiredTargetPositionResponse(True)
+            return crowd_navigation_msgs.srv.SetDesiredTargetPositionResponse(True)
         
     def log_values(self):
         output_dict = {}
@@ -309,7 +309,7 @@ class ControllerManager:
 
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
-        filename = self.hparams.controller_file
+        filename = self.hparams.generator_file
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         log_path = os.path.join(log_dir, filename)
@@ -457,14 +457,14 @@ class ControllerManager:
             rate.sleep()
 
 def main():
-    rospy.init_node('tiago_nmpc_controller', log_level=rospy.INFO)
-    rospy.loginfo('TIAGo control module [OK]')
+    rospy.init_node('tiago_motion_generation', log_level=rospy.INFO)
+    rospy.loginfo('TIAGo motion generation module [OK]')
 
-    # Build and run controller manager
-    controller_manager = ControllerManager()
-    prof_filename = '/tmp/controller.prof'
+    # Build and run motion generation manager
+    motion_generation_manager = MotionGenerationManager()
+    prof_filename = '/tmp/generator.prof'
     cProfile.runctx(
-        'controller_manager.run()',
+        'motion_generation_manager.run()',
         globals=globals(),
         locals=locals(),
         filename=prof_filename

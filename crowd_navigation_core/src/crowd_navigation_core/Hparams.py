@@ -1,5 +1,5 @@
 import numpy as np
-from my_tiago_controller.utils import *
+from crowd_navigation_core.utils import *
 
 class Hparams:
     # Specify whether to save data for plots and .json filename

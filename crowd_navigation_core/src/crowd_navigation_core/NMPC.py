@@ -6,9 +6,9 @@ from numpy.linalg import *
 
 import casadi
 
-from my_tiago_controller.Hparams import *
-from my_tiago_controller.utils import *
-from my_tiago_controller.KinematicModel import *
+from crowd_navigation_core.Hparams import *
+from crowd_navigation_core.utils import *
+from crowd_navigation_core.KinematicModel import *
 
 class NMPC:
     def __init__(self,

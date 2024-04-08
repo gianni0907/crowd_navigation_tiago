@@ -10,13 +10,13 @@ import cProfile
 from sklearn.cluster import DBSCAN
 from scipy.spatial.distance import cdist
 
-from my_tiago_controller.utils import *
-from my_tiago_controller.Hparams import *
-from my_tiago_controller.FSM import *
+from crowd_navigation_core.utils import *
+from crowd_navigation_core.Hparams import *
+from crowd_navigation_core.FSM import *
 
 import sensor_msgs.msg
-import my_tiago_msgs.srv
-import my_tiago_msgs.msg
+import crowd_navigation_msgs.srv
+import crowd_navigation_msgs.msg
 
 def polar2relative(scan, angle_min, angle_incr):
     relative_laser_pos = Hparams.relative_laser_pos
@@ -254,14 +254,14 @@ class CrowdPredictionManager:
         crowd_prediction_topic = 'crowd_motion_prediction'
         self.crowd_motion_prediction_publisher = rospy.Publisher(
             crowd_prediction_topic,
-            my_tiago_msgs.msg.CrowdMotionPredictionStamped,
+            crowd_navigation_msgs.msg.CrowdMotionPredictionStamped,
             queue_size=1
         )
 
         # Setup ROS Service to set actors trajectories:
         self.set_actors_trajectory_srv = rospy.Service(
             'SetActorsTrajectory',
-            my_tiago_msgs.srv.SetActorsTrajectory,
+            crowd_navigation_msgs.srv.SetActorsTrajectory,
             self.set_actors_trajectory_request
         )
 
@@ -286,21 +286,21 @@ class CrowdPredictionManager:
     def set_actors_trajectory_request(self, request):
         if not self.hparams.fake_sensing:
             rospy.loginfo("Cannot set synthetic trajectories, real sensing is active")
-            return my_tiago_msgs.srv.SetActorsTrajectoryResponse(False) 
+            return crowd_navigation_msgs.srv.SetActorsTrajectoryResponse(False) 
         else:
             if self.status == Status.WAITING:
                 rospy.loginfo("Cannot set actors trajectory, robot is not READY")
-                return my_tiago_msgs.srv.SetActorsTrajectoryResponse(False)            
+                return crowd_navigation_msgs.srv.SetActorsTrajectoryResponse(False)            
             elif self.status == Status.READY:
                 self.trajectories = CrowdMotionPrediction.from_message(request.trajectories)
                 self.status = Status.MOVING
                 self.current = 0
                 self.trajectory_length = len(self.trajectories.motion_predictions[0].positions)
                 rospy.loginfo("Actors trajectory successfully set")
-                return my_tiago_msgs.srv.SetActorsTrajectoryResponse(True)
+                return crowd_navigation_msgs.srv.SetActorsTrajectoryResponse(True)
             else:
                 rospy.loginfo("Cannot set actors trajectory, actors are already moving")
-                return my_tiago_msgs.srv.SetActorsTrajectoryResponse(False)
+                return crowd_navigation_msgs.srv.SetActorsTrajectoryResponse(False)
 
     def update_core_points(self):
             core_points = np.zeros((self.n_clusters, 2))

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
 
-import my_tiago_controller.SendDesiredTargetPosition as SendDesiredTargetPosition
+import crowd_navigation_core.SendDesiredTargetPosition as SendDesiredTargetPosition
 if __name__ == '__main__':
     SendDesiredTargetPosition.main()

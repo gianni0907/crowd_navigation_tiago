@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
 
-import my_tiago_controller.Plotter as Plotter
+import crowd_navigation_core.Plotter as Plotter
 if __name__ == '__main__':
     Plotter.main()

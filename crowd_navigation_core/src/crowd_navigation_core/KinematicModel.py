@@ -1,5 +1,5 @@
 import casadi
-from my_tiago_controller.Hparams import *
+from crowd_navigation_core.Hparams import *
 
 class KinematicModel:
     nq = 5

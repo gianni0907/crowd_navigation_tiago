@@ -8,8 +8,8 @@ import matplotlib.gridspec as gridspec
 from matplotlib.patches import Circle, Wedge
 from  matplotlib.animation import FuncAnimation
 
-from my_tiago_controller.utils import *
-from my_tiago_controller.Hparams import *
+from crowd_navigation_core.utils import *
+from crowd_navigation_core.Hparams import *
 
 def plot_results(filename=None):
     save_video = Hparams.save_video

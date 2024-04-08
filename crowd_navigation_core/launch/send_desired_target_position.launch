@@ -6,7 +6,7 @@
   <param name="x_des" value="$(arg x_des)" />
   <param name="y_des" value="$(arg y_des)" />
 
-  <group ns="my_tiago_controller">
-      <node pkg="my_tiago_controller" type="send_desired_target_position" name="send_desired_target_position" output="screen" />
+  <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="send_desired_target_position" name="send_desired_target_position" output="screen" />
   </group>
 </launch>

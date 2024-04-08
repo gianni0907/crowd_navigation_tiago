@@ -1,9 +1,9 @@
 import numpy as np
 import rospy
 
-from my_tiago_controller.Kalman import *
-from my_tiago_controller.Hparams import *
-from my_tiago_controller.utils import *
+from crowd_navigation_core.Kalman import *
+from crowd_navigation_core.Hparams import *
+from crowd_navigation_core.utils import *
 
 class FSM():
     '''

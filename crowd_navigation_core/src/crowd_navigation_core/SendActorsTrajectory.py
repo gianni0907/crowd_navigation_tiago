@@ -2,8 +2,8 @@ import numpy as np
 import rospy
 
 import my_tiago_msgs.srv
-from my_tiago_controller.Hparams import *
-from my_tiago_controller.utils import *
+from crowd_navigation_core.Hparams import *
+from crowd_navigation_core.utils import *
 
 def send_actors_trajectory(trajectories):
     rospy.wait_for_service('SetActorsTrajectory')

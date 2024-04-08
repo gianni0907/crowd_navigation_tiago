@@ -1,0 +1,5 @@
+<launch>
+  <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="crowd_prediction" name="crowd_prediction" output="screen" />
+  </group>
+</launch>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
 
-import my_tiago_controller.CrowdPredictionManager as CrowdPredictionManager
+import crowd_navigation_core.CrowdPredictionManager as CrowdPredictionManager
 if __name__ == '__main__':
     CrowdPredictionManager.main()
