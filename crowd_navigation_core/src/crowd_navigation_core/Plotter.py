@@ -30,7 +30,7 @@ def plot_results(filename=None):
     if not os.path.exists(animation_savedir):
         os.makedirs(animation_savedir)
 
-    log_controller = os.path.join(log_dir, filename + '_controller.json')
+    log_generator = os.path.join(log_dir, filename + '_generator.json')
     log_predictor = os.path.join(log_dir, filename + '_predictor.json')
     configuration_savepath = os.path.join(plots_savedir, filename + '_configuration.png')
     velocity_savepath = os.path.join(plots_savedir, filename + '_velocities.png')
@@ -40,61 +40,61 @@ def plot_results(filename=None):
     scans_savepath = os.path.join(animation_savedir, filename + '_scans.mp4')
     world_savepath = os.path.join(animation_savedir, filename + '_world.mp4')
 
-    # Open the controller log file
-    if os.path.exists(log_controller):
-        with open(log_controller, 'r') as file:
-            controller_dict = json.load(file)
+    # Open the generator log file
+    if os.path.exists(log_generator):
+        with open(log_generator, 'r') as file:
+            generator_dict = json.load(file)
     else:
         raise Exception(
             f"Specified file not found"
         )
 
-    # Extract the controller data
-    iteration_time = np.array(controller_dict['cpu_time'])
-    states = np.array(controller_dict['states'])
+    # Extract the generator data
+    iteration_time = np.array(generator_dict['cpu_time'])
+    states = np.array(generator_dict['states'])
     configurations = states[:, :3]
     robot_center = np.empty((configurations.shape[0], 2))
-    b = controller_dict['offset_b']
+    b = generator_dict['offset_b']
     for i in range(configurations.shape[0]):
         robot_center[i, 0] = configurations[i, 0] - b * math.cos(configurations[i, 2])
         robot_center[i, 1] = configurations[i, 1] - b * math.sin(configurations[i, 2])
     
     driving_velocities = states[:, 3]
     steering_velocities = states[:, 4]
-    robot_predictions = np.array(controller_dict['robot_predictions'])
-    inputs = np.array(controller_dict['wheels_accelerations'])
-    wheels_velocities = np.array(controller_dict['wheels_velocities'])
-    commanded_vel = np.array(controller_dict['commanded_velocities'])
-    targets = np.array(controller_dict['targets'])
+    robot_predictions = np.array(generator_dict['robot_predictions'])
+    inputs = np.array(generator_dict['wheels_accelerations'])
+    wheels_velocities = np.array(generator_dict['wheels_velocities'])
+    commanded_vel = np.array(generator_dict['commanded_velocities'])
+    targets = np.array(generator_dict['targets'])
     errors = targets[:, :2] - configurations[:, :2]
-    wheel_radius = controller_dict['wheel_radius']
-    wheel_separation = controller_dict['wheel_separation']
+    wheel_radius = generator_dict['wheel_radius']
+    wheel_separation = generator_dict['wheel_separation']
     driving_acc = wheel_radius * 0.5 * (inputs[:, 0] + inputs[:, 1])
     steering_acc = (wheel_radius / wheel_separation) * (inputs[:, 0] - inputs[:, 1])
 
-    n_edges = controller_dict['n_edges']
-    boundary_vertexes = np.array(controller_dict['boundary_vertexes'])
-    input_bounds = np.array(controller_dict['input_bounds'])
-    v_bounds = np.array(controller_dict['v_bounds'])
-    omega_bounds = np.array(controller_dict['omega_bounds'])
-    wheels_vel_bounds = np.array(controller_dict['wheels_vel_bounds'])
-    vdot_bounds = np.array(controller_dict['vdot_bounds'])
-    omegadot_bounds = np.array(controller_dict['omegadot_bounds'])
+    n_edges = generator_dict['n_edges']
+    boundary_vertexes = np.array(generator_dict['boundary_vertexes'])
+    input_bounds = np.array(generator_dict['input_bounds'])
+    v_bounds = np.array(generator_dict['v_bounds'])
+    omega_bounds = np.array(generator_dict['omega_bounds'])
+    wheels_vel_bounds = np.array(generator_dict['wheels_vel_bounds'])
+    vdot_bounds = np.array(generator_dict['vdot_bounds'])
+    omegadot_bounds = np.array(generator_dict['omegadot_bounds'])
 
-    n_actors = controller_dict['n_actors']
-    n_clusters = controller_dict['n_clusters']
-    simulation = controller_dict['simulation']
+    n_actors = generator_dict['n_actors']
+    n_clusters = generator_dict['n_clusters']
+    simulation = generator_dict['simulation']
     if n_actors > 0:
-        fake_sensing = controller_dict['fake_sensing']
-        use_kalman = controller_dict['use_kalman']
-        actors_predictions = np.array(controller_dict['actors_predictions'])
+        fake_sensing = generator_dict['fake_sensing']
+        use_kalman = generator_dict['use_kalman']
+        actors_predictions = np.array(generator_dict['actors_predictions'])
         if simulation and not fake_sensing:
-            actors_groundtruth = np.array(controller_dict['actors_gt'])
+            actors_groundtruth = np.array(generator_dict['actors_gt'])
         
-    rho_cbf = controller_dict['rho_cbf']
-    ds_cbf = controller_dict['ds_cbf']
-    frequency = controller_dict['frequency']
-    base_radius = controller_dict['base_radius']
+    rho_cbf = generator_dict['rho_cbf']
+    ds_cbf = generator_dict['ds_cbf']
+    frequency = generator_dict['frequency']
+    base_radius = generator_dict['base_radius']
     shooting_nodes = inputs.shape[0]
     t = inputs[:, 2]
 
@@ -126,11 +126,11 @@ def plot_results(filename=None):
             range_max = predictor_dict['range_max']
             laser_position = np.array(predictor_dict['laser_relative_pos'])       
 
-    # Figure elapsed time per iteration (controller and predictor if prediction module is present)
+    # Figure elapsed time per iteration (generator and predictor if prediction module is present)
     fig, axs = plt.subplots(2, 1, figsize=(16, 8))
     
     axs[0].step(iteration_time[:, 1], iteration_time[:, 0])
-    axs[0].set_title('Elapsed time per controller iteration')
+    axs[0].set_title('Elapsed time per generator iteration')
     axs[0].set_xlabel('$t \quad [s]$')
     axs[0].set_ylabel('$iteration \quad time \quad [s]$')
     axs[0].hlines(1 / frequency, iteration_time[:, 1], iteration_time[-1, 1], color='red', linestyle='--')

@@ -1,7 +1,7 @@
 import numpy as np
 import rospy
 
-import my_tiago_msgs.srv
+import crowd_navigation_msgs.srv
 
 def send_desired_target_position(desired_position):
     rospy.wait_for_service('SetDesiredTargetPosition')
@@ -9,7 +9,7 @@ def send_desired_target_position(desired_position):
     try:
         set_desired_target_position_service = rospy.ServiceProxy(
             'SetDesiredTargetPosition',
-            my_tiago_msgs.srv.SetDesiredTargetPosition
+            crowd_navigation_msgs.srv.SetDesiredTargetPosition
         )
 
         x = desired_position[0]

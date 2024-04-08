@@ -397,7 +397,7 @@ class CrowdPredictionManager:
         
         # log the data in a .json file
         log_dir = '/tmp/crowd_navigation_tiago/data'
-        filename = self.hparams.prediction_file
+        filename = self.hparams.predictor_file
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         log_path = os.path.join(log_dir, filename)

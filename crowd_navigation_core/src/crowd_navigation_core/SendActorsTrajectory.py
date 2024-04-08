@@ -1,7 +1,7 @@
 import numpy as np
 import rospy
 
-import my_tiago_msgs.srv
+import crowd_navigation_msgs.srv
 from crowd_navigation_core.Hparams import *
 from crowd_navigation_core.utils import *
 
@@ -11,7 +11,7 @@ def send_actors_trajectory(trajectories):
     try:
         set_actors_trajectory_service = rospy.ServiceProxy(
             'SetActorsTrajectory',
-            my_tiago_msgs.srv.SetActorsTrajectory
+            crowd_navigation_msgs.srv.SetActorsTrajectory
         )
 
         response = set_actors_trajectory_service(trajectories)

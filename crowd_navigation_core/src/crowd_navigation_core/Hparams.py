@@ -7,8 +7,8 @@ class Hparams:
     save_video = True
     if log:
         filename = 'test'
-        controller_file = filename + '_controller.json'
-        prediction_file = filename + '_predictor.json'
+        generator_file = filename + '_generator.json'
+        predictor_file = filename + '_predictor.json'
 
     # Specify whether to use gazebo (simulation = True) or real robot
     simulation = True
@@ -120,7 +120,7 @@ class Hparams:
     if n_actors > 0:
         nullpos = -30
         nullstate = np.array([nullpos, nullpos, 0.0, 0.0])
-        innovation_threshold = 0.5
+        innovation_threshold = 1
         max_pred_time = dt * N_horizon
         if simulation:
             offset = 20

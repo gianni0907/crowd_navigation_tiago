@@ -1,6 +1,6 @@
 import numpy as np
 import math
-import my_tiago_msgs.msg
+import crowd_navigation_msgs.msg
 import geometry_msgs.msg
 from enum import Enum
 
@@ -72,7 +72,7 @@ class MotionPrediction:
         for i in range(len(motion_prediction.positions)):
             positions_msg.append(Position.to_message(motion_prediction.positions[i]))
 
-        return my_tiago_msgs.msg.MotionPrediction(positions_msg)
+        return crowd_navigation_msgs.msg.MotionPrediction(positions_msg)
 
     @staticmethod
     def from_message(motion_prediction_msg):
@@ -94,7 +94,7 @@ class CrowdMotionPrediction:
     @staticmethod
     def to_message(crowd_motion_prediction):
         crowd_motion_prediction_msg = \
-            my_tiago_msgs.msg.CrowdMotionPrediction()
+            crowd_navigation_msgs.msg.CrowdMotionPrediction()
         for motion_prediction in crowd_motion_prediction.motion_predictions:
             crowd_motion_prediction_msg.motion_predictions.append(
                 MotionPrediction.to_message(motion_prediction)
@@ -120,7 +120,7 @@ class CrowdMotionPredictionStamped:
     @staticmethod
     def to_message(crowd_motion_prediction_stamped):
         crowd_motion_prediction_stamped_msg = \
-            my_tiago_msgs.msg.CrowdMotionPredictionStamped()
+            crowd_navigation_msgs.msg.CrowdMotionPredictionStamped()
         crowd_motion_prediction_stamped_msg.header.stamp = \
             crowd_motion_prediction_stamped.time
         crowd_motion_prediction_stamped_msg.header.frame_id = \

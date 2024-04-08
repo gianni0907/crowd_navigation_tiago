@@ -1,5 +1,4 @@
 import numpy as np
-import rospy
 
 from crowd_navigation_core.Kalman import *
 from crowd_navigation_core.Hparams import *
