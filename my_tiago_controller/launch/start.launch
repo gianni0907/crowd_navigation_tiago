@@ -1,8 +1,8 @@
 <launch>
-    <arg name="x_des" default="10.2" />
-    <arg name="y_des" default="10.3" />
+    <arg name="x_des" default="10.0" />
+    <arg name="y_des" default="10.0" />
     <arg name="delay1" default="30.0" />
-    <arg name="delay2" default="33.0"/>
+    <arg name="delay2" default="35.0"/>
 
     <param name="x_des" value="$(arg x_des)" />
     <param name="y_des" value="$(arg y_des)" />

@@ -6,7 +6,7 @@ class Hparams:
     log = True
     save_video = True
     if log:
-        filename = '2_test_final_5'
+        filename = 'test'
         controller_file = filename + '_controller.json'
         prediction_file = filename + '_predictor.json'
 
@@ -48,7 +48,7 @@ class Hparams:
     
     # Driving and steering velocity limits
     driving_vel_max = 1 * driving_bound_factor # [m/s]
-    driving_vel_min = - 0.2 # [m/s]
+    driving_vel_min = - 0.05 # [m/s]
     steering_vel_max = 1.05 * steering_bound_factor # [rad/s]
     steering_vel_max_neg = - steering_vel_max
     
@@ -95,7 +95,7 @@ class Hparams:
         omega_weight = 1e-5 # steering velocity weight
         u_weight = 1e1 # input weights
         terminal_factor_p = 8e0 # factor for the terminal position weights
-        terminal_factor_v = 8e1 # factor for the terminal velocities (v and omega) weights
+        terminal_factor_v = 3e2 # factor for the terminal velocities (v and omega) weights
     else:
         p_weight = 1e2 # position weights
         v_weight = 5e0 # driving velocity weight
