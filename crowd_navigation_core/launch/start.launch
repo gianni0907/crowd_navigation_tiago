@@ -7,7 +7,7 @@
     <param name="x_des" value="$(arg x_des)" />
     <param name="y_des" value="$(arg y_des)" />
 
-    <arg name="world"  default="labrob_5_humans"/>  <!-- empty, ... (see ../worlds) -->
+    <arg name="world"  default="labrob_7_humans"/>  <!-- empty, ... (see ../worlds) -->
     <!--deprecated argument, you should specify the parameters below-->
     <!-- They are described in tiago.urdf.xacro -->
     <arg name="robot"  default="titanium"/>
