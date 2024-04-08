@@ -1,13 +1,10 @@
-# Crowd Navigation with TIAGo
-## Project on-track
-Accomplished task: TIAGo robot navigation to a desired target position in an environment populated by `n_actors` moving actors (along linear paths).
-2 modules implemented:
--   crowd prediction module:
-    read the laser scan measurement and estimate their state (position and velocity) using `n_clusters` Kalman Filters (KFs), managed via as many Finite State Machines (FSMs). Then, propagate the estimated state over the whole control horizon assuming a constant velocity motion. Finally, send a message containing the predicted actors trajectory.
-    Note: if `fake_sensing=True` the module does not consider the laser scan measurement but a custom ground truth trajectory of the actors. 
+# Safe robot navigation in a crowd: Application to the TIAGo mobile manipulator
+## Project description
+The problem of collision-free mobile robot navigation in a crowded environment is addressed. The adopted sensor-based scheme consists of two main modules:
+-   crowd prediction module: acquires information via an on-board laser rangefinder and produces predictions of the surrounding agents' motion.  
+-   motion generation module: given a desired target position and the crowd predictions, runs a Nonlinear Model Predictive Control (NMPC) algorithm to generate a collision-free robot motion. Collision avoidance constraints are formulated via discrete-time Control Barrier Functions (CBFs).
 
--   controller module:
-    given a desired target position, at each iteration, read the crowd motion prediction message and the current robot configuration and run the NMPC. The extended kinematic model of the TIAGo robot is considered, with wheels angular accelerations as control inputs. The moving humans avoidance is realized introducing nonlinear constraints defined by discrete-time Control Barrier Functions (CBFs) in the NMPC model of the Acados solver. CBFs constraints are also adopted to ensure the permanence of the robot within a predefined region.
+For further details, the interested reader is referred to the thesis and/or the slides in the `media` folder.
 
 ## Usage
 To run the Gazebo simulation (if `simulation=True`):
