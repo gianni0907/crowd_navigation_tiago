@@ -552,6 +552,7 @@ def plot_results(filename=None):
     #                ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
     #                traj_line, robot_pred_line
 
+    # Figure to plot world animation
     world_fig = plt.figure(figsize=(8, 8))
     gs = gridspec.GridSpec(1,1)
     ax_wrld = plt.subplot(gs[0, 0])
@@ -626,8 +627,9 @@ def plot_results(filename=None):
                 ax_wrld.add_patch(actors_clearance[i])
                 actors_label[i].set_position(actor_position)
 
-            if simulation and not fake_sensing:
+            if not fake_sensing:
                 ax_wrld.add_patch(fov)
+            if simulation and not fake_sensing:
                 for i in range(n_actors):
                     actor_gt_position = actors_groundtruth[0, i, :]
                     actors_gt[i].set_offsets(actor_gt_position)
