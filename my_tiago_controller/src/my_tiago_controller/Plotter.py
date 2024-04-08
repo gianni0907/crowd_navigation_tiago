@@ -552,6 +552,7 @@ def plot_results(filename=None):
     #                ex_line, ey_line, wr_line, wl_line, alphar_line, alphal_line, \
     #                traj_line, robot_pred_line
 
+    # Figure to plot world animation
     world_fig = plt.figure(figsize=(8, 8))
     gs = gridspec.GridSpec(1,1)
     ax_wrld = plt.subplot(gs[0, 0])
