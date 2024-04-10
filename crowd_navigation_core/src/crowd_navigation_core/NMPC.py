@@ -120,6 +120,59 @@ class NMPC:
         next_state = np.matmul(F_complete, state)
         return next_state
 
+    def __psi_expr(self, r):
+        # Given a variable s, es = s - s_des 
+        ex = r[self.hparams.x_idx]
+        ey = r[self.hparams.y_idx]
+        # Note: desired theta is zero, thus etheta=theta
+        # In this application, the same holds also for v, omega and inputs
+        theta = r[self.hparams.theta_idx] 
+        v = r[self.hparams.v_idx] 
+        omega = r[self.hparams.omega_idx]
+        u = r[self.nq:]
+
+        # Set weights
+        p_weight = self.hparams.p_weight
+        v_weight = self.hparams.v_weight
+        omega_weight = self.hparams.omega_weight
+        u_weight = self.hparams.u_weight
+        h_weight = self.hparams.h_weight
+
+        # Define the running cost function
+        cost = p_weight * ex ** 2 + p_weight * ey ** 2 + \
+               v_weight * v ** 2 + omega_weight * omega ** 2 + \
+               u_weight * casadi.sumsqr(u) + \
+               h_weight * (ex * casadi.cos(theta) + ey * casadi.sin(theta))
+        return cost
+
+    def __psi_expr_e(self, r):
+        # Given a variable s, es = s - s_des 
+        ex = r[self.hparams.x_idx]
+        ey = r[self.hparams.y_idx]
+        # Note: desired theta is zero, thus etheta=theta
+        # In this application, the same holds also for v and omega
+        theta = r[self.hparams.theta_idx] 
+        v = r[self.hparams.v_idx] 
+        omega = r[self.hparams.omega_idx]
+
+        # Set weights
+        p_weight = self.hparams.p_weight * self.hparams.terminal_factor_p
+        v_weight = self.hparams.v_weight * self.hparams.terminal_factor_v
+        omega_weight = self.hparams.omega_weight
+        h_weight = self.hparams.h_weight
+
+        # Define the terminal cost function
+        cost = p_weight * ex ** 2 + p_weight * ey ** 2 + \
+               v_weight * v ** 2 + omega_weight * omega ** 2 + \
+               h_weight * (ex * casadi.cos(theta) + ey * casadi.sin(theta))
+        return cost
+
+    def __y_expr(self, q, u):
+        return casadi.vertcat(q, u)
+    
+    def __y_expr_e(self, q):
+        return q
+
     # Systems dynamics:
     def __f(self, q, u):
         xdot = casadi.SX.zeros(self.nq)
@@ -189,6 +242,8 @@ class NMPC:
         q = casadi.SX.sym('q', self.nq)
         qdot = casadi.SX.sym('qdot', self.nq)
         u = casadi.SX.sym('u', self.nu)
+        r = casadi.SX.sym('r', self.nq + self.nu)
+        r_e = casadi.SX.sym('r_e', self.nq)
         p = casadi.SX.sym('p', self.n_clusters * self.actor_state_size)
         f_expl = self.__f(q, u)
         f_impl = qdot - f_expl
@@ -197,6 +252,17 @@ class NMPC:
         acados_model = AcadosModel()
         acados_model.name = 'tiago_extended_model'
 
+        # Cost function:
+        acados_model.cost_psi_expr = self.__psi_expr(r)
+        acados_model.cost_psi_expr_0 = self.__psi_expr(r)
+        acados_model.cost_psi_expr_e = self.__psi_expr_e(r_e)
+        acados_model.cost_r_in_psi_expr = r
+        acados_model.cost_r_in_psi_expr_0 = r
+        acados_model.cost_r_in_psi_expr_e = r_e
+        acados_model.cost_y_expr = self.__y_expr(q, u)
+        acados_model.cost_y_expr_0 = self.__y_expr(q, u)
+        acados_model.cost_y_expr_e = self.__y_expr_e(q)
+        
         # System dynamics:
         acados_model.f_impl_expr = f_impl
         acados_model.f_expl_expr = f_expl
@@ -231,30 +297,11 @@ class NMPC:
     def __create_acados_cost(self) -> AcadosOcpCost:
         acados_cost = AcadosOcpCost()
 
-        # Set wheighting matrices
-        Q_mat = np.diag([self.hparams.p_weight, self.hparams.p_weight, 0.0]) # [x, y, theta]
-        R_mat = np.diag([self.hparams.v_weight, self.hparams.omega_weight]) # [v, omega]
-        S_mat = np.diag([self.hparams.u_weight, self.hparams.u_weight]) # [alphar, alphal]
-
-        acados_cost.cost_type   = 'LINEAR_LS'
-        acados_cost.cost_type_e = 'LINEAR_LS'
+        acados_cost.cost_type   = 'CONVEX_OVER_NONLINEAR'
+        acados_cost.cost_type_e = 'CONVEX_OVER_NONLINEAR'
         
         ny = self.nq + self.nu
         ny_e = self.nq
-
-        acados_cost.W_e = scipy.linalg.block_diag(self.hparams.terminal_factor_p * Q_mat,
-                                                  self.hparams.terminal_factor_v * R_mat)
-        acados_cost.W = scipy.linalg.block_diag(Q_mat, R_mat, S_mat)
-
-        Vx = np.zeros((ny, self.nq))
-        Vx[:self.nq, :self.nq] = np.eye(self.nq)
-        acados_cost.Vx = Vx
-
-        Vu = np.zeros((ny, self.nu))
-        Vu[self.nq : ny, 0 : self.nu] = np.eye(self.nu)
-        acados_cost.Vu = Vu
-
-        acados_cost.Vx_e = np.eye(ny_e)
 
         acados_cost.yref = np.zeros((ny,))
         acados_cost.yref_e = np.zeros((ny_e,))
