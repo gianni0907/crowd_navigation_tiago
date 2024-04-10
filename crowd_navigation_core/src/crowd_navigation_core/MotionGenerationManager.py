@@ -121,19 +121,6 @@ class MotionGenerationManager:
         # Initialize the NMPC controller
         self.nmpc_controller.init(self.state)
 
-    def saturate_velocities(self, v, omega):
-        if v > 0.95 * self.hparams.driving_vel_max:
-            v = 0.95 * self.hparams.driving_vel_max
-        elif v < 0.95 * self.hparams.driving_vel_min:
-            v = 0.95 * self.hparams.driving_vel_min
-
-        if omega > 0.95 * self.hparams.steering_vel_max:
-            omega = 0.95 * self.hparams.steering_vel_max
-        elif omega < 0.95 * self.hparams.steering_vel_max_neg:
-            omega = 0.95 * self.hparams.steering_vel_max_neg
-
-        return v, omega
-
     def publish_command(self):
         """
         The NMPC solver returns wheels accelerations as control input
@@ -154,9 +141,8 @@ class MotionGenerationManager:
             omega_dot = (wheel_radius / wheel_separation) * (alpha_r - alpha_l)
             
             # Integrate to get the new wheels velocity
-            self.v = self.state.v + v_dot * dt
-            self.omega = self.state.omega + omega_dot * dt
-            # v, omega = self.saturate_velocities(v, omega)
+            self.v = self.v + v_dot * dt
+            self.omega = self.omega + omega_dot * dt
 
         # Create a twist ROS message:
         cmd_vel_msg = geometry_msgs.msg.Twist()
