@@ -231,7 +231,7 @@ class NMPC:
     def __create_acados_cost(self) -> AcadosOcpCost:
         acados_cost = AcadosOcpCost()
 
-        # Set wheighting matrices
+        # Set weighting matrices
         Q_mat = np.diag([self.hparams.p_weight, self.hparams.p_weight, 0.0]) # [x, y, theta]
         R_mat = np.diag([self.hparams.v_weight, self.hparams.omega_weight]) # [v, omega]
         S_mat = np.diag([self.hparams.u_weight, self.hparams.u_weight]) # [alphar, alphal]
