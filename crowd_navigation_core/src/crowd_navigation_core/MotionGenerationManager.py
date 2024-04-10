@@ -43,6 +43,8 @@ class MotionGenerationManager:
         self.nmpc_controller = NMPC(self.hparams)
 
         self.state = State(0.0, 0.0, 0.0, 0.0, 0.0)
+        self.v = 0.0
+        self.omega = 0.0
         self.wheels_vel = np.zeros(2) # [w_r, w_l]
         if self.hparams.simulation and not self.hparams.fake_sensing:
             self.actors_configuration = np.zeros(self.hparams.n_actors, dtype=Configuration)
@@ -135,11 +137,11 @@ class MotionGenerationManager:
     def publish_command(self):
         """
         The NMPC solver returns wheels accelerations as control input
-        Transform it into the avilable robot control input: driving and steering velocities
+        Map it into the admissible robot commands: driving and steering velocities
         """
         if all(input == 0.0 for input in self.control_input):
-            v = 0.0
-            omega = 0.0
+            self.v = 0.0
+            self.omega = 0.0
         else:
             dt = 1 / self.hparams.controller_frequency
             alpha_r = self.control_input[self.hparams.r_wheel_idx]
@@ -152,22 +154,22 @@ class MotionGenerationManager:
             omega_dot = (wheel_radius / wheel_separation) * (alpha_r - alpha_l)
             
             # Integrate to get the new wheels velocity
-            v = self.state.v + v_dot * dt
-            omega = self.state.omega + omega_dot * dt
+            self.v = self.state.v + v_dot * dt
+            self.omega = self.state.omega + omega_dot * dt
             # v, omega = self.saturate_velocities(v, omega)
 
         # Create a twist ROS message:
         cmd_vel_msg = geometry_msgs.msg.Twist()
-        cmd_vel_msg.linear.x = v
+        cmd_vel_msg.linear.x = self.v
         cmd_vel_msg.linear.y = 0.0
         cmd_vel_msg.linear.z = 0.0
         cmd_vel_msg.angular.x = 0.0
         cmd_vel_msg.angular.y = 0.0
-        cmd_vel_msg.angular.z = omega
+        cmd_vel_msg.angular.z = self.omega
 
         # Publish wheel velocity commands
         self.cmd_vel_publisher.publish(cmd_vel_msg)
-        return v, omega
+        return self.v, self.omega
     
     def joint_states_callback(self, msg):
         self.wheels_vel = np.array([msg.velocity[13], msg.velocity[12]])

@@ -48,7 +48,7 @@ class Hparams:
     
     # Driving and steering velocity limits
     driving_vel_max = 1 * driving_bound_factor # [m/s]
-    driving_vel_min = - 0.05 # [m/s]
+    driving_vel_min = - 0.2 # [m/s]
     steering_vel_max = 1.05 * steering_bound_factor # [rad/s]
     steering_vel_max_neg = - steering_vel_max
     
