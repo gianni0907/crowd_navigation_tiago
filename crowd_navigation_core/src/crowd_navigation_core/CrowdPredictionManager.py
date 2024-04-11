@@ -449,79 +449,102 @@ class CrowdPredictionManager:
             crowd_motion_prediction = CrowdMotionPrediction()
             
             # Update the actors position (based on fake or real sensing)
-            self.update_core_points()
-
-            if self.hparams.use_kalman:
-                # Perform data association
-                # predict next positions according to fsms
-                next_predicted_positions = np.zeros((self.hparams.n_clusters, 2))
-
-                for (i, fsm) in enumerate(fsms):
-                    fsm_next_state = fsm.next_state
-                    if self.hparams.log:
-                        self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
-                                                                         FSMStates.print(fsm_next_state),
-                                                                         start_time])
-                    if fsm_next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
-                        predicted_state = self.propagate_state(fsm.current_estimate, 1)[0]
-                    elif fsm_next_state is FSMStates.START:
-                        predicted_state = fsm.current_estimate
+            if self.hparams.fake_sensing:
+                for i in range(self.n_clusters):
+                    positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
+                    # Create the prediction within the horizon
+                    if self.current + self.N_horizon <= self.trajectory_length:
+                        positions = self.trajectories.motion_predictions[i].positions[self.current : self.current + self.N_horizon]
+                    elif self.current < self.trajectory_length:
+                        positions[:self.trajectory_length - self.current] = \
+                            self.trajectories.motion_predictions[i].positions[self.current : self.trajectory_length]
+                        for j in range(self.N_horizon - self.trajectory_length + self.current):
+                            positions[self.trajectory_length - self.current + j] = \
+                                self.trajectories.motion_predictions[i].positions[-1]
                     else:
-                        predicted_state = self.hparams.nullstate
-                    next_predicted_positions[i] = predicted_state[:2]
-                
-                fsm_indices = data_association(next_predicted_positions, self.core_points)
-                self.associations.append([fsm_indices.tolist(), start_time])
+                        for j in range(self.N_horizon):
+                            positions[j] = self.trajectories.motion_predictions[i].positions[-1]
 
-                # update each fsm based on the associations
-                for (i, fsm) in enumerate(fsms):
-                    associated = False
-                    for (j,fsm_idx) in enumerate(fsm_indices):
-                        if fsm_idx == i:
-                            measure = self.core_points[j]
-                            fsm.update(start_time, measure)
-                            associated = True
-                            break
-                    if associated == False:
-                        for (k, fsm_idx) in enumerate(fsm_indices):
-                            if fsm_idx == -1:
-                                measure = self.core_points[k]
+                    crowd_motion_prediction.append(MotionPrediction(positions))
+                    
+                self.current += 1
+                if self.current == self.trajectory_length:
+                    self.current = 0
+
+            else:
+                self.update_core_points()
+
+                if self.hparams.use_kalman:
+                    # Perform data association
+                    # predict next positions according to fsms
+                    next_predicted_positions = np.zeros((self.hparams.n_clusters, 2))
+
+                    for (i, fsm) in enumerate(fsms):
+                        fsm_next_state = fsm.next_state
+                        if self.hparams.log:
+                            self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
+                                                                            FSMStates.print(fsm_next_state),
+                                                                            start_time])
+                        if fsm_next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
+                            predicted_state = self.propagate_state(fsm.current_estimate, 1)[0]
+                        elif fsm_next_state is FSMStates.START:
+                            predicted_state = fsm.current_estimate
+                        else:
+                            predicted_state = self.hparams.nullstate
+                        next_predicted_positions[i] = predicted_state[:2]
+                    
+                    fsm_indices = data_association(next_predicted_positions, self.core_points)
+                    self.associations.append([fsm_indices.tolist(), start_time])
+
+                    # update each fsm based on the associations
+                    for (i, fsm) in enumerate(fsms):
+                        associated = False
+                        for (j,fsm_idx) in enumerate(fsm_indices):
+                            if fsm_idx == i:
+                                measure = self.core_points[j]
                                 fsm.update(start_time, measure)
-                                fsm_indices[k] = i
                                 associated = True
                                 break
-                    if associated == False:
-                        measure = None
-                        fsm.update(start_time, measure)
+                        if associated == False:
+                            for (k, fsm_idx) in enumerate(fsm_indices):
+                                if fsm_idx == -1:
+                                    measure = self.core_points[k]
+                                    fsm.update(start_time, measure)
+                                    fsm_indices[k] = i
+                                    associated = True
+                                    break
+                        if associated == False:
+                            measure = None
+                            fsm.update(start_time, measure)
 
-                    current_estimate = fsm.current_estimate
-                    self.estimated_actors_state[i] = current_estimate
-                    predictions = self.propagate_state(current_estimate, self.N_horizon)
-                    predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
-                    for j in range(self.N_horizon):
-                        predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
+                        current_estimate = fsm.current_estimate
+                        self.estimated_actors_state[i] = current_estimate
+                        predictions = self.propagate_state(current_estimate, self.N_horizon)
+                        predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
+                        for j in range(self.N_horizon):
+                            predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
+                        
+                        crowd_motion_prediction.append(
+                                MotionPrediction(predicted_positions)
+                        )
+                else:
+                    for i in range(self.hparams.n_clusters):
+                        if i < self.core_points.shape[0]:
+                            current_estimate = np.array([self.core_points[i, 0],
+                                                        self.core_points[i, 1],
+                                                        0.0,
+                                                        0.0])
+                        else:
+                            current_estimate = self.hparams.nullstate
+
+                        predictions = self.propagate_state(current_estimate, self.N_horizon)
+                        predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
+                        for j in range(self.N_horizon):
+                            predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
                     
-                    crowd_motion_prediction.append(
+                        crowd_motion_prediction.append(
                             MotionPrediction(predicted_positions)
-                    )
-            else:
-                for i in range(self.hparams.n_clusters):
-                    if i < self.core_points.shape[0]:
-                        current_estimate = np.array([self.core_points[i, 0],
-                                                     self.core_points[i, 1],
-                                                     0.0,
-                                                     0.0])
-                    else:
-                        current_estimate = self.hparams.nullstate
-
-                    predictions = self.propagate_state(current_estimate, self.N_horizon)
-                    predicted_positions = [Position(0.0, 0.0) for _ in range(self.N_horizon)]
-                    for j in range(self.N_horizon):
-                        predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
-                
-                    crowd_motion_prediction.append(
-                        MotionPrediction(predicted_positions)
-                    )
+                        )
 
             crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(start_time),
                                                                            'map',

@@ -16,8 +16,11 @@ class Hparams:
     # Specify whether to use laser scans data or ground truth
     fake_sensing = False
 
-    # Specify whether to process measurement with KFs
-    use_kalman = True
+    # Specify whether to process measurement with KFs (only if fake_sensing = False)
+    if not fake_sensing:
+        use_kalman = True # Set to False to not use KFs
+    else:
+        use_kalman = False
 
     # Kinematic parameters
     base_radius = 0.27 # [m]
@@ -110,7 +113,7 @@ class Hparams:
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_actors = 5 # number of actors
+    n_actors = 7 # number of actors
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
