@@ -34,15 +34,17 @@ def main():
         rospy.logwarn("No actors")
         return
     
-    positions_i = np.array([Position(1.5, 0.1),
-                            Position(1.7, -1.1),
-                            Position(3.0, 0.0),
-                            Position(3.4, -1.0)]) # initial position of the actors
-    positions_f = np.array([Position(1.5, 0.1),
-                            Position(1.7, -1.1),
-                            Position(3.0, 0.0),
-                            Position(3.4, -1.0)]) # final position of the actors
-    n_steps = 150 # number of steps to go from init to final positions (and vice-versa)
+    positions_i = np.array([Position(7.4, 10.5),
+                            Position(9.2, -3.0),
+                            Position(-3.5, 7.4),
+                            Position(-1.0, 3.0),
+                            Position(-1.0, 4.5)]) # initial position of the actors
+    positions_f = np.array([Position(7.4, -0.5),
+                            Position(9.2, 11.5),
+                            Position(10.5, 7.4),
+                            Position(10.0, 3.0),
+                            Position(11.0, 4.5)]) # final position of the actors
+    n_steps = 125 # number of steps to go from init to final positions (and vice-versa)
     trajectories = CrowdMotionPrediction()
 
     for i in range(n_actors):
@@ -50,7 +52,7 @@ def main():
         velocities = [Velocity(0.0, 0.0) for _ in range(n_steps * 2)]
         positions[:n_steps], velocities[:n_steps] = linear_trajectory(positions_i[i], positions_f[i], n_steps)
         positions[n_steps:], velocities[n_steps:] = linear_trajectory(positions_f[i], positions_i[i], n_steps)
-        trajectories.append(MotionPrediction(positions, velocities))
+        trajectories.append(MotionPrediction(positions))
     
     # Service request:
     rospy.loginfo("Sending actors trajectories")

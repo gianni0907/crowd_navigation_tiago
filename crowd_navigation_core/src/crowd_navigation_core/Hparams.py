@@ -16,8 +16,11 @@ class Hparams:
     # Specify whether to use laser scans data or ground truth
     fake_sensing = False
 
-    # Specify whether to process measurement with KFs
-    use_kalman = True
+    # Specify whether to process measurement with KFs (only if fake_sensing = False)
+    if not fake_sensing:
+        use_kalman = True # Set to False to not use KFs
+    else:
+        use_kalman = False
 
     # Kinematic parameters
     base_radius = 0.27 # [m]
