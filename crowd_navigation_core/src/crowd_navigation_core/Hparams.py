@@ -6,7 +6,7 @@ class Hparams:
     log = True
     save_video = True
     if log:
-        filename = 'heading_crowd'
+        filename = 'test'
         generator_file = filename + '_generator.json'
         predictor_file = filename + '_predictor.json'
 
@@ -63,6 +63,10 @@ class Hparams:
     ### NOTE: define the points in a counter-clockwise order
     n_points = 4
     if simulation:
+        # vertexes = np.array([[-6, 6],
+        #                      [-6, -6],
+        #                      [6, -6],
+        #                      [6, 6]])
         vertexes = np.array([[-1.5, 11.5],
                              [-1.5, -1.5],
                              [11.5, -1.5],
@@ -115,7 +119,7 @@ class Hparams:
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_actors = 7 # number of actors
+    n_actors = 5 # number of actors
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:

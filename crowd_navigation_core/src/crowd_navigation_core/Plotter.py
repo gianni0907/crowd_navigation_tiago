@@ -732,7 +732,7 @@ def plot_results(filename=None):
         core_points_position = []
         core_points_label = []        
         for i in range(n_clusters):
-            core_points_position.append(ax.scatter([], [], marker='.', label='KF-${}$'.format(i+1), color='b'))
+            core_points_position.append(ax.scatter([], [], marker='.', label='KF-{}'.format(i+1), color='b'))
             core_points_label.append(ax.text(np.nan, np.nan, core_points_position[i].get_label(), fontsize=16, ha='left', va='bottom'))
             pt_pred_line, = ax.plot([], [], color='orange', label='actor prediction')
             core_pred_line.append(pt_pred_line)
@@ -772,7 +772,7 @@ def plot_results(filename=None):
             for i in range(n_clusters):
                 core_point_position = core_points_predictions[0, i, :, 0]
                 core_points_position[i].set_offsets(core_point_position)
-                core_points_label[i].set_position(core_points_position)
+                core_points_label[i].set_position(core_point_position)
         
             return robot, fov, robot_label, core_points_position, core_points_label
         
@@ -799,7 +799,6 @@ def plot_results(filename=None):
                 core_points_position[i].set_offsets(core_point_position)
                 core_points_label[i].set_position(core_point_position)
                 core_pred_line[i].set_data(core_point_prediction[0, :], core_point_prediction[1, :])
-
 
             if current_scans.shape[0] > 0:
                 scans.set_data(current_scans[:, 0], current_scans[:, 1])

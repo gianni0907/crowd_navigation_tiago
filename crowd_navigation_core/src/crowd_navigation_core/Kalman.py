@@ -17,7 +17,7 @@ class Kalman:
         self.X_k = np.array(init_state).T
         self.t_start = init_time
         
-        self.Pk = np.zeros(4)
+        self.Pk = np.eye(4)
         var_v = 0.01
         self.Vk = np.eye(4) * var_v
         var_w = 0.01

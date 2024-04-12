@@ -113,7 +113,7 @@ def data_clustering(absolute_scans, tiago_state):
 
     return core_points
 
-def data_association(estimates, core_points):
+def data_association(estimates, cov_mat, core_points):
     n_measurements = core_points.shape[0]
     n_fsms = estimates.shape[0]
 
@@ -130,8 +130,9 @@ def data_association(estimates, core_points):
     if n_fsms == 0 or n_measurements == 0:
         return fsm_indices
 
-    D = cdist(core_points, estimates) # [n_measurements x n_fsms] association matrix
-
+    info_mat = np.linalg.inv(cov_mat)
+    D = cdist(core_points, estimates, 'mahalanobis', VI=info_mat) # [n_measurements x n_fsms] association matrix
+    print(D)
     for j in range(n_measurements):
         # compute row minimum
         d_ji = np.min(D[j, :])
@@ -478,6 +479,7 @@ class CrowdPredictionManager:
                     # Perform data association
                     # predict next positions according to fsms
                     next_predicted_positions = np.zeros((self.hparams.n_clusters, 2))
+                    next_positions_cov = np.zeros((self.hparams.n_clusters, 2, 2))
 
                     for (i, fsm) in enumerate(fsms):
                         fsm_next_state = fsm.next_state
@@ -487,13 +489,18 @@ class CrowdPredictionManager:
                                                                             start_time])
                         if fsm_next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
                             predicted_state = self.propagate_state(fsm.current_estimate, 1)[0]
+                            predicted_cov = fsm.kalman_f.Pk
                         elif fsm_next_state is FSMStates.START:
                             predicted_state = fsm.current_estimate
+                            predicted_cov = np.eye(4)
                         else:
                             predicted_state = self.hparams.nullstate
+                            predicted_cov = np.eye(4)
+
                         next_predicted_positions[i] = predicted_state[:2]
-                    
-                    fsm_indices = data_association(next_predicted_positions, self.core_points)
+                        next_positions_cov[i] = predicted_cov[:2, :2]
+
+                    fsm_indices = data_association(next_predicted_positions, next_positions_cov, self.core_points)
                     self.associations.append([fsm_indices.tolist(), start_time])
 
                     # update each fsm based on the associations
