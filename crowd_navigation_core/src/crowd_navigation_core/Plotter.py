@@ -772,7 +772,7 @@ def plot_results(filename=None):
             for i in range(n_clusters):
                 core_point_position = core_points_predictions[0, i, :, 0]
                 core_points_position[i].set_offsets(core_point_position)
-                core_points_label[i].set_position(core_points_position)
+                core_points_label[i].set_position(core_point_position)
         
             return robot, fov, robot_label, core_points_position, core_points_label
         
