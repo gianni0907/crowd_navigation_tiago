@@ -113,14 +113,14 @@ def data_clustering(absolute_scans, tiago_state):
 
     return core_points
 
-def data_association(estimates, cov_mat, core_points):
-    n_measurements = core_points.shape[0]
-    n_fsms = estimates.shape[0]
+def data_association(predictions, covariances, measurements):
+    n_measurements = measurements.shape[0]
+    n_fsms = predictions.shape[0]
 
     # Heuristics to consider for the associations: gating, best friend, lonely best friend
     # heuristics param
-    gating_tau = 1 # maximum distance threshold
-    gamma_threshold = 1e-3 # lonely best friends threshold
+    gating_tau = 10 # maximum Mahalanobis distance threshold
+    gamma_threshold = 1e-1 # lonely best friends threshold
     # consider 2 arrays of dimension [n_measurements] containing the following association info:
     #   fsm indices
     #   association value (euclidean distance)
@@ -130,13 +130,17 @@ def data_association(estimates, cov_mat, core_points):
     if n_fsms == 0 or n_measurements == 0:
         return fsm_indices
 
-    info_mat = np.linalg.inv(cov_mat)
-    D = cdist(core_points, estimates, 'mahalanobis', VI=info_mat) # [n_measurements x n_fsms] association matrix
-    print(D)
+    A_mat = np.zeros((n_measurements, n_fsms)) # [n_measurements x n_fsms] Association matrix
+    for i in range(n_fsms):
+        info_mat = np.linalg.inv(covariances[i])
+        for j in range(n_measurements):
+            diff = measurements[j] - predictions[i]
+            A_mat[j, i] = np.sqrt(diff @ info_mat @ diff.T)
+
     for j in range(n_measurements):
         # compute row minimum
-        d_ji = np.min(D[j, :])
-        min_idx = np.argmin(D[j, :])
+        d_ji = np.min(A_mat[j, :])
+        min_idx = np.argmin(A_mat[j, :])
 
         # gating
         if (d_ji < gating_tau):
@@ -152,7 +156,7 @@ def data_association(estimates, cov_mat, core_points):
         d_ji = distances[j]
         if proposed_est != -1:
             # compute column minimum
-            col_min = np.min(D[:, proposed_est])
+            col_min = np.min(A_mat[:, proposed_est])
 
             if d_ji != col_min:
                 fsm_indices[j] = -1
@@ -168,11 +172,11 @@ def data_association(estimates, cov_mat, core_points):
                 continue
 
             # take second best value of the row
-            ordered_row = np.sort(D[j, :])
+            ordered_row = np.sort(A_mat[j, :])
             second_min_row = ordered_row[1]
 
             # take second best value of the col
-            ordered_col = np.sort(D[:, proposed_est])
+            ordered_col = np.sort(A_mat[:, proposed_est])
             second_min_col = ordered_col[1]
 
             # check association ambiguity
@@ -492,10 +496,10 @@ class CrowdPredictionManager:
                             predicted_cov = fsm.kalman_f.Pk
                         elif fsm_next_state is FSMStates.START:
                             predicted_state = fsm.current_estimate
-                            predicted_cov = np.eye(4)
+                            predicted_cov = np.eye(4) * 1e-2
                         else:
                             predicted_state = self.hparams.nullstate
-                            predicted_cov = np.eye(4)
+                            predicted_cov = np.eye(4) * 1e-2
 
                         next_predicted_positions[i] = predicted_state[:2]
                         next_positions_cov[i] = predicted_cov[:2, :2]

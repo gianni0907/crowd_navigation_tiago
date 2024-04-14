@@ -50,7 +50,7 @@ def plot_results(filename=None):
         )
 
     # Extract the generator data
-    iteration_time = np.array(generator_dict['cpu_time'])
+    generator_time = np.array(generator_dict['cpu_time'])
     states = np.array(generator_dict['states'])
     configurations = states[:, :3]
     robot_center = np.empty((configurations.shape[0], 2))
@@ -129,12 +129,12 @@ def plot_results(filename=None):
     # Figure elapsed time per iteration (generator and predictor if prediction module is present)
     fig, axs = plt.subplots(2, 1, figsize=(16, 8))
     
-    axs[0].step(iteration_time[:, 1], iteration_time[:, 0])
+    axs[0].step(generator_time[:, 1], generator_time[:, 0])
     axs[0].set_title('Elapsed time per generator iteration')
     axs[0].set_xlabel('$t \quad [s]$')
     axs[0].set_ylabel('$iteration \quad time \quad [s]$')
-    axs[0].hlines(1 / frequency, iteration_time[:, 1], iteration_time[-1, 1], color='red', linestyle='--')
-    axs[0].set_xlim([iteration_time[0, 1], iteration_time[-1, 1]])
+    axs[0].hlines(1 / frequency, generator_time[:, 1], generator_time[-1, 1], color='red', linestyle='--')
+    axs[0].set_xlim([generator_time[0, 1], generator_time[-1, 1]])
     axs[0].grid(True)
 
     if n_actors > 0:
@@ -651,6 +651,7 @@ def plot_results(filename=None):
         if frame == shooting_nodes - 1:
             world_animation.event_source.stop()
 
+        ax_wrld.set_title(f'TIAGo World, t={generator_time[frame, 1]}')
         robot_prediction = robot_predictions[frame, :, :]
         current_target = targets[frame, :]
         traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
@@ -780,6 +781,7 @@ def plot_results(filename=None):
             if frame == shooting_nodes - 1:
                 scans_animation.event_source.stop()
 
+            ax.set_title(f'TIAGo Scans, t={predictor_time[frame, 1]}')
             robot.set_center(robot_center[frame])
             controlled_pt.set_offsets(robot_config[frame, :2])
             robot_label.set_position(robot_center[frame])

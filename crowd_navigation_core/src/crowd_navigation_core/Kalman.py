@@ -6,7 +6,7 @@ class Kalman:
     Vk: covariance matrix of the state
     Wk: covariance matrix of the output
     Pk: corrected covariance
-    X_k: state of the actor at k-th instant (h stands for???)
+    X_k: state of the actor at k-th instant
     '''
 
     def __init__(self,
@@ -17,7 +17,7 @@ class Kalman:
         self.X_k = np.array(init_state).T
         self.t_start = init_time
         
-        self.Pk = np.eye(4)
+        self.Pk = np.eye(4) * 1e-2
         var_v = 0.01
         self.Vk = np.eye(4) * var_v
         var_w = 0.01
