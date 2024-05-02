@@ -1,0 +1,5 @@
+<launch>
+  <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="agents_detection" name="agents_detection" output="screen" />
+  </group>
+</launch>
