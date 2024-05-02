@@ -72,10 +72,11 @@ class Hparams:
                              [11.5, -1.5],
                              [11.5, 11.5]])
     else:
-        vertexes = np.array([[-3.9, 0.0],
-                             [-3.0, -2.4],
-                             [2.6, -0.2],
-                             [1.8, 2.0]])
+        vertexes = np.array([[5.1, -5.1],
+                             [5.1, -7.4],
+                             [11.3, -7.7],
+                             [11.8, -5.4]])
+
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
         normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
