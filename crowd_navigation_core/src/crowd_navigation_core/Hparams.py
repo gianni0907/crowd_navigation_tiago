@@ -30,9 +30,9 @@ class Hparams:
     relative_laser_pos = np.array([0.2012 - b, -0.0009])
 
     # NMPC parameters
-    controller_frequency = 10.0 # [Hz]
+    controller_frequency = 20.0 # [Hz]
     dt = 1.0 / controller_frequency # [s]
-    N_horizon = 20
+    N_horizon = 50
     unbounded = 1000
 
     # Driving and steering acceleration limits
@@ -99,7 +99,7 @@ class Hparams:
     # Cost function weights
     if simulation:
         p_weight = 1e2 # position weights
-        v_weight = 8e1 # driving velocity weight
+        v_weight = 5e1 # driving velocity weight
         omega_weight = 1e-5 # steering velocity weight
         u_weight = 1e1 # input weights
         h_weight = 1e2 # heading term weight
@@ -124,7 +124,7 @@ class Hparams:
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
-        n_clusters = 3 # number of clusters
+        n_clusters = 5 # number of clusters
 
     # Parameters for the crowd prediction
     if n_actors > 0:
