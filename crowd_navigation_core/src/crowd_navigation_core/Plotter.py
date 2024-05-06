@@ -133,7 +133,7 @@ def plot_results(filename=None):
     axs[0].set_title('Elapsed time per generator iteration')
     axs[0].set_xlabel('$t \quad [s]$')
     axs[0].set_ylabel('$iteration \quad time \quad [s]$')
-    axs[0].hlines(1 / frequency, generator_time[:, 1], generator_time[-1, 1], color='red', linestyle='--')
+    axs[0].hlines(1 / frequency, generator_time[0, 1], generator_time[-1, 1], color='red', linestyle='--')
     axs[0].set_xlim([generator_time[0, 1], generator_time[-1, 1]])
     axs[0].grid(True)
 
@@ -295,13 +295,13 @@ def plot_results(filename=None):
                         active = False
                         kfs_ax[0, i].fill_between(t_predictor, 0, 14,
                                                   where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                  color='gray', alpha='0.1')
+                                                  color='gray', alpha=0.1)
                         kfs_ax[1, i].fill_between(t_predictor, -1.4, 1.4,
                                                   where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                  color='gray', alpha='0.1')
+                                                  color='gray', alpha=0.1)
                         kfs_ax[2, i].fill_between(t_predictor, -1.4, 1.4,
                                                   where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                  color='gray', alpha='0.1')
+                                                  color='gray', alpha=0.1)
                 
                 if all(pos == Hparams.nullpos for pos in fsm_estimates[j, i, :2]):
                     if not plot:
@@ -317,13 +317,13 @@ def plot_results(filename=None):
             if active:
                 kfs_ax[0, i].fill_between(t_predictor, 0, 14,
                                           where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
-                                          color='gray', alpha='0.1')
+                                          color='gray', alpha=0.1)
                 kfs_ax[1, i].fill_between(t_predictor, -1.4, 1.4,
                                           where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
-                                          color='gray', alpha='0.1')
+                                          color='gray', alpha=0.1)
                 kfs_ax[2, i].fill_between(t_predictor, -1.4, 1.4,
                                           where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
-                                          color='gray', alpha='0.1')
+                                          color='gray', alpha=0.1)
             if not plot:
                 kfs_ax[0, i].plot(t_predictor[plot_start_idx:], distances[plot_start_idx:], color=colors[i], label='$\hat{d}$')
                 kfs_ax[1, i].plot(t_predictor[plot_start_idx:], fsm_estimates[plot_start_idx:, i, 2], color=colors[i], label='$\hat{\dot{p}}_x$')
