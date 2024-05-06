@@ -87,7 +87,7 @@
 
 
     <node pkg="labrob_tiago_gazebo" type="Localization.py" name="localization" output="screen"/>
-
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find tiago_2dnav)/config/rviz/advanced_navigation.rviz"/>
 
 
     <group ns="crowd_navigation_core">

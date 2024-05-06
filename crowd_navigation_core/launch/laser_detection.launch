@@ -1,0 +1,5 @@
+<launch>
+  <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="laser_detection" name="laser_detection" output="screen" />
+  </group>
+</launch>

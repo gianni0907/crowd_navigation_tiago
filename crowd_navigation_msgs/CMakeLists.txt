@@ -14,6 +14,8 @@ add_message_files(
   CrowdMotionPrediction.msg
   CrowdMotionPredictionStamped.msg
   MotionPrediction.msg
+  Measurements.msg
+  MeasurementsStamped.msg
 )
 
 ## Generate services in the 'srv' folder

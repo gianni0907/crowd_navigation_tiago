@@ -35,7 +35,7 @@ class MotionGenerationManager:
         
         self.sensing = False
 
-        # counter for the angle unwrapping
+        # Set counter for the angle unwrapping
         self.k = 0
         self.previous_theta = 0.0
 
@@ -191,7 +191,7 @@ class MotionGenerationManager:
             self.actors_configuration = actors_configuration
             self.data_lock.release()
 
-    def set_from_tf_transform(self, transform):
+    def tf2q(self, transform):
         q = transform.transform.rotation
         theta = math.atan2(
             2.0 * (q.w * q.z + q.x * q.y),
@@ -218,7 +218,7 @@ class MotionGenerationManager:
             transform = self.tf_buffer.lookup_transform(
                 self.map_frame, self.base_footprint_frame, rospy.Time()
             )
-            self.set_from_tf_transform(transform)
+            self.tf2q(transform)
             # Update [v, omega]
             self.state.v = self.hparams.wheel_radius * 0.5 * \
                 (self.wheels_vel[self.hparams.r_wheel_idx] + self.wheels_vel[self.hparams.l_wheel_idx])
@@ -288,6 +288,7 @@ class MotionGenerationManager:
         output_dict['v_weight'] = self.hparams.v_weight
         output_dict['omega_weight'] = self.hparams.omega_weight
         output_dict['input_weight'] = self.hparams.u_weight
+        output_dict['heading_weight'] = self.hparams.h_weight
         output_dict['terminal_factor_p'] = self.hparams.terminal_factor_p
         output_dict['terminal_factor_v'] = self.hparams.terminal_factor_v
         output_dict['offset_b'] = self.hparams.b

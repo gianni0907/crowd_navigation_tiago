@@ -22,7 +22,8 @@ include_directories(
 )
 
 catkin_install_python(PROGRAMS
-  scripts/agents_detection
+  scripts/laser_detection
+  scripts/camera_detection
   scripts/motion_generation
   scripts/crowd_prediction
   scripts/plotter
