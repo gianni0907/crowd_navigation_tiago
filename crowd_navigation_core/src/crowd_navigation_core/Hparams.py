@@ -6,9 +6,12 @@ class Hparams:
     log = True
     save_video = True
     if log:
+        log_dir = '/tmp/crowd_navigation_tiago/data'
         filename = 'test'
         generator_file = filename + '_generator.json'
         predictor_file = filename + '_predictor.json'
+        laser_detector_file = filename + '_laser_detector.json'
+        camera_detector_file = filename + '_camera_detector.json'
 
     # Specify whether to use gazebo (simulation = True) or real robot
     simulation = True

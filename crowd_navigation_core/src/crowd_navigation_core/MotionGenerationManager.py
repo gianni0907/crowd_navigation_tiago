@@ -101,6 +101,7 @@ class MotionGenerationManager:
             gazebo_msgs.msg.ModelStates,
             self.gazebo_model_states_callback
         )
+        
         # Set variables to store data
         if self.hparams.log:
             self.state_history = []
@@ -297,7 +298,7 @@ class MotionGenerationManager:
         output_dict['wheel_separation'] = self.hparams.wheel_separation
 
         # log the data in a .json file
-        log_dir = '/tmp/crowd_navigation_tiago/data'
+        log_dir = self.hparams.log_dir
         filename = self.hparams.generator_file
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
@@ -354,9 +355,9 @@ class MotionGenerationManager:
         else:
             self.control_input = np.zeros((self.nmpc_controller.nu))
             if not(self.sensing) and self.hparams.n_actors > 0:
-                rospy.logwarn("Missing sensing info")
+                rospy.logwarn("Missing sensing data")
             if self.status == Status.MOVING:
-                rospy.logwarn("Cannot reach target position, not enough environmental info")
+                rospy.logwarn("Cannot reach target position, not enough environmental data")
                 print("Stop state ###############################")
                 print(self.state)
                 print("##########################################")

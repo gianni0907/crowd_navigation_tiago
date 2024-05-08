@@ -62,6 +62,61 @@ class Velocity:
     def from_message(velocity_msg):
         return Velocity(velocity_msg.x, velocity_msg.y)
     
+class Measurements:
+    def __init__(self):
+        self.positions = []
+        self.size = 0
+
+    def append(self, core_point):
+        self.positions.append(core_point)
+        self.size += 1
+    
+    @staticmethod
+    def to_message(measurements):
+        measurements_msg = crowd_navigation_msgs.msg.Measurements()
+        for core_point in measurements.positions:
+            measurements_msg.positions.append(Position.to_message(core_point))
+
+        return measurements_msg
+
+    @staticmethod
+    def from_message(measurements_msg):
+        measurements = Measurements()
+        for position_msg in measurements_msg.positions:
+            measurements.append(Position.from_message(position_msg))
+            
+        return measurements
+    
+class MeasurementsStamped:
+    def __init__(self, time, frame_id, measurements):
+        self.time = time
+        self.frame_id = frame_id
+        self.measurements = measurements
+
+    @staticmethod
+    def to_message(measurements_stamped):
+        measurements_stamped_msg = \
+            crowd_navigation_msgs.msg.MeasurementsStamped()
+        measurements_stamped_msg.header.stamp = \
+            measurements_stamped.time
+        measurements_stamped_msg.header.frame_id = \
+            measurements_stamped.frame_id
+        measurements_stamped_msg.measurements= \
+            Measurements.to_message(
+                measurements_stamped.measurements
+            )
+        return measurements_stamped_msg
+
+    @staticmethod
+    def from_message(measurements_stamped_msg):
+        return MeasurementsStamped(
+            measurements_stamped_msg.header.stamp,
+            measurements_stamped_msg.header.frame_id,
+            Measurements.from_message(
+                measurements_stamped_msg.measurements
+            )
+        )
+ 
 class MotionPrediction:
     def __init__(self, positions):
         self.positions = positions
@@ -207,6 +262,17 @@ def integrate(f, x0, u, dt, integration_method='RK4'):
         return RK4(f, x0, u, dt)
     else:
         return Euler(f, x0, u, dt)
+
+def moving_average(points, window_size=1):
+    smoothed_points = np.zeros(points.shape)
+    
+    for i in range(points.shape[0]):
+        # Compute indices for the moving window
+        start_idx = np.max([0, i - window_size // 2])
+        end_idx = np.min([points.shape[0], i + window_size // 2 + 1])
+        smoothed_points[i] = np.sum(points[start_idx : end_idx], 0) / (end_idx - start_idx)
+
+    return smoothed_points
 
 def z_rotation(angle, point2d):
     R = np.array([[math.cos(angle), - math.sin(angle), 0.0],

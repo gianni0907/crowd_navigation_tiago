@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
 
-import crowd_navigation_core.AgentsDetectionManager as AgentsDetectionManager
+import crowd_navigation_core.CameraDetectionManager as CameraDetectionManager
 if __name__ == '__main__':
-    AgentsDetectionManager.main()
+    CameraDetectionManager.main()

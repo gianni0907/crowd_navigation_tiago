@@ -1,10 +1,13 @@
 import numpy as np
-import threading
-import rospy
-import tf2_ros
-import cv2
+import math
+import time
 import os
+import json
+import threading
 import cProfile
+import tf2_ros
+import rospy
+import cv2
 import torch
 from cv_bridge import CvBridge
 from ultralytics import YOLO
@@ -14,30 +17,39 @@ from image_geometry import PinholeCameraModel as PC
 from crowd_navigation_core.Hparams import *
 from crowd_navigation_core.utils import *
 
+import gazebo_msgs.msg
 import sensor_msgs.msg
+import crowd_navigation_msgs.msg
 
 class CameraDetectionManager:
     '''
-    Detect surrounding agents from the RGB-D camera images
+    Extract the agents' representative 2D-point from the RGB-D camera
     '''
     def __init__(self):
         self.data_lock = threading.Lock()
 
-        self.status = Status.WAITING # WAITING for the initial robot state
-        self.robot_state = State(0.0, 0.0, 0.0, 0.0, 0.0)
+        # Set status, two possibilities:
+        # WAITING: waiting for the initial robot configuration
+        # READY: reading from the camera
+        self.status = Status.WAITING
+        
+        self.robot_config = Configuration(0.0, 0.0, 0.0)
         self.hparams = Hparams()
         self.bridge = CvBridge()
+        self.rgb_image_nonrt = None
+        self.depth_image_nonrt = None
         self.model = YOLO("yolov8n.pt")
-        self.n_actors = self.hparams.n_actors
-        self.core_points = np.zeros((self.n_actors, 2))
-
-        self.frequency = self.hparams.controller_frequency
+        if self.hparams.simulation:
+            self.agents_pos_nonrt = np.zeros((self.hparams.n_actors, 2))
+            self.agents_name = ['actor_{}'.format(i) for i in range(self.hparams.n_actors)]
 
         # Set variables to store data
         if self.hparams.log:
-            if not self.hparams.fake_sensing:
-                self.core_points_history = []
-                self.robot_state_history = []
+            self.time_history = []
+            self.measurements_history = []
+            self.robot_config_history = []
+            self.agents_pos_history = []
+            self.boundary_vertexes = []
 
         # Setup reference frames
         self.map_frame = 'map'
@@ -64,7 +76,7 @@ class CameraDetectionManager:
             self.depth_callback
         )
 
-        # Setup publisher for the processed images
+        # Setup publisher to the image topic
         processed_image_topic = '/image'
         self.processed_image_publisher = rospy.Publisher(
             processed_image_topic,
@@ -72,19 +84,46 @@ class CameraDetectionManager:
             queue_size=1
         )
 
+        # Setup subscriber to model_states topic
+        model_states_topic = "/gazebo/model_states"
+        rospy.Subscriber(
+            model_states_topic,
+            gazebo_msgs.msg.ModelStates,
+            self.gazebo_model_states_callback
+        )
+
+        # Setup publisher to camera_measurements topic
+        measurements_topic = 'camera_measurements'
+        self.measurements_publisher = rospy.Publisher(
+            measurements_topic,
+            crowd_navigation_msgs.msg.MeasurementsStamped,
+            queue_size=1
+        )
+
     def image_callback(self, data):
-        with self.data_lock:
-            try:
-                self.cv_image = self.bridge.imgmsg_to_cv2(data, 'bgr8')
-            except Exception as e:
-                rospy.logerr(e)
+        try:
+            self.rgb_image_nonrt = self.bridge.imgmsg_to_cv2(data, 'bgr8')
+        except Exception as e:
+            rospy.logerr(e)
 
     def depth_callback(self, data):
-        with self.data_lock:
-            try:
-                self.depth_image = self.bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
-            except Exception as e:
-                rospy.logerr(e)
+        try:
+            self.depth_image_nonrt = self.bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+        except Exception as e:
+            rospy.logerr(e)
+
+    def gazebo_model_states_callback(self, msg):
+        if self.hparams.simulation:
+            agents_pos = np.zeros((self.hparams.n_actors, 2))
+            idx = 0
+            for agent_name in self.agents_name:
+                if agent_name in msg.name:
+                    agent_idx = msg.name.index(agent_name)
+                    p = msg.pose[agent_idx].position
+                    agent_pos = np.array([p.x, p.y])
+                    agents_pos[idx] = agent_pos
+                    idx += 1
+            self.agents_pos_nonrt = agents_pos
 
     def tf2q(self, transform):
         q = transform.transform.rotation
@@ -92,28 +131,21 @@ class CameraDetectionManager:
             2.0 * (q.w * q.z + q.x * q.y),
             1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         )
-        self.robot_state.theta = theta
-        self.robot_state.x = transform.transform.translation.x + self.hparams.b * math.cos(theta)
-        self.robot_state.y = transform.transform.translation.y + self.hparams.b * math.sin(theta)
+        self.robot_config.theta = theta
+        self.robot_config.x = transform.transform.translation.x + self.hparams.b * math.cos(theta)
+        self.robot_config.y = transform.transform.translation.y + self.hparams.b * math.sin(theta)
 
-    def update_state(self):
+    def update_configuration(self):
         try:
-            # Update [x, y, theta]
             transform = self.tf_buffer.lookup_transform(
                 self.map_frame, self.base_footprint_frame, rospy.Time()
             )
             self.tf2q(transform)
-            # Update [v, omega]
-            self.robot_state.v = self.hparams.wheel_radius * 0.5 * \
-                (self.wheels_vel[self.hparams.r_wheel_idx] + self.wheels_vel[self.hparams.l_wheel_idx])
-            
-            self.robot_state.omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * \
-                (self.wheels_vel[self.hparams.r_wheel_idx] - self.wheels_vel[self.hparams.l_wheel_idx])
             return True
         except(tf2_ros.LookupException,
                tf2_ros.ConnectivityException,
                tf2_ros.ExtrapolationException):
-            rospy.logwarn("Missing current state")
+            rospy.logwarn("Missing current configuration")
             return False
 
     def get_camera_pose(self):
@@ -141,51 +173,132 @@ class CameraDetectionManager:
             rospy.logwarn("Missing camera pose")
             return False
 
+    def data_extraction(self):
+        robot_position = self.robot_config.get_q()[:2]
+        dynamic_n_agents = 0
+        core_points = np.ones((self.hparams.n_actors, 2)) * 1000
+        results = self.model(self.rgb_image, conf=0.5, verbose=False)
+        for result in results:
+            labels, cords = result.boxes.cls, result.boxes.xyxyn
+            for label, cord in zip(labels, cords):
+                if label == 0:
+                    box_center = torch.tensor([(cord[0] + cord[2]) / 2 * self.rgb_image.shape[1],
+                                               (cord[1] + cord[3]) / 2 * self.rgb_image.shape[0]]).to("cpu")
+                    x_c = int(torch.round(box_center[0]).item())
+                    y_c = int(torch.round(box_center[1]).item())
+                    # center = (x_c, y_c)
+                    # cv2.circle(self.rgb_image, center, radius=5, color=(0, 0, 255), thickness=-1)
+                    depth = self.depth_image[y_c, x_c]
+                    point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
+                    scale = depth / point_cam[2]
+                    point_cam = point_cam * scale
+                    homo_point_cam = np.append(point_cam, 1)
+                    homo_point_wrld = np.matmul(self.camera_pose, homo_point_cam)
+                    core_points[dynamic_n_agents] = homo_point_wrld[:2]
+                    dynamic_n_agents += 1
+            image = result.plot()
+            self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(image))
+
+        core_points, _ = sort_by_distance(core_points, robot_position)
+        core_points = core_points[:np.min([self.hparams.n_clusters,dynamic_n_agents])]
+
+        return core_points
+
+    def log_values(self):
+        output_dict = {}
+        output_dict['cpu_time'] = self.time_history
+        output_dict['measurements'] = self.measurements_history
+        output_dict['robot_config'] = self.robot_config_history
+        output_dict['frequency'] = self.hparams.controller_frequency
+        output_dict['b'] = self.hparams.b
+        output_dict['n_clusters'] = self.hparams.n_clusters
+        output_dict['n_points'] = self.hparams.n_points
+        for i in range(self.hparams.n_points):
+            self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
+        output_dict['boundary_vertexes'] = self.boundary_vertexes
+        output_dict['base_radius'] = self.hparams.base_radius
+        output_dict['simulation'] = self.hparams.simulation
+        if self.hparams.simulation:
+            output_dict['n_agents'] = self.hparams.n_actors
+            output_dict['agents_pos'] = self.agents_pos_history
+            output_dict['agent_radius'] = self.hparams.ds_cbf
+
+        # log the data in a .json file
+        log_dir = self.hparams.log_dir
+        filename = self.hparams.camera_detector_file
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        log_path = os.path.join(log_dir, filename)
+        with open(log_path, 'w') as file:
+            json.dump(output_dict, file)
+
     def run(self):
         cam_info = rospy.wait_for_message("/xtion/rgb/camera_info", sensor_msgs.msg.CameraInfo, timeout=None)
-        imgproc = PC()
-        imgproc.fromCameraInfo(cam_info)
+        self.imgproc = PC()
+        self.imgproc.fromCameraInfo(cam_info)
 
-        rate = rospy.Rate(self.frequency)
+        rate = rospy.Rate(self.hparams.controller_frequency)
+
+        if self.hparams.log:
+            rospy.on_shutdown(self.log_values)
+
         while not rospy.is_shutdown():
-            if self.cv_image is None:
-                rospy.logwarn("Missing images")
+            start_time = time.time()
+
+            if self.status == Status.WAITING:
+                if self.update_configuration():
+                    self.status = Status.READY
+                else:
+                    rate.sleep()
+                    continue
+
+            if self.rgb_image_nonrt is None or self.depth_image_nonrt is None:
+                rospy.logwarn("Missing camera data")
                 rate.sleep()
                 continue
 
-            self.get_camera_pose()
-            results = self.model(self.cv_image, conf=0.5)
-            for result in results:
-                labels, cords = result.boxes.cls, result.boxes.xyxyn
-                for label, cord in zip(labels, cords):
-                    if label == 0:
-                        box_center = torch.tensor([(cord[0] + cord[2]) / 2 * self.cv_image.shape[1],
-                                                   (cord[1] + cord[3]) / 2 * self.cv_image.shape[0]]).to("cpu")
-                        x_c = int(torch.round(box_center[0]).item())
-                        y_c = int(torch.round(box_center[1]).item())
-                        # center = (x_c, y_c)
-                        # cv2.circle(self.cv_image, center, radius=5, color=(0, 0, 255), thickness=-1)
-                        depth = self.depth_image[y_c, x_c]
-                        obj_coord = np.array(imgproc.projectPixelTo3dRay(box_center))
-                        scale = depth / obj_coord[2]
-                        obj_coord = obj_coord * scale
-                        homo_obj_coord = np.array([obj_coord[0],
-                                                   obj_coord[1],
-                                                   obj_coord[2],
-                                                   1])
-                        wrld_obj_coord = np.matmul(self.camera_pose, homo_obj_coord)
-                image = result.plot()
-                self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(image)) 
+            with self.data_lock:
+                self.update_configuration()
+                self.get_camera_pose()
+                self.rgb_image = self.rgb_image_nonrt
+                self.depth_image = self.depth_image_nonrt
+                self.agents_pos = self.agents_pos_nonrt
+
+            self.measurements = self.data_extraction()
+
+            # Update measurements message
+            measurements = Measurements()
+            for measurement in self.measurements:
+                measurements.append(Position(measurement[0], measurement[1]))
+            measurements_stamped = MeasurementsStamped(rospy.Time.from_sec(start_time),
+                                                       'map',
+                                                       measurements)
+            measurements_stamped_msg = MeasurementsStamped.to_message(measurements_stamped)
+            self.measurements_publisher.publish(measurements_stamped_msg)
+
+            if self.hparams.log:
+                self.robot_config_history.append([self.robot_config.x,
+                                                  self.robot_config.y,
+                                                  self.robot_config.theta,
+                                                  start_time])
+                self.measurements_history.append(self.measurements.tolist())
+                if self.hparams.simulation:
+                    self.agents_pos_history.append(self.agents_pos.tolist())
+
+                end_time = time.time()
+                deltat = end_time - start_time
+                self.time_history.append([deltat, start_time])
+
             rate.sleep()
 
 def main():
     rospy.init_node('tiago_camera_detection', log_level=rospy.INFO)
     rospy.loginfo('TIAGo camera detection module [OK]')
 
-    agents_detection_manager = CameraDetectionManager()
-    prof_filename = '/tmp/agents_detection.prof'
+    camera_detection_manager = CameraDetectionManager()
+    prof_filename = '/tmp/camera_detection.prof'
     cProfile.runctx(
-        'agents_detection_manager.run()',
+        'camera_detection_manager.run()',
         globals=globals(),
         locals=locals(),
         filename=prof_filename
