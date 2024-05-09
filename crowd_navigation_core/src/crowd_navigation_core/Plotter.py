@@ -122,7 +122,7 @@ class Plotter:
 
     def plot_camera(self):
         # Specify the saving path
-        cam_path = os.path.join(self.animation_dir, self.filename + '_cam.mp4')
+        cam_path = os.path.join(self.animation_dir, self.filename + '_camera.mp4')
 
         # Open the camera detector log file
         if os.path.exists(self.log_camera_detector):

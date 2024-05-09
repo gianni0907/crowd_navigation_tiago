@@ -38,6 +38,7 @@ class CameraDetectionManager:
         self.bridge = CvBridge()
         self.rgb_image_nonrt = None
         self.depth_image_nonrt = None
+        self.processed_image = None
         self.model = YOLO("yolov8n.pt")
         if self.hparams.simulation:
             self.agents_pos_nonrt = np.zeros((self.hparams.n_actors, 2))
@@ -50,6 +51,12 @@ class CameraDetectionManager:
             self.robot_config_history = []
             self.agents_pos_history = []
             self.boundary_vertexes = []
+            # Setup variables to create a video
+            self.fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+            self.out = cv2.VideoWriter(os.path.join(self.hparams.log_dir, self.hparams.filename + '_camera_view.mp4'),
+                                       self.fourcc,
+                                       self.hparams.controller_frequency,
+                                       (640, 480))
 
         # Setup reference frames
         self.map_frame = 'map'
@@ -196,8 +203,8 @@ class CameraDetectionManager:
                     homo_point_wrld = np.matmul(self.camera_pose, homo_point_cam)
                     core_points[dynamic_n_agents] = homo_point_wrld[:2]
                     dynamic_n_agents += 1
-            image = result.plot()
-            self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(image))
+            self.processed_image = result.plot()
+            self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(self.processed_image))
 
         core_points, _ = sort_by_distance(core_points, robot_position)
         core_points = core_points[:np.min([self.hparams.n_clusters,dynamic_n_agents])]
@@ -231,6 +238,8 @@ class CameraDetectionManager:
         log_path = os.path.join(log_dir, filename)
         with open(log_path, 'w') as file:
             json.dump(output_dict, file)
+
+        self.out.release()
 
     def run(self):
         cam_info = rospy.wait_for_message("/xtion/rgb/camera_info", sensor_msgs.msg.CameraInfo, timeout=None)
@@ -277,6 +286,7 @@ class CameraDetectionManager:
             self.measurements_publisher.publish(measurements_stamped_msg)
 
             if self.hparams.log:
+                self.out.write(self.processed_image)
                 self.robot_config_history.append([self.robot_config.x,
                                                   self.robot_config.y,
                                                   self.robot_config.theta,
