@@ -8,10 +8,12 @@ import cProfile
 import tf2_ros
 import rospy
 from sklearn.cluster import DBSCAN
+from scipy.spatial.transform import Rotation as R
 
 from crowd_navigation_core.Hparams import *
 from crowd_navigation_core.utils import *
 
+import gazebo_msgs.msg
 import sensor_msgs.msg
 import crowd_navigation_msgs.msg
 
@@ -28,8 +30,11 @@ class LaserDetectionManager:
         self.status = Status.WAITING
 
         self.robot_config = Configuration(0.0, 0.0, 0.0)
-        self.laser_scan = None
         self.hparams = Hparams()
+        self.laser_scan_nonrt = None
+        if self.hparams.simulation:
+            self.agents_pos_nonrt = np.zeros((self.hparams.n_actors, 2))
+            self.agents_name = ['actor_{}'.format(i) for i in range(self.hparams.n_actors)]
 
         # Set variables to store data
         if self.hparams.log:
@@ -37,10 +42,15 @@ class LaserDetectionManager:
             self.scans_history = []
             self.measurements_history = []
             self.robot_config_history = []
+            self.laser_pos_history = []
+            self.boundary_vertexes = []
+            if self.hparams.simulation:
+                self.agents_pos_history = []
 
         # Setup reference frames:
         self.map_frame = 'map'
         self.base_footprint_frame = 'base_footprint'
+        self.laser_frame = 'base_laser_link'
 
         # Setup TF listener:
         self.tf_buffer = tf2_ros.Buffer()
@@ -54,6 +64,14 @@ class LaserDetectionManager:
             self.laser_scan_callback
         )
 
+        # Setup subscriber to model_states topic
+        model_states_topic = "/gazebo/model_states"
+        rospy.Subscriber(
+            model_states_topic,
+            gazebo_msgs.msg.ModelStates,
+            self.gazebo_model_states_callback
+        )
+
         # Setup publisher to laser_measurements topic
         measurements_topic = 'laser_measurements'
         self.measurements_publisher = rospy.Publisher(
@@ -63,7 +81,20 @@ class LaserDetectionManager:
         )
 
     def laser_scan_callback(self, msg):
-        self.laser_scan = LaserScan.from_message(msg)
+        self.laser_scan_nonrt = LaserScan.from_message(msg)
+
+    def gazebo_model_states_callback(self, msg):
+        if self.hparams.simulation:
+            agents_pos = np.zeros((self.hparams.n_actors, 2))
+            idx = 0
+            for agent_name in self.agents_name:
+                if agent_name in msg.name:
+                    agent_idx = msg.name.index(agent_name)
+                    p = msg.pose[agent_idx].position
+                    agent_pos = np.array([p.x, p.y])
+                    agents_pos[idx] = agent_pos
+                    idx += 1
+            self.agents_pos_nonrt = agents_pos
 
     def tf2q(self, transform):
         q = transform.transform.rotation
@@ -88,23 +119,42 @@ class LaserDetectionManager:
             rospy.logwarn("Missing current configuration")
             return False
         
-    def polar2relative(self, scan):
-        idx = scan[0]
-        distance = scan[1]
+    def get_laser_pose(self):
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.map_frame, self.laser_frame, rospy.Time()
+            )
+            quat = np.array([transform.transform.rotation.x,
+                             transform.transform.rotation.y,
+                             transform.transform.rotation.z,
+                             transform.transform.rotation.w])
+            
+            pos = np.array([transform.transform.translation.x, 
+                            transform.transform.translation.y, 
+                            transform.transform.translation.z])
+            
+            rotation_matrix = R.from_quat(quat).as_matrix()
+            self.laser_pose = np.eye(4)
+            self.laser_pose[:3, :3] = rotation_matrix
+            self.laser_pose[:3, 3] = pos
+            return True
+        except(tf2_ros.LookupException,
+               tf2_ros.ConnectivityException,
+               tf2_ros.ExtrapolationException):
+            rospy.logwarn("Missing laser pose")
+            return False
+
+    def polar2cartesian(self, polar):
+        idx = polar[0]
+        distance = polar[1]
         angle = self.laser_scan.angle_min + idx * self.laser_scan.angle_increment
-        xy_relative = np.array([distance * math.cos(angle) + self.hparams.relative_laser_pos[0],
-                                distance * math.sin(angle) + self.hparams.relative_laser_pos[1]])
-        return xy_relative
-
-    def polar2absolute(self, scan):
-        xy_relative = self.polar2relative(scan)
-        config = self.robot_config
-        xy_absolute = z_rotation(config.theta, xy_relative) + np.array([config.x, config.y])
-        return xy_absolute
-
+        cartesian = np.array([distance * math.cos(angle),
+                              distance * math.sin(angle)])
+        return cartesian
+    
     def data_preprocessing(self):
         scans = self.laser_scan.ranges
-        absolute_scans = []
+        output_points = []
 
         # Delete the first and last 'offset' laser scan ranges (wrong measurements?)
         offset = self.hparams.offset
@@ -114,33 +164,35 @@ class LaserDetectionManager:
         for idx, value in enumerate(scans):
             outside = False
             if value != np.inf and value >= self.laser_scan.range_min:
-                absolute_scan = self.polar2absolute((idx + offset, value))
+                point_las = self.polar2cartesian((idx + offset, value))
+                homo_point_las = np.append(point_las, np.append(self.laser_pose[2,3], 1))
+                point_wrld = np.matmul(self.laser_pose, homo_point_las)[:2]
                 for i in range(self.hparams.n_points):
                     vertex = self.hparams.vertexes[i]
-                    if np.dot(self.hparams.normals[i], absolute_scan - vertex) < 0.0:
+                    if np.dot(self.hparams.normals[i], point_wrld - vertex) < 0.0:
                         outside = True
                         break
                 if not outside:
-                    absolute_scans.append(absolute_scan.tolist())
+                    output_points.append(point_wrld.tolist())
 
-        return absolute_scans
+        return output_points
 
-    def data_clustering(self):
+    def data_clustering(self, observations):
         robot_position = self.robot_config.get_q()[:2]
         if self.hparams.selection_mode == SelectionMode.CLOSEST:
             window_size = self.hparams.avg_win_size
 
-        if len(self.absolute_scans) != 0:
+        if len(observations) != 0:
             k_means = DBSCAN(eps=self.hparams.eps,
                              min_samples=self.hparams.min_samples)
-            clusters = k_means.fit_predict(np.array(self.absolute_scans))
+            clusters = k_means.fit_predict(np.array(observations))
             dynamic_n_clusters = max(clusters) + 1
             core_points = np.zeros((dynamic_n_clusters, 2))
 
             if self.hparams.selection_mode == SelectionMode.CLOSEST:
                 clusters_points = [[] for _ in range(dynamic_n_clusters)]
 
-                for id, point in zip(clusters, self.absolute_scans):
+                for id, point in zip(clusters, observations):
                     if id != -1:
                         clusters_points[id].append(point)
 
@@ -156,7 +208,7 @@ class LaserDetectionManager:
             elif self.hparams.selection_mode == SelectionMode.AVERAGE:
                 n_points = np.zeros((dynamic_n_clusters,))       
 
-                for id, point in zip(clusters, self.absolute_scans):
+                for id, point in zip(clusters, observations):
                     if id != -1:
                         n_points[id] += 1
                         core_points[id] = core_points[id] + (point - core_points[id]) / n_points[id]
@@ -174,8 +226,21 @@ class LaserDetectionManager:
         output_dict['laser_scans'] = self.scans_history
         output_dict['measurements'] = self.measurements_history
         output_dict['robot_config'] = self.robot_config_history
+        output_dict['laser_positions'] = self.laser_pos_history
+        output_dict['frequency'] = self.hparams.controller_frequency
+        output_dict['b'] = self.hparams.b
+        output_dict['n_clusters'] = self.hparams.n_clusters
+        output_dict['n_points'] = self.hparams.n_points
+        for i in range(self.hparams.n_points):
+            self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
+        output_dict['boundary_vertexes'] = self.boundary_vertexes
+        output_dict['base_radius'] = self.hparams.base_radius
+        output_dict['simulation'] = self.hparams.simulation
+        if self.hparams.simulation:
+            output_dict['n_agents'] = self.hparams.n_actors
+            output_dict['agents_pos'] = self.agents_pos_history
+            output_dict['agent_radius'] = self.hparams.ds_cbf
         output_dict['laser_offset'] = self.hparams.offset
-        output_dict['laser_relative_pos'] = self.hparams.relative_laser_pos.tolist()
         output_dict['min_samples'] = self.hparams.min_samples
         output_dict['epsilon'] = self.hparams.eps
         output_dict['angle_min'] = self.laser_scan.angle_min
@@ -205,31 +270,35 @@ class LaserDetectionManager:
             start_time = time.time()
 
             if self.status == Status.WAITING:
-                if self.update_configuration():
+                if self.update_configuration() and self.get_laser_pose():
                     self.status = Status.READY
                 else:
                     rate.sleep()
                     continue
 
-            if self.laser_scan is None:
+            if self.laser_scan_nonrt is None:
                 rospy.logwarn("Missing laser data")
                 rate.sleep()
                 continue
 
             with self.data_lock:
                 self.update_configuration()
-                # Perform data preprocessing
-                self.absolute_scans = self.data_preprocessing()
-                # Perform data clustering
-                self.measurements = self.data_clustering()
+                self.get_laser_pose()
+                self.laser_scan = self.laser_scan_nonrt
+                agents_pos = self.agents_pos_nonrt
 
-            # Update measurements message
-            measurements = Measurements()
-            for measurement in self.measurements:
-                measurements.append(Position(measurement[0], measurement[1]))
+            # Perform data preprocessing
+            observations = self.data_preprocessing()
+            # Perform data clustering
+            measurements = self.data_clustering(observations)
+
+            # Create measurements message
+            measurements_obj = Measurements()
+            for measurement in measurements:
+                measurements_obj.append(Position(measurement[0], measurement[1]))
             measurements_stamped = MeasurementsStamped(rospy.Time.from_sec(start_time),
                                                        'map',
-                                                       measurements)
+                                                       measurements_obj)
             measurements_stamped_msg = MeasurementsStamped.to_message(measurements_stamped)
             self.measurements_publisher.publish(measurements_stamped_msg)
 
@@ -238,8 +307,11 @@ class LaserDetectionManager:
                                                   self.robot_config.y,
                                                   self.robot_config.theta,
                                                   start_time])
-                self.scans_history.append(self.absolute_scans)
-                self.measurements_history.append(self.measurements.tolist())
+                self.laser_pos_history.append(self.laser_pose[:2, 3].tolist())
+                self.scans_history.append(observations)
+                self.measurements_history.append(measurements.tolist())
+                if self.hparams.simulation:
+                    self.agents_pos_history.append(agents_pos.tolist())
                 end_time = time.time()
                 deltat = end_time - start_time
                 self.time_history.append([deltat, start_time])

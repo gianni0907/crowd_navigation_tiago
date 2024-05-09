@@ -162,7 +162,7 @@ class Plotter:
         robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
         controlled_pt = ax.scatter([], [], marker='.', color='k')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
-        meas, = ax.plot([], [], color='magenta', marker='.', markersize=5, linestyle='', label='meas')
+        meas, = ax.plot([], [], color='blue', marker='.', markersize=5, linestyle='', label='meas')
 
         boundary_line = []
         for i in range(n_points - 1):
@@ -244,15 +244,159 @@ class Plotter:
         
         plt.show()
 
+    def plot_laser(self):
+        # Specify the saving path
+        las_path = os.path.join(self.animation_dir, self.filename + '_laser.mp4')
+
+        # Open the laser detector log file
+        if os.path.exists(self.log_laser_detector):
+            with open(self.log_laser_detector, 'r') as file:
+                laser_detector_dict = json.load(file)
+        else:
+            raise Exception(
+                f"Laser detector logfile not found"
+            )
+        
+        # Extract the laser detector data
+        time = np.array(laser_detector_dict['cpu_time'])
+        laser_scans = laser_detector_dict['laser_scans']
+        measurements = laser_detector_dict['measurements']
+        robot_config = np.array(laser_detector_dict['robot_config'])
+        laser_pos = np.array(laser_detector_dict['laser_positions'])
+        b = laser_detector_dict['b']
+        shooting_nodes = robot_config.shape[0]
+        robot_center = np.empty((shooting_nodes, 2))
+        for i in range(shooting_nodes):
+            robot_center[i, 0] = robot_config[i, 0] - b * math.cos(robot_config[i, 2])
+            robot_center[i, 1] = robot_config[i, 1] - b * math.sin(robot_config[i, 2])
+
+        frequency = laser_detector_dict['frequency']
+        n_points = laser_detector_dict['n_points']
+        boundary_vertexes = np.array(laser_detector_dict['boundary_vertexes'])
+        base_radius = laser_detector_dict['base_radius']
+        simulation = laser_detector_dict['simulation']
+        if simulation:
+            n_agents = laser_detector_dict['n_agents']
+            agents_pos = np.array(laser_detector_dict['agents_pos'])
+            agent_radius = laser_detector_dict['agent_radius']
+        angle_inc = laser_detector_dict['angle_inc']
+        offset = laser_detector_dict['laser_offset']
+        angle_min = laser_detector_dict['angle_min'] + angle_inc * offset
+        angle_max = laser_detector_dict['angle_max'] - angle_inc * offset
+        range_min = laser_detector_dict['range_min']
+        range_max = laser_detector_dict['range_max']
+
+        # Plot animation with laser measurements
+        fig = plt.figure(figsize=(8, 8))
+        gs = gridspec.GridSpec(1,1)
+        ax = plt.subplot(gs[0, 0])
+
+        robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
+        controlled_pt = ax.scatter([], [], marker='.', color='k')
+        robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
+        scans, = ax.plot([], [], color='magenta', marker='.', markersize=3, linestyle='', label='scans') 
+        meas, = ax.plot([], [], color='blue', marker='.', markersize=5, linestyle='', label='meas')
+        fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
+
+        boundary_line = []
+        for i in range(n_points - 1):
+            x_values = [boundary_vertexes[i, 0], boundary_vertexes [i + 1, 0]]
+            y_values = [boundary_vertexes[i, 1], boundary_vertexes [i + 1, 1]]
+            line, = ax.plot(x_values, y_values, color='red', linestyle='--')
+            boundary_line.append(line)
+        x_values = [boundary_vertexes[n_points - 1, 0], boundary_vertexes [0, 0]]
+        y_values = [boundary_vertexes[n_points - 1, 1], boundary_vertexes [0, 1]]
+        line, = ax.plot(x_values, y_values, color='red', linestyle='--')
+        boundary_line.append(line)
+
+        if simulation:
+            agents = []
+            agents_label = []
+            agents_clearance = []
+            for i in range(n_agents):
+                agents.append(ax.scatter([], [], marker='.', label='hum{}'.format(i+1), color='k', alpha=0.3))
+                agents_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', linestyle='--', alpha=0.3))
+                agents_label.append(ax.text(np.nan, np.nan, agents[i].get_label(), fontsize=16, ha='left', va='bottom', alpha=0.3))
+
+        ax.set_title('TIAGo laser measurements')
+        ax.set_xlabel("$x \quad [m]$")
+        ax.set_ylabel('$y \quad [m]$')
+        ax.set_aspect('equal', adjustable='box')
+        ax.grid(True)
+
+        # init and update function for the laser animation
+        def init():
+            robot.set_center(robot_center[0])
+            robot.set_radius(base_radius)
+            ax.add_patch(robot)
+            ax.add_patch(fov)
+            controlled_pt.set_offsets(robot_config[0, :2])
+            robot_label.set_position(robot_center[0])
+            if simulation:
+                for i in range(n_agents):
+                    agent_pos = agents_pos[0, i, :]
+                    agents[i].set_offsets(agent_pos)
+                    agents_clearance[i].set_center(agent_pos)
+                    agents_clearance[i].set_radius(agent_radius)
+                    ax.add_patch(agents_clearance[i])
+                    agents_label[i].set_position(agent_pos)
+                return robot, robot_label, controlled_pt, agents, agents_clearance, agents_label
+            return robot, robot_label, controlled_pt
+        
+        def update(frame):
+            if frame == shooting_nodes - 1:
+                animation.event_source.stop()
+            ax.set_title(f'TIAGo laser measurements, t={time[frame, 1]}')
+            robot.set_center(robot_center[frame])
+            controlled_pt.set_offsets(robot_config[frame, :2])
+            robot_label.set_position(robot_center[frame])
+            current_meas = np.array(measurements[frame])
+            current_scans = np.array(laser_scans[frame])
+            current_theta = robot_config[frame, 2]
+            current_laser_pos = laser_pos[frame]
+            fov.set_center(current_laser_pos)
+            fov.set_radius(range_max)
+            fov.set_theta1((current_theta + angle_min) * 180 / np.pi)
+            fov.set_theta2((current_theta + angle_max) * 180 / np.pi)
+            fov.set_width(range_max - range_min)
+            if current_scans.shape[0] > 0:
+                scans.set_data(current_scans[:, 0], current_scans[:, 1])
+            else:
+                meas.set_data([], [])
+            if current_meas.shape[0] > 0:
+                meas.set_data(current_meas[:, 0], current_meas[:, 1])
+            else:
+                meas.set_data([], [])
+            if simulation:
+                for i in range(n_agents):
+                    agent_pos = agents_pos[frame, i, :]
+                    agents[i].set_offsets(agent_pos)
+                    agents_clearance[i].set_center(agent_pos)
+                    agents_label[i].set_position(agent_pos)
+                return robot, robot_label, controlled_pt, meas, scans, fov, \
+                       agents, agents_clearance, agents_label
+            return robot, robot_label, controlled_pt, meas
+
+        animation = FuncAnimation(fig, update,
+                                  frames=shooting_nodes,
+                                  init_func=init,
+                                  interval=1/frequency,
+                                  blit=False,
+                                  repeat=False)
+        fig.tight_layout()
+
+        if self.save_video:
+            animation.save(las_path, writer='ffmpeg', fps=frequency, dpi=80)
+            print("Laser animation saved")
+        
+        plt.show()
+
     def run(self):
         self.plot_times()
         self.plot_camera()
+        self.plot_laser()
 
 # def plot_results(filename=None):
-
-#         plot_camera(filename, animation_savedir)
-#         plot_laser(filename, animation_savedir)
-#         plot_motion(filename, log_dir, plots_savedir, animation_savedir)
 
 #         configuration_savepath = os.path.join(plots_savedir, filename + '_configuration.png')
 #         velocity_savepath = os.path.join(plots_savedir, filename + '_velocities.png')
@@ -327,59 +471,6 @@ class Plotter:
 #         agents_predictions = np.array(predictor_dict['agents_predictions'])
 #         if use_kalman:
 #             fsm_estimates = np.array(predictor_dict['fsm_estimates'])
-
-#     # Open the laser detector log file
-#     if os.path.exists(log_laser_detector):
-#         with open(log_laser_detector, 'r') as file:
-#             laser_detector_dict = json.load(file)
-#     else:
-#         raise Exception(
-#             f"Specified file not found"
-#         )
-
-#     # Extract the laser detector data
-#     laser_detector_time = np.array(laser_detector_dict['cpu_time'])
-#     laser_scans = laser_detector_dict['laser_scans']
-#     measurements = laser_detector_dict['measurements']
-#     angle_inc = laser_detector_dict['angle_inc']
-#     offset = laser_detector_dict['laser_offset']
-#     angle_min = laser_detector_dict['angle_min'] + angle_inc * offset
-#     angle_max = laser_detector_dict['angle_max'] - angle_inc * offset
-#     range_min = laser_detector_dict['range_min']
-#     range_max = laser_detector_dict['range_max']
-#     laser_position = np.array(laser_detector_dict['laser_relative_pos'])       
-
-#     # Figure representing elapsed time per module iteration
-#     fig, axs = plt.subplots(3, 1, figsize=(16, 8))
-    
-#     # Laser detector
-#     axs[0].step(laser_detector_time[:, 1], laser_detector_time[:, 0])
-#     axs[0].set_title('Laser detector module iteration time')
-#     axs[0].set_xlabel('$t \quad [s]$')
-#     axs[0].set_ylabel('$iteration \quad time \quad [s]$')
-#     axs[0].hlines(1 / frequency, laser_detector_time[0, 1], laser_detector_time[-1, 1], color='red', linestyle='--')
-#     axs[0].set_xlim([laser_detector_time[0, 1], laser_detector_time[-1, 1]])
-#     axs[0].grid(True) 
-#     # Generator
-#     axs[1].step(generator_time[:, 1], generator_time[:, 0])
-#     axs[1].set_title('Generator module iteration time')
-#     axs[1].set_xlabel('$t \quad [s]$')
-#     axs[1].set_ylabel('$iteration \quad time \quad [s]$')
-#     axs[1].hlines(1 / frequency, generator_time[0, 1], generator_time[-1, 1], color='red', linestyle='--')
-#     axs[1].set_xlim([generator_time[0, 1], generator_time[-1, 1]])
-#     axs[1].grid(True)
-#     # Predictor
-#     if n_actors > 0:
-#         axs[2].step(predictor_time[:, 1], predictor_time[:, 0])
-#         axs[2].set_title('Elapsed time per predictor iteration')
-#         axs[2].set_xlabel('$t \quad [s]$')
-#         axs[2].set_ylabel('$iteration \quad time \quad [s]$')
-#         axs[2].hlines(1 / frequency, predictor_time[0, 1], predictor_time[-1, 1], color='red', linestyle='--')
-#         axs[2].set_xlim([predictor_time[0, 1], predictor_time[-1, 1]])
-#         axs[2].grid(True)
-
-#     fig.tight_layout()
-#     fig.savefig(time_savepath)
 
 #     # Configuration figure
 #     config_fig, config_ax = plt.subplots(4, 1, figsize=(16, 8))
@@ -748,111 +839,6 @@ class Plotter:
 #         print("World animation saved")
     
 #     plt.show()
-
-#     # # Figure to plot scans animation
-#     # if n_actors > 0 and not fake_sensing:
-#     #     scans_fig = plt.figure(figsize=(8, 8))
-#     #     gs = gridspec.GridSpec(1,1)
-#     #     ax = plt.subplot(gs[0, 0])
-
-#     #     robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
-#     #     controlled_pt = ax.scatter([], [], marker='.', color='k')
-#     #     robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
-#     #     scans, = ax.plot([], [], color='magenta', marker='.', markersize=3, linestyle='', label='scans')
-#     #     fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
-
-#     #     core_pred_line = []
-#     #     core_points_position = []
-#     #     core_points_label = []        
-#     #     for i in range(n_clusters):
-#     #         core_points_position.append(ax.scatter([], [], marker='.', label='KF-{}'.format(i+1), color='b'))
-#     #         core_points_label.append(ax.text(np.nan, np.nan, core_points_position[i].get_label(), fontsize=16, ha='left', va='bottom'))
-#     #         pt_pred_line, = ax.plot([], [], color='orange', label='actor prediction')
-#     #         core_pred_line.append(pt_pred_line)
-
-#     #     boundary_line = []
-#     #     for i in range(n_edges - 1):
-#     #         x_values = [boundary_vertexes[i, 0], boundary_vertexes [i + 1, 0]]
-#     #         y_values = [boundary_vertexes[i, 1], boundary_vertexes [i + 1, 1]]
-#     #         line, = ax.plot(x_values, y_values, color='red', linestyle='--')
-#     #         boundary_line.append(line)
-#     #     x_values = [boundary_vertexes[n_edges - 1, 0], boundary_vertexes [0, 0]]
-#     #     y_values = [boundary_vertexes[n_edges - 1, 1], boundary_vertexes [0, 1]]
-#     #     line, = ax.plot(x_values, y_values, color='red', linestyle='--')
-#     #     boundary_line.append(line)
-
-#     #     ax.set_title('TIAGo Scans')
-#     #     ax.set_xlabel("$x \quad [m]$")
-#     #     ax.set_ylabel('$y \quad [m]$')
-#     #     ax.set_aspect('equal', adjustable='box')
-#     #     ax.grid(True)
-
-#     #     shooting_nodes = robot_config.shape[0]
-#     #     robot_center = np.empty((robot_config.shape[0], 2))
-#     #     for i in range(robot_config.shape[0]):
-#     #         robot_center[i, 0] = robot_config[i, 0] - b * math.cos(robot_config[i, 2])
-#     #         robot_center[i, 1] = robot_config[i, 1] - b * math.sin(robot_config[i, 2])
-
-#     #     # init and update function for the scans animation
-#     #     def init_scans():
-#     #         robot.set_center(robot_center[0])
-#     #         robot.set_radius(base_radius)
-#     #         ax.add_patch(robot)
-#     #         ax.add_patch(fov)
-#     #         controlled_pt.set_offsets(robot_config[0, :2])
-#     #         robot_label.set_position(robot_center[0])
-
-#     #         for i in range(n_clusters):
-#     #             core_point_position = core_points_predictions[0, i, :, 0]
-#     #             core_points_position[i].set_offsets(core_point_position)
-#     #             core_points_label[i].set_position(core_point_position)
-        
-#     #         return robot, fov, robot_label, core_points_position, core_points_label
-        
-#     #     def update_scans(frame):
-#     #         if frame == shooting_nodes - 1:
-#     #             scans_animation.event_source.stop()
-
-#     #         ax.set_title(f'TIAGo Scans, t={predictor_time[frame, 1]}')
-#     #         robot.set_center(robot_center[frame])
-#     #         controlled_pt.set_offsets(robot_config[frame, :2])
-#     #         robot_label.set_position(robot_center[frame])
-#     #         current_scans = np.array(laser_scans[frame])
-
-#     #         theta = robot_config[frame, 2]
-#     #         current_laser_pos = robot_config[frame, :2] + z_rotation(theta, laser_position)
-#     #         fov.set_center(current_laser_pos)
-#     #         fov.set_radius(range_max)
-#     #         fov.set_theta1((theta + angle_min) * 180 / np.pi)
-#     #         fov.set_theta2((theta + angle_max) * 180 / np.pi)
-#     #         fov.set_width(range_max - range_min)
-
-#     #         for i in range(n_clusters):
-#     #             core_point_prediction = core_points_predictions[frame, i, :, :]
-#     #             core_point_position = core_point_prediction[: , 0]
-#     #             core_points_position[i].set_offsets(core_point_position)
-#     #             core_points_label[i].set_position(core_point_position)
-#     #             core_pred_line[i].set_data(core_point_prediction[0, :], core_point_prediction[1, :])
-
-#     #         if current_scans.shape[0] > 0:
-#     #             scans.set_data(current_scans[:, 0], current_scans[:, 1])
-#     #         else:
-#     #             scans.set_data([], [])
-
-#     #         return robot, robot_label, fov, scans, core_points_position, core_points_label, core_pred_line
-
-#     #     scans_animation = FuncAnimation(scans_fig, update_scans,
-#     #                                     frames=shooting_nodes,
-#     #                                     init_func=init_scans,
-#     #                                     blit=False,
-#     #                                     interval=1/frequency*500,
-#     #                                     repeat=False)
-#     #     scans_fig.tight_layout()
-#     #     if save_video:
-#     #         scans_animation.save(scans_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-#     #         print("Scans animation saved")
-        
-#     #     plt.show()
 
 def main():
     rospy.init_node('tiago_plotter', log_level=rospy.INFO)

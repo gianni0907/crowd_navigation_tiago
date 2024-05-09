@@ -38,7 +38,6 @@ class CameraDetectionManager:
         self.bridge = CvBridge()
         self.rgb_image_nonrt = None
         self.depth_image_nonrt = None
-        self.processed_image = None
         self.model = YOLO("yolov8n.pt")
         if self.hparams.simulation:
             self.agents_pos_nonrt = np.zeros((self.hparams.n_actors, 2))
@@ -49,7 +48,6 @@ class CameraDetectionManager:
             self.time_history = []
             self.measurements_history = []
             self.robot_config_history = []
-            self.agents_pos_history = []
             self.boundary_vertexes = []
             # Setup variables to create a video
             self.fourcc = cv2.VideoWriter_fourcc(*'MP4V')
@@ -57,6 +55,8 @@ class CameraDetectionManager:
                                        self.fourcc,
                                        self.hparams.controller_frequency,
                                        (640, 480))
+            if self.hparams.simulation:
+                self.agents_pos_history = []
 
         # Setup reference frames
         self.map_frame = 'map'
@@ -180,22 +180,22 @@ class CameraDetectionManager:
             rospy.logwarn("Missing camera pose")
             return False
 
-    def data_extraction(self):
+    def data_extraction(self, rgb_img, depth_img):
         robot_position = self.robot_config.get_q()[:2]
         dynamic_n_agents = 0
         core_points = np.ones((self.hparams.n_actors, 2)) * 1000
-        results = self.model(self.rgb_image, conf=0.5, verbose=False)
+        results = self.model(rgb_img, conf=0.5, verbose=False)
         for result in results:
             labels, cords = result.boxes.cls, result.boxes.xyxyn
             for label, cord in zip(labels, cords):
                 if label == 0:
-                    box_center = torch.tensor([(cord[0] + cord[2]) / 2 * self.rgb_image.shape[1],
-                                               (cord[1] + cord[3]) / 2 * self.rgb_image.shape[0]]).to("cpu")
+                    box_center = torch.tensor([(cord[0] + cord[2]) / 2 * rgb_img.shape[1],
+                                               (cord[1] + cord[3]) / 2 * rgb_img.shape[0]]).to("cpu")
                     x_c = int(torch.round(box_center[0]).item())
                     y_c = int(torch.round(box_center[1]).item())
                     # center = (x_c, y_c)
-                    # cv2.circle(self.rgb_image, center, radius=5, color=(0, 0, 255), thickness=-1)
-                    depth = self.depth_image[y_c, x_c]
+                    # cv2.circle(rgb_img, center, radius=5, color=(0, 0, 255), thickness=-1)
+                    depth = depth_img[y_c, x_c]
                     point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
                     scale = depth / point_cam[2]
                     point_cam = point_cam * scale
@@ -203,13 +203,13 @@ class CameraDetectionManager:
                     homo_point_wrld = np.matmul(self.camera_pose, homo_point_cam)
                     core_points[dynamic_n_agents] = homo_point_wrld[:2]
                     dynamic_n_agents += 1
-            self.processed_image = result.plot()
-            self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(self.processed_image))
+            processed_img = result.plot()
+            self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
 
         core_points, _ = sort_by_distance(core_points, robot_position)
         core_points = core_points[:np.min([self.hparams.n_clusters,dynamic_n_agents])]
 
-        return core_points
+        return core_points, processed_img
 
     def log_values(self):
         output_dict = {}
@@ -255,7 +255,7 @@ class CameraDetectionManager:
             start_time = time.time()
 
             if self.status == Status.WAITING:
-                if self.update_configuration():
+                if self.update_configuration() and self.get_camera_pose():
                     self.status = Status.READY
                 else:
                     rate.sleep()
@@ -269,32 +269,31 @@ class CameraDetectionManager:
             with self.data_lock:
                 self.update_configuration()
                 self.get_camera_pose()
-                self.rgb_image = self.rgb_image_nonrt
-                self.depth_image = self.depth_image_nonrt
-                self.agents_pos = self.agents_pos_nonrt
+                rgb_image = self.rgb_image_nonrt
+                depth_image = self.depth_image_nonrt
+                agents_pos = self.agents_pos_nonrt
 
-            self.measurements = self.data_extraction()
+            measurements, processed_image = self.data_extraction(rgb_image, depth_image)
 
             # Update measurements message
-            measurements = Measurements()
-            for measurement in self.measurements:
-                measurements.append(Position(measurement[0], measurement[1]))
+            measurements_obj = Measurements()
+            for measurement in measurements:
+                measurements_obj.append(Position(measurement[0], measurement[1]))
             measurements_stamped = MeasurementsStamped(rospy.Time.from_sec(start_time),
                                                        'map',
-                                                       measurements)
+                                                       measurements_obj)
             measurements_stamped_msg = MeasurementsStamped.to_message(measurements_stamped)
             self.measurements_publisher.publish(measurements_stamped_msg)
 
             if self.hparams.log:
-                self.out.write(self.processed_image)
+                self.out.write(processed_image)
                 self.robot_config_history.append([self.robot_config.x,
                                                   self.robot_config.y,
                                                   self.robot_config.theta,
                                                   start_time])
-                self.measurements_history.append(self.measurements.tolist())
+                self.measurements_history.append(measurements.tolist())
                 if self.hparams.simulation:
-                    self.agents_pos_history.append(self.agents_pos.tolist())
-
+                    self.agents_pos_history.append(agents_pos.tolist())
                 end_time = time.time()
                 deltat = end_time - start_time
                 self.time_history.append([deltat, start_time])

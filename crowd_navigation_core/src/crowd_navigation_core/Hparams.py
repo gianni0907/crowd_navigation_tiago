@@ -30,7 +30,6 @@ class Hparams:
     wheel_radius = 0.0985 # [m]
     wheel_separation = 0.4044 # [m]
     b = 0.1 # [m]
-    relative_laser_pos = np.array([0.2012 - b, -0.0009])
 
     # NMPC parameters
     controller_frequency = 10.0 # [Hz]
