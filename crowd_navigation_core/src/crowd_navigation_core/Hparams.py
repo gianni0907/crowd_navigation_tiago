@@ -72,10 +72,10 @@ class Hparams:
                              [11.5, -1.5],
                              [11.5, 11.5]])
     else:
-        vertexes = np.array([[5.1, -5.1],
-                             [5.1, -7.4],
-                             [11.3, -7.7],
-                             [11.8, -5.4]])
+        vertexes = np.array([[-0.6, 0.8],
+                             [-0.6, -1.3],
+                             [5.5, -1.3],
+                             [5.5, 0.8]])
 
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
@@ -107,16 +107,16 @@ class Hparams:
         terminal_factor_v = 3e2 # factor for the terminal velocities (v and omega) weights
     else:
         p_weight = 1e2 # position weights
-        v_weight = 5e0 # driving velocity weight
+        v_weight = 5e1 # driving velocity weight
         omega_weight = 1e-5 # steering velocity weight
-        u_weight = 2e1 # input weights
+        u_weight = 1e1 # input weights
         h_weight = 1e2 # heading term weight
-        terminal_factor_p = 1e1 # factor for the terminal position weights
-        terminal_factor_v = 5e1 # factor for the terminal velocities (v and omega) weights
+        terminal_factor_p = 8e0 # factor for the terminal position weights
+        terminal_factor_v = 3e2 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
-    ds_cbf = 0.5 # safety clearance
+    ds_cbf = 0.4 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
