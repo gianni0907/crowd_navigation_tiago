@@ -220,11 +220,13 @@ class MotionGenerationManager:
             )
             self.set_from_tf_transform(transform)
             # Update [v, omega]
-            self.state.v = self.hparams.wheel_radius * 0.5 * \
-                (self.wheels_vel[self.hparams.r_wheel_idx] + self.wheels_vel[self.hparams.l_wheel_idx])
+            # self.state.v = self.hparams.wheel_radius * 0.5 * \
+            #     (self.wheels_vel[self.hparams.r_wheel_idx] + self.wheels_vel[self.hparams.l_wheel_idx])
             
-            self.state.omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * \
-                (self.wheels_vel[self.hparams.r_wheel_idx] - self.wheels_vel[self.hparams.l_wheel_idx])
+            # self.state.omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * \
+            #     (self.wheels_vel[self.hparams.r_wheel_idx] - self.wheels_vel[self.hparams.l_wheel_idx])
+            self.state.v = self.v
+            self.state.omega = self.omega
             return True
         except(tf2_ros.LookupException,
                tf2_ros.ConnectivityException,
