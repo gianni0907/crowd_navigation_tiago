@@ -26,9 +26,6 @@ class NMPC:
         # Number of control intervals:
         self.N = hparams.N_horizon
 
-        # Setup control inputs over the horizon
-        self.u = np.zeros((self.N, self.nu))
-
         # Horizon duration:
         self.dt = self.hparams.dt
         self.T = self.dt * self.N # [s]
@@ -412,8 +409,5 @@ class NMPC:
         # Solve NLP
         self.u0 = self.acados_ocp_solver.solve_for_x0(state.get_state())
 
-        for k in range(self.N):
-            self.u[k] = self.acados_ocp_solver.get(k, 'u')
-
     def get_command(self):
-        return self.u
+        return self.u0

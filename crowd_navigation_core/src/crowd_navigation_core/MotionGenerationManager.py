@@ -55,10 +55,6 @@ class MotionGenerationManager:
         # Set real-time prediction:
         self.crowd_motion_prediction_stamped_rt = self.crowd_motion_prediction_stamped
 
-        # Set index counter for the previously found commands to use whenever NMPC fails
-        self.command_counter = 0
-        self.commands = np.zeros((self.hparams.N_horizon, self.nmpc_controller.nu))
-
         # Setup publisher for wheel velocity commands:
         cmd_vel_topic = '/mobile_base_controller/cmd_vel'
         self.cmd_vel_publisher = rospy.Publisher(
@@ -346,20 +342,14 @@ class MotionGenerationManager:
                         u_ref,
                         self.crowd_motion_prediction_stamped_rt.crowd_motion_prediction
                     )
-                    self.command_counter = 0
-                    self.commands = self.nmpc_controller.get_command()
-                    self.control_input = self.commands[self.command_counter]
+                    self.control_input = self.nmpc_controller.get_command()
                 except Exception as e:
-                    rospy.logwarn(f"NMPC solver failed, {self.command_counter}")
+                    rospy.logwarn("NMPC solver failed")
                     rospy.logwarn('{}'.format(e))
+                    self.control_input = np.zeros(self.nmpc_controller.nu)
                     print("Failure state ############################")
                     print(self.state)
                     print("##########################################")
-                    if self.command_counter + 1 < self.hparams.N_horizon:
-                        self.command_counter += 1
-                        self.control_input = self.commands[self.command_counter]
-                    else:
-                        self.control_input = np.zeros(self.nmpc_controller.nu)
                 
         else:
             self.control_input = np.zeros((self.nmpc_controller.nu))
