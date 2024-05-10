@@ -139,9 +139,9 @@ class Hparams:
         # Clustering hparams
         selection_mode = SelectionMode.AVERAGE
         if selection_mode == SelectionMode.CLOSEST:
-            eps = 0.6
+            eps = 0.7
             min_samples = 2
             avg_win_size = 5
         elif selection_mode == SelectionMode.AVERAGE:
-            eps = 0.6
+            eps = 0.7
             min_samples = 2

@@ -120,7 +120,7 @@ def data_association(predictions, covariances, measurements):
     # Heuristics to consider for the associations: gating, best friend, lonely best friend
     # heuristics param
     gating_tau = 10 # maximum Mahalanobis distance threshold
-    gamma_threshold = 1e-1 # lonely best friends threshold
+    gamma_threshold = 1e-2 # lonely best friends threshold
     # consider 2 arrays of dimension [n_measurements] containing the following association info:
     #   fsm indices
     #   association value (euclidean distance)

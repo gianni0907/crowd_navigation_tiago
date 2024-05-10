@@ -331,7 +331,7 @@ class MotionGenerationManager:
                               0.0 - self.state.omega])
             
             if norm(error) < self.hparams.error_tol:
-                self.control_input = np.zeros((self.nmpc_controller.nu))
+                self.control_input = np.zeros(self.nmpc_controller.nu)
                 print("Stop state ###############################")
                 print(self.state)
                 print("##########################################")
@@ -354,7 +354,7 @@ class MotionGenerationManager:
                     print("##########################################")
                 
         else:
-            self.control_input = np.zeros((self.nmpc_controller.nu))
+            self.control_input = np.zeros(self.nmpc_controller.nu)
             if not(self.sensing) and self.hparams.n_actors > 0:
                 rospy.logwarn("Missing sensing info")
             if self.status == Status.MOVING:
