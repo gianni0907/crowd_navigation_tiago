@@ -221,11 +221,13 @@ class MotionGenerationManager:
             )
             self.tf2q(transform)
             # Update [v, omega]
-            self.state.v = self.hparams.wheel_radius * 0.5 * \
-                (self.wheels_vel[self.hparams.r_wheel_idx] + self.wheels_vel[self.hparams.l_wheel_idx])
+            # self.state.v = self.hparams.wheel_radius * 0.5 * \
+            #     (self.wheels_vel[self.hparams.r_wheel_idx] + self.wheels_vel[self.hparams.l_wheel_idx])
             
-            self.state.omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * \
-                (self.wheels_vel[self.hparams.r_wheel_idx] - self.wheels_vel[self.hparams.l_wheel_idx])
+            # self.state.omega = (self.hparams.wheel_radius / self.hparams.wheel_separation) * \
+            #     (self.wheels_vel[self.hparams.r_wheel_idx] - self.wheels_vel[self.hparams.l_wheel_idx])
+            self.state.v = self.v
+            self.state.omega = self.omega
             return True
         except(tf2_ros.LookupException,
                tf2_ros.ConnectivityException,
@@ -330,7 +332,7 @@ class MotionGenerationManager:
                               0.0 - self.state.omega])
             
             if norm(error) < self.hparams.error_tol:
-                self.control_input = np.zeros((self.nmpc_controller.nu))
+                self.control_input = np.zeros(self.nmpc_controller.nu)
                 print("Stop state ###############################")
                 print(self.state)
                 print("##########################################")
@@ -347,13 +349,13 @@ class MotionGenerationManager:
                 except Exception as e:
                     rospy.logwarn("NMPC solver failed")
                     rospy.logwarn('{}'.format(e))
-                    self.control_input = np.zeros((self.nmpc_controller.nu))
+                    self.control_input = np.zeros(self.nmpc_controller.nu)
                     print("Failure state ############################")
                     print(self.state)
                     print("##########################################")
                 
         else:
-            self.control_input = np.zeros((self.nmpc_controller.nu))
+            self.control_input = np.zeros(self.nmpc_controller.nu)
             if not(self.sensing) and self.hparams.n_actors > 0:
                 rospy.logwarn("Missing sensing data")
             if self.status == Status.MOVING:

@@ -100,7 +100,7 @@ class Hparams:
     # Cost function weights
     if simulation:
         p_weight = 1e2 # position weights
-        v_weight = 8e1 # driving velocity weight
+        v_weight = 5e1 # driving velocity weight
         omega_weight = 1e-5 # steering velocity weight
         u_weight = 1e1 # input weights
         h_weight = 1e2 # heading term weight
@@ -108,16 +108,16 @@ class Hparams:
         terminal_factor_v = 3e2 # factor for the terminal velocities (v and omega) weights
     else:
         p_weight = 1e2 # position weights
-        v_weight = 5e0 # driving velocity weight
+        v_weight = 5e1 # driving velocity weight
         omega_weight = 1e-5 # steering velocity weight
-        u_weight = 2e1 # input weights
+        u_weight = 1e1 # input weights
         h_weight = 1e2 # heading term weight
-        terminal_factor_p = 1e1 # factor for the terminal position weights
-        terminal_factor_v = 5e1 # factor for the terminal velocities (v and omega) weights
+        terminal_factor_p = 8e0 # factor for the terminal position weights
+        terminal_factor_v = 3e2 # factor for the terminal velocities (v and omega) weights
 
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
-    ds_cbf = 0.5 # safety clearance
+    ds_cbf = 0.4 # safety clearance
     gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
@@ -125,7 +125,7 @@ class Hparams:
     if n_actors == 0 or fake_sensing:
         n_clusters = n_actors
     else:
-        n_clusters = 3 # number of clusters
+        n_clusters = 5 # number of clusters
 
     # Parameters for the crowd prediction
     if n_actors > 0:
@@ -140,9 +140,9 @@ class Hparams:
         # Clustering hparams
         selection_mode = SelectionMode.AVERAGE
         if selection_mode == SelectionMode.CLOSEST:
-            eps = 0.6
+            eps = 0.7
             min_samples = 2
             avg_win_size = 5
         elif selection_mode == SelectionMode.AVERAGE:
-            eps = 0.6
+            eps = 0.7
             min_samples = 2
