@@ -233,6 +233,15 @@ class Status(Enum):
     READY = 1
     MOVING = 2
 
+class Perception(Enum):
+    FAKE = 0
+    LASER = 1
+    CAMERA = 2
+    BOTH = 3
+
+    def print(mode):
+        return f'{mode}'
+
 class SelectionMode(Enum):
     CLOSEST = 0
     AVERAGE = 1
@@ -341,3 +350,75 @@ def compute_normal_vector(p1, p2):
     normalized_normal_vector = normal_vector / magnitude
 
     return normalized_normal_vector
+
+def data_association(predictions, covariances, measurements):
+    n_measurements = measurements.shape[0]
+    n_fsms = predictions.shape[0]
+
+    # Heuristics to consider for the associations: gating, best friend, lonely best friend
+    # heuristics param
+    gating_tau = 10 # maximum Mahalanobis distance threshold
+    gamma_threshold = 1e-1 # lonely best friends threshold
+    # consider 2 arrays of dimension [n_measurements] containing the following association info:
+    #   fsm indices
+    #   distances (mahalanobis distance)
+    fsm_indices = -1 * np.ones(n_measurements, dtype=int)
+    distances = np.ones(n_measurements) * np.inf
+
+    if n_fsms == 0 or n_measurements == 0:
+        return fsm_indices
+
+    A_mat = np.zeros((n_measurements, n_fsms)) # [n_measurements x n_fsms] Association matrix
+    for i in range(n_fsms):
+        info_mat = np.linalg.inv(covariances[i])
+        for j in range(n_measurements):
+            diff = measurements[j] - predictions[i]
+            A_mat[j, i] = np.sqrt(diff @ info_mat @ diff.T)
+
+    for j in range(n_measurements):
+        # compute row minimum
+        d_ji = np.min(A_mat[j, :])
+        min_idx = np.argmin(A_mat[j, :])
+
+        # gating
+        if (d_ji < gating_tau):
+            fsm_indices[j] = min_idx
+            distances[j] = d_ji
+        else:
+            fsm_indices[j] = -1
+            distances[j] = d_ji
+
+    # best friends
+    for j in range(n_measurements):    
+        proposed_est = fsm_indices[j]
+        d_ji = distances[j]
+        if proposed_est != -1:
+            # compute column minimum
+            col_min = np.min(A_mat[:, proposed_est])
+
+            if d_ji != col_min:
+                fsm_indices[j] = -1
+
+
+    # lonely best friends
+    if n_fsms > 1 and n_measurements > 1:
+        for j in range(n_measurements):
+            proposed_est = fsm_indices[j]
+            d_ji = distances[j]
+
+            if proposed_est == -1:
+                continue
+
+            # take second best value of the row
+            ordered_row = np.sort(A_mat[j, :])
+            second_min_row = ordered_row[1]
+
+            # take second best value of the col
+            ordered_col = np.sort(A_mat[:, proposed_est])
+            second_min_col = ordered_col[1]
+
+            # check association ambiguity
+            if (second_min_row - d_ji) < gamma_threshold or (second_min_col - d_ji) < gamma_threshold:
+                fsm_indices[j] = -1
+    
+    return fsm_indices

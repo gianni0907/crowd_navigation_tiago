@@ -28,6 +28,6 @@ catkin_install_python(PROGRAMS
   scripts/crowd_prediction
   scripts/plotter
   scripts/send_desired_target_position
-  scripts/send_actors_trajectory
+  scripts/send_agents_trajectory
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

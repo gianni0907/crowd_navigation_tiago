@@ -40,8 +40,8 @@ class CameraDetectionManager:
         self.depth_image_nonrt = None
         self.model = YOLO("yolov8n.pt")
         if self.hparams.simulation:
-            self.agents_pos_nonrt = np.zeros((self.hparams.n_actors, 2))
-            self.agents_name = ['actor_{}'.format(i) for i in range(self.hparams.n_actors)]
+            self.agents_pos_nonrt = np.zeros((self.hparams.n_agents, 2))
+            self.agents_name = ['actor_{}'.format(i) for i in range(self.hparams.n_agents)]
 
         # Set variables to store data
         if self.hparams.log:
@@ -49,12 +49,6 @@ class CameraDetectionManager:
             self.measurements_history = []
             self.robot_config_history = []
             self.boundary_vertexes = []
-            # Setup variables to create a video
-            self.fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-            self.out = cv2.VideoWriter(os.path.join(self.hparams.log_dir, self.hparams.filename + '_camera_view.mp4'),
-                                       self.fourcc,
-                                       self.hparams.controller_frequency,
-                                       (640, 480))
             if self.hparams.simulation:
                 self.agents_pos_history = []
 
@@ -68,10 +62,10 @@ class CameraDetectionManager:
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         # Setup subscriber to image_raw topic
-        image_topic = '/xtion/rgb/image_raw'
+        image_topic = '/xtion/rgb/image_raw/compressed'
         rospy.Subscriber(
             image_topic,
-            sensor_msgs.msg.Image,
+            sensor_msgs.msg.CompressedImage,
             self.image_callback
         )
 
@@ -109,7 +103,7 @@ class CameraDetectionManager:
 
     def image_callback(self, data):
         try:
-            self.rgb_image_nonrt = self.bridge.imgmsg_to_cv2(data, 'bgr8')
+            self.rgb_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data, 'bgr8')
         except Exception as e:
             rospy.logerr(e)
 
@@ -121,7 +115,7 @@ class CameraDetectionManager:
 
     def gazebo_model_states_callback(self, msg):
         if self.hparams.simulation:
-            agents_pos = np.zeros((self.hparams.n_actors, 2))
+            agents_pos = np.zeros((self.hparams.n_agents, 2))
             idx = 0
             for agent_name in self.agents_name:
                 if agent_name in msg.name:
@@ -182,8 +176,7 @@ class CameraDetectionManager:
 
     def data_extraction(self, rgb_img, depth_img):
         robot_position = self.robot_config.get_q()[:2]
-        dynamic_n_agents = 0
-        core_points = np.ones((self.hparams.n_actors, 2)) * 1000
+        core_points = []
         results = self.model(rgb_img, conf=0.5, verbose=False)
         for result in results:
             labels, cords = result.boxes.cls, result.boxes.xyxyn
@@ -196,18 +189,19 @@ class CameraDetectionManager:
                     # center = (x_c, y_c)
                     # cv2.circle(rgb_img, center, radius=5, color=(0, 0, 255), thickness=-1)
                     depth = depth_img[y_c, x_c]
-                    point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
-                    scale = depth / point_cam[2]
-                    point_cam = point_cam * scale
-                    homo_point_cam = np.append(point_cam, 1)
-                    homo_point_wrld = np.matmul(self.camera_pose, homo_point_cam)
-                    core_points[dynamic_n_agents] = homo_point_wrld[:2]
-                    dynamic_n_agents += 1
+                    if not np.isnan(depth):
+                        point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
+                        scale = depth / point_cam[2]
+                        point_cam = point_cam * scale
+                        homo_point_cam = np.append(point_cam, 1)
+                        homo_point_wrld = np.matmul(self.camera_pose, homo_point_cam)
+                        core_points.append(homo_point_wrld[:2])
             processed_img = result.plot()
             self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
 
+        core_points = np.array(core_points)
         core_points, _ = sort_by_distance(core_points, robot_position)
-        core_points = core_points[:np.min([self.hparams.n_clusters,dynamic_n_agents])]
+        core_points = core_points[:self.hparams.n_filters]
 
         return core_points, processed_img
 
@@ -218,7 +212,7 @@ class CameraDetectionManager:
         output_dict['robot_config'] = self.robot_config_history
         output_dict['frequency'] = self.hparams.controller_frequency
         output_dict['b'] = self.hparams.b
-        output_dict['n_clusters'] = self.hparams.n_clusters
+        output_dict['n_filters'] = self.hparams.n_filters
         output_dict['n_points'] = self.hparams.n_points
         for i in range(self.hparams.n_points):
             self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
@@ -226,7 +220,7 @@ class CameraDetectionManager:
         output_dict['base_radius'] = self.hparams.base_radius
         output_dict['simulation'] = self.hparams.simulation
         if self.hparams.simulation:
-            output_dict['n_agents'] = self.hparams.n_actors
+            output_dict['n_agents'] = self.hparams.n_agents
             output_dict['agents_pos'] = self.agents_pos_history
             output_dict['agent_radius'] = self.hparams.ds_cbf
 
@@ -248,7 +242,21 @@ class CameraDetectionManager:
 
         rate = rospy.Rate(self.hparams.controller_frequency)
 
+        if self.hparams.n_filters == 0:
+            rospy.logwarn("No agent considered, camera detection disabled")
+            return
+
+        if self.hparams.perception == Perception.FAKE or self.hparams.perception == Perception.LASER:
+            rospy.logwarn("Camera detection disabled")
+            return
+
         if self.hparams.log:
+            # Setup variables to create a video
+            self.fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+            self.out = cv2.VideoWriter(os.path.join(self.hparams.log_dir, self.hparams.filename + '_camera_view.mp4'),
+                                       self.fourcc,
+                                       self.hparams.controller_frequency,
+                                       (cam_info.width, cam_info.height))
             rospy.on_shutdown(self.log_values)
 
         while not rospy.is_shutdown():
@@ -271,11 +279,12 @@ class CameraDetectionManager:
                 self.get_camera_pose()
                 rgb_image = self.rgb_image_nonrt
                 depth_image = self.depth_image_nonrt
-                agents_pos = self.agents_pos_nonrt
+                if self.hparams.simulation:
+                    agents_pos = self.agents_pos_nonrt
 
             measurements, processed_image = self.data_extraction(rgb_image, depth_image)
 
-            # Update measurements message
+            # Create measurements message
             measurements_obj = Measurements()
             for measurement in measurements:
                 measurements_obj.append(Position(measurement[0], measurement[1]))
@@ -285,6 +294,7 @@ class CameraDetectionManager:
             measurements_stamped_msg = MeasurementsStamped.to_message(measurements_stamped)
             self.measurements_publisher.publish(measurements_stamped_msg)
 
+            # Update logged data
             if self.hparams.log:
                 self.out.write(processed_image)
                 self.robot_config_history.append([self.robot_config.x,

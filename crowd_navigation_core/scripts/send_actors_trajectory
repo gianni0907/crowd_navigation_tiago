@@ -1,5 +1,0 @@
-#!/usr/bin/env python3
-
-import crowd_navigation_core.SendActorsTrajectory as SendActorsTrajectory
-if __name__ == '__main__':
-    SendActorsTrajectory.main()

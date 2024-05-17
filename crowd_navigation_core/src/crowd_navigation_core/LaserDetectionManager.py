@@ -33,8 +33,8 @@ class LaserDetectionManager:
         self.hparams = Hparams()
         self.laser_scan_nonrt = None
         if self.hparams.simulation:
-            self.agents_pos_nonrt = np.zeros((self.hparams.n_actors, 2))
-            self.agents_name = ['actor_{}'.format(i) for i in range(self.hparams.n_actors)]
+            self.agents_pos_nonrt = np.zeros((self.hparams.n_agents, 2))
+            self.agents_name = ['actor_{}'.format(i) for i in range(self.hparams.n_agents)]
 
         # Set variables to store data
         if self.hparams.log:
@@ -85,7 +85,7 @@ class LaserDetectionManager:
 
     def gazebo_model_states_callback(self, msg):
         if self.hparams.simulation:
-            agents_pos = np.zeros((self.hparams.n_actors, 2))
+            agents_pos = np.zeros((self.hparams.n_agents, 2))
             idx = 0
             for agent_name in self.agents_name:
                 if agent_name in msg.name:
@@ -214,7 +214,7 @@ class LaserDetectionManager:
                         core_points[id] = core_points[id] + (point - core_points[id]) / n_points[id]
 
             core_points, _ = sort_by_distance(core_points, robot_position)
-            core_points = core_points[:self.hparams.n_clusters]
+            core_points = core_points[:self.hparams.n_filters]
         else:
             core_points = np.array([])
 
@@ -229,7 +229,7 @@ class LaserDetectionManager:
         output_dict['laser_positions'] = self.laser_pos_history
         output_dict['frequency'] = self.hparams.controller_frequency
         output_dict['b'] = self.hparams.b
-        output_dict['n_clusters'] = self.hparams.n_clusters
+        output_dict['n_filters'] = self.hparams.n_filters
         output_dict['n_points'] = self.hparams.n_points
         for i in range(self.hparams.n_points):
             self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
@@ -237,7 +237,7 @@ class LaserDetectionManager:
         output_dict['base_radius'] = self.hparams.base_radius
         output_dict['simulation'] = self.hparams.simulation
         if self.hparams.simulation:
-            output_dict['n_agents'] = self.hparams.n_actors
+            output_dict['n_agents'] = self.hparams.n_agents
             output_dict['agents_pos'] = self.agents_pos_history
             output_dict['agent_radius'] = self.hparams.ds_cbf
         output_dict['laser_offset'] = self.hparams.offset
@@ -263,6 +263,14 @@ class LaserDetectionManager:
     def run(self):
         rate = rospy.Rate(self.hparams.controller_frequency)
 
+        if self.hparams.n_filters == 0:
+            rospy.logwarn("No agent considered, laser detection disabled")
+            return
+
+        if self.hparams.perception == Perception.FAKE or self.hparams.perception == Perception.CAMERA:
+            rospy.logwarn("Laser detection disabled")
+            return
+
         if self.hparams.log:
             rospy.on_shutdown(self.log_values)
 
@@ -285,7 +293,8 @@ class LaserDetectionManager:
                 self.update_configuration()
                 self.get_laser_pose()
                 self.laser_scan = self.laser_scan_nonrt
-                agents_pos = self.agents_pos_nonrt
+                if self.hparams.simulation:
+                    agents_pos = self.agents_pos_nonrt
 
             # Perform data preprocessing
             observations = self.data_preprocessing()
@@ -302,6 +311,7 @@ class LaserDetectionManager:
             measurements_stamped_msg = MeasurementsStamped.to_message(measurements_stamped)
             self.measurements_publisher.publish(measurements_stamped_msg)
 
+            # Update logged data
             if self.hparams.log:
                 self.robot_config_history.append([self.robot_config.x,
                                                   self.robot_config.y,

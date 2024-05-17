@@ -4,10 +4,10 @@ from crowd_navigation_core.utils import *
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    save_video = True
+    save_video = False
     if log:
         log_dir = '/tmp/crowd_navigation_tiago/data'
-        filename = 'test'
+        filename = 'test_both'
         generator_file = filename + '_generator.json'
         predictor_file = filename + '_predictor.json'
         laser_detector_file = filename + '_laser_detector.json'
@@ -16,14 +16,21 @@ class Hparams:
     # Specify whether to use gazebo (simulation = True) or real robot
     simulation = True
 
-    # Specify whether to use laser scans data or ground truth
-    fake_sensing = False
+    # Specify the type of sensing, 4 possibilities:
+    # FAKE: no sensors, the robot knows the fake trajectory assigned to agents (not visible in Gazebo)
+    # LASER: only lasser sensor enabled
+    # CAMERA: only camera enabled
+    # BOTH: both laser and camera enabled
+    perception = Perception.BOTH
 
-    # Specify whether to process measurement with KFs (only if fake_sensing = False)
-    if not fake_sensing:
-        use_kalman = True # Set to False to not use KFs
-    else:
-        use_kalman = False
+    if perception == Perception.FAKE and not simulation:
+        raise ValueError("Cannot use fake perception in real world")
+
+    # Specify whether to process measurement with KFs
+    use_kalman = True
+
+    if perception == Perception.FAKE and use_kalman == True:
+        raise ValueError("Cannot use KFs with fake sensing")
 
     # Kinematic parameters
     base_radius = 0.27 # [m]
@@ -118,17 +125,17 @@ class Hparams:
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
     ds_cbf = 0.4 # safety clearance
-    gamma_actor = 0.1 # in (0,1], hyperparameter for the h function associated to actor
+    gamma_agent = 0.1 # in (0,1], hyperparameter for the h function associated to agent
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_actors = 7 # number of actors
-    if n_actors == 0 or fake_sensing:
-        n_clusters = n_actors
-    else:
-        n_clusters = 5 # number of clusters
+    n_filters = 3 # maximum number of simultaneously tracked agents
+    if simulation:
+        n_agents = 7 # number of total agents involved, for plotting purpose
+        if perception == Perception.FAKE:
+            n_filters = n_agents
 
     # Parameters for the crowd prediction
-    if n_actors > 0:
+    if n_filters > 0:
         nullpos = -30
         nullstate = np.array([nullpos, nullpos, 0.0, 0.0])
         innovation_threshold = 1
