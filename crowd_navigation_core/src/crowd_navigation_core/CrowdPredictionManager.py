@@ -212,6 +212,12 @@ class CrowdPredictionManager:
                 if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):       
                         camera_measurements = self.adapt_measurements_format(camera_measurements)
 
+                # NOTE: sensor fusion is not implemented yet, regardless of the perception mode selected
+                if self.hparams.perception in (Perception.LASER, Perception.BOTH):
+                    measurements = laser_measurements
+                elif self.hparams.perception == Perception.CAMERA:
+                    measurements = camera_measurements
+
                 if self.hparams.use_kalman:
                     # Perform data association
                     # predict next positions according to fsms
@@ -246,22 +252,28 @@ class CrowdPredictionManager:
                         if self.hparams.log:
                             self.camera_associations.append([fsm_indices_camera.tolist(), start_time])
 
-                    # update each fsm based on the associations
+                    # NOTE: sensor fusion is not implemented yet, regardless of the perception mode selected
+                    if self.hparams.perception in (Perception.LASER, Perception.BOTH):
+                        fsm_indices = fsm_indices_laser
+                    elif self.hparams.perception == Perception.CAMERA:
+                        fsm_indices = fsm_indices_camera
+
+                    # update each fsm based on the associations 
                     agents_estimation = np.zeros((self.hparams.n_filters, 4))
                     for (i, fsm) in enumerate(fsms):
                         associated = False
-                        for (j,fsm_idx) in enumerate(fsm_indices_laser):
+                        for (j,fsm_idx) in enumerate(fsm_indices):
                             if fsm_idx == i:
-                                measure = laser_measurements[j]
+                                measure = measurements[j]
                                 fsm.update(start_time, measure)
                                 associated = True
                                 break
                         if associated == False:
-                            for (k, fsm_idx) in enumerate(fsm_indices_laser):
+                            for (k, fsm_idx) in enumerate(fsm_indices):
                                 if fsm_idx == -1:
-                                    measure = laser_measurements[k]
+                                    measure = measurements[k]
                                     fsm.update(start_time, measure)
-                                    fsm_indices_laser[k] = i
+                                    fsm_indices[k] = i
                                     associated = True
                                     break
                         if associated == False:
@@ -278,9 +290,9 @@ class CrowdPredictionManager:
                         crowd_motion_prediction.append(MotionPrediction(predicted_positions))
                 else:
                     for i in range(self.hparams.n_filters):
-                        if i < laser_measurements.shape[0]:
-                            current_estimate = np.array([laser_measurements[i, 0],
-                                                         laser_measurements[i, 1],
+                        if i < measurements.shape[0]:
+                            current_estimate = np.array([measurements[i, 0],
+                                                         measurements[i, 1],
                                                          0.0,
                                                          0.0])
                         else:
