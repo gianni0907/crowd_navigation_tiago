@@ -72,8 +72,8 @@ class LaserDetectionManager:
             self.gazebo_model_states_callback
         )
 
-        # Setup publisher to laser_measurements topic
-        measurements_topic = 'laser_measurements'
+        # Setup publisher to measurements topic
+        measurements_topic = 'measurements'
         self.measurements_publisher = rospy.Publisher(
             measurements_topic,
             crowd_navigation_msgs.msg.MeasurementsStamped,
@@ -227,7 +227,7 @@ class LaserDetectionManager:
         output_dict['measurements'] = self.measurements_history
         output_dict['robot_config'] = self.robot_config_history
         output_dict['laser_positions'] = self.laser_pos_history
-        output_dict['frequency'] = self.hparams.controller_frequency
+        output_dict['frequency'] = self.hparams.laser_detector_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
         output_dict['n_points'] = self.hparams.n_points
@@ -261,7 +261,7 @@ class LaserDetectionManager:
             json.dump(output_dict, file)     
 
     def run(self):
-        rate = rospy.Rate(self.hparams.controller_frequency)
+        rate = rospy.Rate(self.hparams.laser_detector_frequency)
 
         if self.hparams.n_filters == 0:
             rospy.logwarn("No agent considered, laser detection disabled")

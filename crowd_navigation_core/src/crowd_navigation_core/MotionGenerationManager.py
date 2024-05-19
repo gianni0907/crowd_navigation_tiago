@@ -218,7 +218,7 @@ class MotionGenerationManager:
             self.v = 0.0
             self.omega = 0.0
         else:
-            dt = 1 / self.hparams.controller_frequency
+            dt = 1 / self.hparams.generator_frequency
             alpha_r = control_input[self.hparams.r_wheel_idx]
             alpha_l = control_input[self.hparams.l_wheel_idx]
             wheel_radius = self.hparams.wheel_radius
@@ -277,7 +277,7 @@ class MotionGenerationManager:
         output_dict['agent_radius'] = self.hparams.ds_cbf
         output_dict['gamma_bound'] = self.hparams.gamma_bound
         output_dict['gamma_agent'] = self.hparams.gamma_agent
-        output_dict['frequency'] = self.hparams.controller_frequency
+        output_dict['frequency'] = self.hparams.generator_frequency
         output_dict['dt'] = self.hparams.dt
         output_dict['N_horizon'] = self.hparams.N_horizon
         output_dict['position_weight'] = self.hparams.p_weight
@@ -346,7 +346,7 @@ class MotionGenerationManager:
         return control_input
             
     def run(self):
-        rate = rospy.Rate(self.hparams.controller_frequency)
+        rate = rospy.Rate(self.hparams.generator_frequency)
 
         if self.hparams.log:
             rospy.on_shutdown(self.log_values)
@@ -358,7 +358,6 @@ class MotionGenerationManager:
                 if self.update_state():
                     self.init()
                     self.laser_relative_position = self.get_laser_relative_position()
-                    print(f'laser relative position {self.laser_relative_position}')
                     self.status = Status.READY
                     print("Initial state ****************************")
                     print(self.state)
@@ -424,7 +423,7 @@ class MotionGenerationManager:
                 end_time = time.time()        
                 deltat = end_time - start_time
                 self.time_history.append([deltat, start_time])
-                if deltat > 1 / (2 * self.hparams.controller_frequency):
+                if deltat > 1 / (2 * self.hparams.generator_frequency):
                     print(f"Iteration time {deltat} at instant {start_time}")
 
             rate.sleep()

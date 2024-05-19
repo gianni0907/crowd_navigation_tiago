@@ -93,8 +93,8 @@ class CameraDetectionManager:
             self.gazebo_model_states_callback
         )
 
-        # Setup publisher to camera_measurements topic
-        measurements_topic = 'camera_measurements'
+        # Setup publisher to measurements topic
+        measurements_topic = 'measurements'
         self.measurements_publisher = rospy.Publisher(
             measurements_topic,
             crowd_navigation_msgs.msg.MeasurementsStamped,
@@ -210,7 +210,7 @@ class CameraDetectionManager:
         output_dict['cpu_time'] = self.time_history
         output_dict['measurements'] = self.measurements_history
         output_dict['robot_config'] = self.robot_config_history
-        output_dict['frequency'] = self.hparams.controller_frequency
+        output_dict['frequency'] = self.hparams.camera_detector_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
         output_dict['n_points'] = self.hparams.n_points
@@ -240,7 +240,7 @@ class CameraDetectionManager:
         self.imgproc = PC()
         self.imgproc.fromCameraInfo(cam_info)
 
-        rate = rospy.Rate(self.hparams.controller_frequency)
+        rate = rospy.Rate(self.hparams.camera_detector_frequency)
 
         if self.hparams.n_filters == 0:
             rospy.logwarn("No agent considered, camera detection disabled")
@@ -255,7 +255,7 @@ class CameraDetectionManager:
             self.fourcc = cv2.VideoWriter_fourcc(*'MP4V')
             self.out = cv2.VideoWriter(os.path.join(self.hparams.log_dir, self.hparams.filename + '_camera_view.mp4'),
                                        self.fourcc,
-                                       self.hparams.controller_frequency,
+                                       self.hparams.camera_detector_frequency,
                                        (cam_info.width, cam_info.height))
             rospy.on_shutdown(self.log_values)
 

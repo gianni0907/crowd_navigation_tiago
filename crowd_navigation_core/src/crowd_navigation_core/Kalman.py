@@ -20,7 +20,7 @@ class Kalman:
         self.Pk = np.eye(4) * 1e-2
         var_v = 0.01
         self.Vk = np.eye(4) * var_v
-        var_w = 0.01
+        var_w = 1
         self.Wk = np.eye(2) * var_w
 
         if self.print_info:

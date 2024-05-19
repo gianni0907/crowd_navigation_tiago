@@ -29,35 +29,21 @@ class CrowdPredictionManager:
             self.kalman_infos = {}
             kalman_names = ['KF_{}'.format(i + 1) for i in range(self.hparams.n_filters)]
             self.kalman_infos = {key: list() for key in kalman_names}
-            if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
-                self.camera_associations = []
-            if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                self.laser_associations = []
+            if self.hparams.perception != Perception.FAKE:
+                self.associations = []
             if self.hparams.use_kalman:
                 self.estimation_history = []
 
         if self.hparams.perception == Perception.FAKE:
             self.fake_trajectories = None
         else:
-            # Setup subscriber to laser_measurements topic
-            if self.hparams.perception in (Perception.LASER, Perception.BOTH):  
-                self.laser_measurements_stamped_nonrt = None
-                laser_meas_topic = 'laser_measurements'
-                rospy.Subscriber(
-                    laser_meas_topic,
-                    crowd_navigation_msgs.msg.MeasurementsStamped,
-                    self.laser_measurements_callback
-                )
-
-            # Setup subscriber to camera_measurements topic
-            if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
-                self.camera_measurements_stamped_nonrt = None
-                camera_meas_topic = 'camera_measurements'
-                rospy.Subscriber(
-                    camera_meas_topic,
-                    crowd_navigation_msgs.msg.MeasurementsStamped,
-                    self.camera_measurements_callback
-                )
+            self.measurements_stamped_nonrt = None
+            measurements_topic = 'measurements'
+            rospy.Subscriber(
+                measurements_topic,
+                crowd_navigation_msgs.msg.MeasurementsStamped,
+                self.measurements_callback
+            )
 
         # Setup ROS Service to set agents trajectories:
         self.set_agents_trajectory_srv = rospy.Service(
@@ -74,11 +60,8 @@ class CrowdPredictionManager:
             queue_size=1
         )
 
-    def laser_measurements_callback(self, msg):
-        self.laser_measurements_stamped_nonrt = MeasurementsStamped.from_message(msg)
-
-    def camera_measurements_callback(self, msg):
-        self.camera_measurements_stamped_nonrt = MeasurementsStamped.from_message(msg)
+    def measurements_callback(self, msg):
+        self.measurements_stamped_nonrt = MeasurementsStamped.from_message(msg)
 
     def set_agents_trajectory_request(self, request):
         if self.hparams.perception == Perception.FAKE:           
@@ -124,10 +107,9 @@ class CrowdPredictionManager:
         output_dict = {}
         output_dict['cpu_time'] = self.time_history
         output_dict['kfs'] = self.kalman_infos
-        if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
-            output_dict['camera_associations'] = self.camera_associations
-        if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-            output_dict['laser_associations'] = self.laser_associations
+        output_dict['frequency'] = self.hparams.predictor_frequency
+        if self.hparams.perception != Perception.FAKE:
+            output_dict['associations'] = self.associations
         output_dict['use_kalman'] = self.hparams.use_kalman
         if self.hparams.use_kalman:
             output_dict['estimations'] = self.estimation_history
@@ -142,7 +124,7 @@ class CrowdPredictionManager:
             json.dump(output_dict, file)
 
     def run(self):
-        rate = rospy.Rate(self.hparams.controller_frequency)
+        rate = rospy.Rate(self.hparams.predictor_frequency)
         N = self.hparams.N_horizon
 
         if self.hparams.n_filters == 0:
@@ -162,25 +144,14 @@ class CrowdPredictionManager:
                 rospy.logwarn("Missing fake measurements")
                 rate.sleep()
                 continue
-            if (self.hparams.perception == Perception.BOTH) and \
-               (self.laser_measurements_stamped_nonrt is None or self.camera_measurements_stamped_nonrt is None):
-                rospy.logwarn("Missing both measurements")
-                rate.sleep()
-                continue
-            if self.hparams.perception == Perception.LASER and self.laser_measurements_stamped_nonrt is None:
-                rospy.logwarn("Missing laser measurements")
-                rate.sleep()
-                continue
-            if self.hparams.perception == Perception.CAMERA and self.camera_measurements_stamped_nonrt is None:
-                rospy.logwarn("Missing camera measurements")
+            elif self.hparams.perception != Perception.FAKE and self.measurements_stamped_nonrt is None:
+                rospy.logwarn("Missing measurements")
                 rate.sleep()
                 continue
 
             with self.data_lock:
-                if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                    laser_measurements = self.laser_measurements_stamped_nonrt
-                if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
-                    camera_measurements = self.camera_measurements_stamped_nonrt
+                if self.hparams.perception != Perception.FAKE:
+                    measurements = self.measurements_stamped_nonrt
             
             # Create crowd motion prediction message (based on the perception type)
             crowd_motion_prediction = CrowdMotionPrediction()
@@ -206,17 +177,8 @@ class CrowdPredictionManager:
                 self.current += 1
                 if self.current == self.trajectory_length:
                     self.current = 0
-            else:
-                if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                        laser_measurements = self.adapt_measurements_format(laser_measurements)
-                if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):       
-                        camera_measurements = self.adapt_measurements_format(camera_measurements)
-
-                # NOTE: sensor fusion is not implemented yet, regardless of the perception mode selected
-                if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                    measurements = laser_measurements
-                elif self.hparams.perception == Perception.CAMERA:
-                    measurements = camera_measurements
+            else:      
+                measurements = self.adapt_measurements_format(measurements)
 
                 if self.hparams.use_kalman:
                     # Perform data association
@@ -243,20 +205,9 @@ class CrowdPredictionManager:
                         next_predicted_positions[i] = predicted_state[:2]
                         next_positions_cov[i] = predicted_cov[:2, :2]
 
-                    if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                        fsm_indices_laser = data_association(next_predicted_positions, next_positions_cov, laser_measurements)
-                        if self.hparams.log:
-                            self.laser_associations.append([fsm_indices_laser.tolist(), start_time])
-                    if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):  
-                        fsm_indices_camera = data_association(next_predicted_positions, next_positions_cov, camera_measurements)
-                        if self.hparams.log:
-                            self.camera_associations.append([fsm_indices_camera.tolist(), start_time])
-
-                    # NOTE: sensor fusion is not implemented yet, regardless of the perception mode selected
-                    if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                        fsm_indices = fsm_indices_laser
-                    elif self.hparams.perception == Perception.CAMERA:
-                        fsm_indices = fsm_indices_camera
+                    fsm_indices = data_association(next_predicted_positions, next_positions_cov, measurements)
+                    if self.hparams.log:
+                        self.associations.append([fsm_indices.tolist(), start_time])
 
                     # update each fsm based on the associations 
                     agents_estimation = np.zeros((self.hparams.n_filters, 4))

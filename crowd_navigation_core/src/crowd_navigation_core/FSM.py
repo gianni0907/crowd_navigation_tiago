@@ -1,7 +1,6 @@
 import numpy as np
 
 from crowd_navigation_core.Kalman import *
-from crowd_navigation_core.Hparams import *
 from crowd_navigation_core.utils import *
 
 class FSM():
@@ -74,8 +73,8 @@ class FSM():
                                      0.0])
                 self.next_state = FSMStates.START
         else:
-            self.kalman_f.predict(time)
-            estimate, _ = self.kalman_f.correct(self.last_valid_measure)
+            estimate = self.kalman_f.predict(time)
+            # estimate, _ = self.kalman_f.correct(self.last_valid_measure)
             self.next_state = FSMStates.HOLD
 
         return estimate
@@ -96,8 +95,8 @@ class FSM():
                 self.next_state = FSMStates.START
         else:
             if time <= self.last_valid_time + self.T_bar:
-                self.kalman_f.predict(time)
-                estimate, _ = self.kalman_f.correct(self.last_valid_measure)
+                estimate = self.kalman_f.predict(time)
+                # estimate, _ = self.kalman_f.correct(self.last_valid_measure)
                 self.next_state = FSMStates.HOLD
             else:
                 estimate = self.previous_estimate

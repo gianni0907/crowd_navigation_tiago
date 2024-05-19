@@ -4,10 +4,10 @@ from crowd_navigation_core.utils import *
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
-    save_video = False
+    save_video = True
     if log:
         log_dir = '/tmp/crowd_navigation_tiago/data'
-        filename = 'test_both'
+        filename = 'both_higher_fsmmod2'
         generator_file = filename + '_generator.json'
         predictor_file = filename + '_predictor.json'
         laser_detector_file = filename + '_laser_detector.json'
@@ -15,6 +15,14 @@ class Hparams:
 
     # Specify whether to use gazebo (simulation = True) or real robot
     simulation = True
+
+    # Specify the frequency of the sensors' modules
+    if simulation:
+        laser_detector_frequency = 10 # [Hz]
+        camera_detector_frequency = 30 # [Hz]
+    else:
+        laser_detector_frequency = 15 # [Hz]
+        camera_detector_frequency = 30 # TBD [Hz]
 
     # Specify the type of sensing, 4 possibilities:
     # FAKE: no sensors, the robot knows the fake trajectory assigned to agents (not visible in Gazebo)
@@ -39,9 +47,17 @@ class Hparams:
     b = 0.1 # [m]
 
     # NMPC parameters
-    controller_frequency = 10.0 # [Hz]
-    dt = 1.0 / controller_frequency # [s]
-    N_horizon = 20
+    if perception in (Perception.CAMERA, Perception.BOTH):
+        generator_frequency = camera_detector_frequency
+        N_horizon = 75
+    elif perception == Perception.LASER:
+        generator_frequency = laser_detector_frequency
+        N_horizon = 25
+    else:
+        generator_frequency = 20
+        N_horizon = 50
+    predictor_frequency = generator_frequency
+    dt = 1.0 / generator_frequency # [s]
     unbounded = 1000
 
     # Driving and steering acceleration limits
@@ -72,14 +88,14 @@ class Hparams:
     ### NOTE: define the points in a counter-clockwise order
     n_points = 4
     if simulation:
-        # vertexes = np.array([[-6, 6],
-        #                      [-6, -6],
-        #                      [6, -6],
-        #                      [6, 6]])
-        vertexes = np.array([[-1.5, 11.5],
-                             [-1.5, -1.5],
-                             [11.5, -1.5],
-                             [11.5, 11.5]])
+        vertexes = np.array([[-6, 6],
+                             [-6, -6],
+                             [6, -6],
+                             [6, 6]])
+        # vertexes = np.array([[-1.5, 11.5],
+        #                      [-1.5, -1.5],
+        #                      [11.5, -1.5],
+        #                      [11.5, 11.5]])
     else:
         vertexes = np.array([[-3.9, 0.0],
                              [-3.0, -2.4],
@@ -128,9 +144,9 @@ class Hparams:
     gamma_agent = 0.1 # in (0,1], hyperparameter for the h function associated to agent
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
-    n_filters = 3 # maximum number of simultaneously tracked agents
+    n_filters = 5 # maximum number of simultaneously tracked agents
     if simulation:
-        n_agents = 7 # number of total agents involved, for plotting purpose
+        n_agents = 5 # number of total agents involved, for plotting purpose
         if perception == Perception.FAKE:
             n_filters = n_agents
 
