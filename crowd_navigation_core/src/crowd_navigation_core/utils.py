@@ -351,71 +351,65 @@ def compute_normal_vector(p1, p2):
 
     return normalized_normal_vector
 
+def is_outside(point, vertexes, normals):
+    for i, vertex in enumerate(vertexes):
+        if np.dot(normals[i], point - vertex) < 0.0:
+            return True
+    return False
+
 def data_association(predictions, covariances, measurements):
     n_measurements = measurements.shape[0]
     n_fsms = predictions.shape[0]
 
-    # Heuristics to consider for the associations: gating, best friend, lonely best friend
-    # heuristics param
+    # Heuristics parameters
     gating_tau = 10 # maximum Mahalanobis distance threshold
     gamma_threshold = 1e-1 # lonely best friends threshold
-    # consider 2 arrays of dimension [n_measurements] containing the following association info:
-    #   fsm indices
-    #   distances (mahalanobis distance)
+
+    # Initialize association info arrays
     fsm_indices = -1 * np.ones(n_measurements, dtype=int)
-    distances = np.ones(n_measurements) * np.inf
+    distances = np.full(n_measurements, np.inf)
 
     if n_fsms == 0 or n_measurements == 0:
         return fsm_indices
 
-    A_mat = np.zeros((n_measurements, n_fsms)) # [n_measurements x n_fsms] Association matrix
+    # Step 1: compute the association matrix
+    A_mat = np.zeros((n_measurements, n_fsms))
     for i in range(n_fsms):
         info_mat = np.linalg.inv(covariances[i])
-        for j in range(n_measurements):
-            diff = measurements[j] - predictions[i]
-            A_mat[j, i] = np.sqrt(diff @ info_mat @ diff.T)
+        diffs = measurements - predictions[i]
+        A_mat[:, i] = np.sqrt(np.einsum('ij,ij->i', diffs @ info_mat, diffs))
 
+    # Step 2: perform gating and initial assignment
+    min_indices = np.argmin(A_mat, axis=1)
+    min_distances = np.min(A_mat, axis=1)
+
+    valid_indices = min_distances < gating_tau
+    fsm_indices[valid_indices] = min_indices[valid_indices]
+    distances[valid_indices] = min_distances[valid_indices]
+
+    # Step 3: apply the best friend criterion
     for j in range(n_measurements):
-        # compute row minimum
-        d_ji = np.min(A_mat[j, :])
-        min_idx = np.argmin(A_mat[j, :])
-
-        # gating
-        if (d_ji < gating_tau):
-            fsm_indices[j] = min_idx
-            distances[j] = d_ji
-        else:
-            fsm_indices[j] = -1
-            distances[j] = d_ji
-
-    # best friends
-    for j in range(n_measurements):    
-        proposed_est = fsm_indices[j]
-        d_ji = distances[j]
-        if proposed_est != -1:
-            # compute column minimum
-            col_min = np.min(A_mat[:, proposed_est])
-
-            if d_ji != col_min:
+        if fsm_indices[j] != -1:
+            col_min = np.min(A_mat[:, fsm_indices[j]])
+            if distances[j] != col_min:
                 fsm_indices[j] = -1
 
-
-    # lonely best friends
+    # Step 4: apply the lonely best friend criterion
     if n_fsms > 1 and n_measurements > 1:
         for j in range(n_measurements):
             proposed_est = fsm_indices[j]
-            d_ji = distances[j]
-
             if proposed_est == -1:
                 continue
 
-            # take second best value of the row
-            ordered_row = np.sort(A_mat[j, :])
-            second_min_row = ordered_row[1]
+            d_ji = distances[j]
 
-            # take second best value of the col
-            ordered_col = np.sort(A_mat[:, proposed_est])
-            second_min_col = ordered_col[1]
+            # find the second best value of the row
+            row = A_mat[j, :]
+            second_min_row = np.partition(row, 1)[1]
+
+            # find the second best value of the col
+            col = A_mat[:, proposed_est]
+            second_min_col = np.partition(col, 1)[1]
 
             # check association ambiguity
             if (second_min_row - d_ji) < gamma_threshold or (second_min_col - d_ji) < gamma_threshold:

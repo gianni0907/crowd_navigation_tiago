@@ -85,52 +85,110 @@ class Plotter:
         # Specify the saving path
         time_path = os.path.join(self.plots_dir, self.filename + '_time.png')
 
-        frequency = self.generator_dict['frequency']
+        generator_frequency = self.generator_dict['frequency']
         generator_time = np.array(self.generator_dict['cpu_time'])
-        predictor_time = np.array(self.predictor_dict['cpu_time'])
-        all_times = np.concatenate([generator_time[:, 1], predictor_time[:, 1]])
-        if self.perception_mode == 'Perception.BOTH':
-            camera_detector_time = np.array(self.camera_detector_dict['cpu_time'])
-            laser_detector_time = np.array(self.laser_detector_dict['cpu_time'])
-            # Determine xlim
-            all_times = np.concatenate([all_times,
-                                        camera_detector_time[:, 1],
-                                        laser_detector_time[:, 1]])
-        elif self.perception_mode == 'Perception.LASER':
-            laser_detector_time = np.array(self.laser_detector_dict['cpu_time'])
-            # Determine xlim
-            all_times = np.concatenate([all_times,
-                                        laser_detector_time[:, 1]])
-        elif self.perception_mode == 'Perception.CAMERA':
-            camera_detector_time = np.array(self.camera_detector_dict['cpu_time'])
-            # Determine xlim
-            all_times = np.concatenate([all_times,
-                                        camera_detector_time[:, 1]])
+        all_times = generator_time[:, 1]
+        if self.n_filters > 0:
+            predictor_frequency = self.predictor_dict['frequency']
+            predictor_time = np.array(self.predictor_dict['cpu_time'])
+            all_times = np.concatenate([all_times, predictor_time[:, 1]])
+            # Plot timing
+            if self.perception_mode == 'Perception.BOTH':
+                camera_detector_frequency = self.camera_detector_dict['frequency']
+                laser_detector_frequency = self.laser_detector_dict['frequency']
+                camera_detector_time = np.array(self.camera_detector_dict['cpu_time'])
+                laser_detector_time = np.array(self.laser_detector_dict['cpu_time'])
+                # Determine xlim
+                all_times = np.concatenate([all_times,
+                                            camera_detector_time[:, 1],
+                                            laser_detector_time[:, 1]])
+
+                time_fig, time_ax = plt.subplots(4, 1, figsize=(16,8))        
+            elif self.perception_mode == 'Perception.LASER':
+                laser_detector_frequency = self.laser_detector_dict['frequency']
+                laser_detector_time = np.array(self.laser_detector_dict['cpu_time'])
+                # Determine xlim
+                all_times = np.concatenate([all_times,
+                                            laser_detector_time[:, 1]])
+                time_fig, time_ax = plt.subplots(3, 1, figsize=(16,8))  
+            elif self.perception_mode == 'Perception.CAMERA':
+                camera_detector_frequency = self.camera_detector_dict['frequency']
+                camera_detector_time = np.array(self.camera_detector_dict['cpu_time'])
+                # Determine xlim
+                all_times = np.concatenate([all_times,
+                                            camera_detector_time[:, 1]])
+                time_fig, time_ax = plt.subplots(3, 1, figsize=(16,8))
+            else:
+                time_fig, time_ax = plt.subplots(2, 1, figsize=(16,8))
+        else:
+            time_fig, time_ax = plt.subplots(2, 1, figsize=(16,8))
 
         min_time = np.min(all_times)
         max_time = np.max(all_times)
 
-        # Plot timing
-        plt.figure(figsize=(10,6))
+        time_ax[0].step(generator_time[:, 1], generator_time[:, 0], label='generator')
 
-        plt.step(generator_time[:, 1], generator_time[:, 0], label='generator')
-        plt.step(predictor_time[:, 1], predictor_time[:, 0], label='predictor')
-        if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-            plt.step(camera_detector_time[:, 1], camera_detector_time[:, 0], label='camera')
-        if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-            plt.step(laser_detector_time[:, 1], laser_detector_time[:, 0], label='laser')
+        time_ax[0].set_title('Generator time')
+        time_ax[0].set_xlabel('$t \quad [s]$')
+        time_ax[0].set_ylabel('$iteration \ time \quad [s]$')
+        time_ax[0].hlines(1 / generator_frequency, min_time, max_time, colors='r', linestyles='--')
+        time_ax[0].set_xlim([min_time, max_time])
+        time_ax[0].set_ylim([-0.02, 1 / generator_frequency + 0.02])
+        time_ax[0].grid(True)
 
-        plt.title('Modules\' Iteration time')
-        plt.xlabel('$t \quad [s]$')
-        plt.ylabel('$iteration \ time \quad [s]$')
-        plt.hlines(1 / frequency, min_time, max_time, colors='red', linestyles='--')
-        plt.xlim([min_time, max_time])
-        plt.ylim([-0.02, 1 / frequency + 0.02])
-        plt.legend(loc='upper right')
-        plt.grid(True)
+        if self.n_filters > 0:
+            time_ax[1].step(predictor_time[:, 1], predictor_time[:, 0], label='predictor')
 
-        plt.tight_layout()
-        plt.savefig(time_path)
+            time_ax[1].set_title('Predictor time')
+            time_ax[1].set_xlabel('$t \quad [s]$')
+            time_ax[1].set_ylabel('$iteration \ time \quad [s]$')
+            time_ax[1].hlines(1 / predictor_frequency, min_time, max_time, colors='r', linestyles='--')
+            time_ax[1].set_xlim([min_time, max_time])
+            time_ax[1].set_ylim([-0.02, 1 / predictor_frequency + 0.02])
+            time_ax[1].grid(True)
+
+            if self.perception_mode == 'Perception.BOTH':
+                time_ax[2].step(laser_detector_time[:, 1], laser_detector_time[:, 0], label='laser')
+                time_ax[3].step(camera_detector_time[:, 1], camera_detector_time[:, 0], label='camera')
+
+                time_ax[2].set_title('Laser detector time')
+                time_ax[2].set_xlabel('$t \quad [s]$')
+                time_ax[2].set_ylabel('$iteration \ time \quad [s]$')
+                time_ax[2].hlines(1 / laser_detector_frequency, min_time, max_time, colors='r', linestyles='--')
+                time_ax[2].set_xlim([min_time, max_time])
+                time_ax[2].set_ylim([-0.02, 1 / laser_detector_frequency + 0.02])
+                time_ax[2].grid(True)
+
+                time_ax[3].set_title('Camera detector time')
+                time_ax[3].set_xlabel('$t \quad [s]$')
+                time_ax[3].set_ylabel('$iteration \ time \quad [s]$')
+                time_ax[3].hlines(1 / camera_detector_frequency, min_time, max_time, colors='r', linestyles='--')
+                time_ax[3].set_xlim([min_time, max_time])
+                time_ax[3].set_ylim([-0.02, 1 / camera_detector_frequency + 0.02])
+                time_ax[3].grid(True)
+            elif self.perception_mode == 'Perception.LASER':
+                time_ax[2].step(laser_detector_time[:, 1], laser_detector_time[:, 0], label='laser')
+
+                time_ax[2].set_title('Laser detector time')
+                time_ax[2].set_xlabel('$t \quad [s]$')
+                time_ax[2].set_ylabel('$iteration \ time \quad [s]$')
+                time_ax[2].hlines(1 / laser_detector_frequency, min_time, max_time, colors='r', linestyles='--')
+                time_ax[2].set_xlim([min_time, max_time])
+                time_ax[2].set_ylim([-0.02, 1 / laser_detector_frequency + 0.02])
+                time_ax[2].grid(True)
+            elif self.perception_mode == 'Perception.CAMERA':
+                time_ax[2].step(camera_detector_time[:, 1], camera_detector_time[:, 0], label='camera')
+
+                time_ax[2].set_title('Camera detector time')
+                time_ax[2].set_xlabel('$t \quad [s]$')
+                time_ax[2].set_ylabel('$iteration \ time \quad [s]$')
+                time_ax[2].hlines(1 / camera_detector_frequency, min_time, max_time, colors='r', linestyles='--')
+                time_ax[2].set_xlim([min_time, max_time])
+                time_ax[2].set_ylim([-0.02, 1 / camera_detector_frequency + 0.02])
+                time_ax[2].grid(True)
+
+        time_fig.tight_layout()
+        time_fig.savefig(time_path)
         plt.show()
 
     def plot_camera(self):
@@ -516,7 +574,7 @@ class Plotter:
         configuration_savepath = os.path.join(self.plots_dir, self.filename + '_configuration.png')
         velocity_savepath = os.path.join(self.plots_dir, self.filename + '_velocities.png')
         acceleration_savepath = os.path.join(self.plots_dir, self.filename + '_accelerations.png')
-        world_savepath = os.path.join(self.animation_dir, self.filename + '_world.mp4')
+        motion_savepath = os.path.join(self.animation_dir, self.filename + '_motion.mp4')
 
         # Extract the generator data
         generator_time = np.array(self.generator_dict['cpu_time'])
@@ -585,14 +643,14 @@ class Plotter:
         config_ax[2].plot(t, errors[:, 1], label='$e_y$')
         config_ax[3].plot(t, configurations[:, 2], label='$\theta$')
 
-        config_ax[0].set_title('$x-position$')
+        config_ax[0].set_title('x-position')
         config_ax[0].set_xlabel('$t \quad [s]$')
         config_ax[0].set_ylabel('$[m]$')
         config_ax[0].legend(loc='upper left')
         config_ax[0].set_xlim([t[0], t[-1]])
         config_ax[0].grid(True)
 
-        config_ax[1].set_title('$y-position$')
+        config_ax[1].set_title('y-position')
         config_ax[1].set_xlabel('$t \quad [s]$')
         config_ax[1].set_ylabel('$[m]$')
         config_ax[1].legend(loc='upper left')
@@ -700,8 +758,8 @@ class Plotter:
 
         plt.show()
 
-        # Figure to plot world animation
-        world_fig = plt.figure(figsize=(8, 8))
+        # Figure to plot motion animation
+        motion_fig = plt.figure(figsize=(8, 8))
         gs = gridspec.GridSpec(1,1)
         ax_wrld = plt.subplot(gs[0, 0])
 
@@ -746,14 +804,14 @@ class Plotter:
         line, = ax_wrld.plot(x_values, y_values, color='red', linestyle='--')
         boundary_line.append(line)
 
-        ax_wrld.set_title('TIAGo World')
+        ax_wrld.set_title('TIAGo motion')
         ax_wrld.set_xlabel("$x \quad [m]$")
         ax_wrld.set_ylabel('$y \quad [m]$')
         ax_wrld.set_aspect('equal', adjustable='box')
         ax_wrld.grid(True)
 
-        # init and update function for the world animation
-        def init_world():
+        # init and update function for the motion animation
+        def init_motion():
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
             ax_wrld.add_patch(robot)
@@ -797,11 +855,11 @@ class Plotter:
                        estimates, estimates_clearance, estimates_label
             return robot, robot_clearance, robot_label, controlled_pt, goal, goal_label
             
-        def update_world(frame):
+        def update_motion(frame):
             if frame == shooting_nodes - 1:
-                world_animation.event_source.stop()
+                motion_animation.event_source.stop()
 
-            ax_wrld.set_title(f'TIAGo World, t={generator_time[frame, 1]}')
+            ax_wrld.set_title(f'TIAGo motion, t={generator_time[frame, 1]}')
             robot_prediction = robot_predictions[frame, :, :]
             current_target = targets[frame, :]
             traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
@@ -850,22 +908,22 @@ class Plotter:
             return robot, robot_clearance, robot_label, goal, goal_label, \
                 traj_line, robot_pred_line
         
-        world_animation = FuncAnimation(world_fig, update_world,
+        motion_animation = FuncAnimation(motion_fig, update_motion,
                                         frames=shooting_nodes,
-                                        init_func=init_world,
+                                        init_func=init_motion,
                                         blit=False,
                                         interval=1/frequency*500,
                                         repeat=False)
-        world_fig.tight_layout()
+        motion_fig.tight_layout()
         if self.save_video:
-            world_animation.save(world_savepath, writer='ffmpeg', fps=frequency, dpi=80)
-            print("World animation saved")
+            motion_animation.save(motion_savepath, writer='ffmpeg', fps=frequency, dpi=80)
+            print("Motion animation saved")
         
         plt.show()
 
     def run(self):
+        self.plot_times()
         if self.n_filters > 0:
-            self.plot_times()
             if self.perception_mode == 'Perception.FAKE':
                 pass
             elif self.perception_mode == 'Perception.BOTH':
@@ -878,7 +936,7 @@ class Plotter:
             elif self.perception_mode == 'Perception.CAMERA':
                 self.plot_camera()
                 self.plot_estimation()
-            self.plot_motion()
+        self.plot_motion()
 
 def main():
     rospy.init_node('tiago_plotter', log_level=rospy.INFO)

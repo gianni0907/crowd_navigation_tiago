@@ -167,12 +167,7 @@ class LaserDetectionManager:
                 point_las = self.polar2cartesian((idx + offset, value))
                 homo_point_las = np.append(point_las, np.append(self.laser_pose[2,3], 1))
                 point_wrld = np.matmul(self.laser_pose, homo_point_las)[:2]
-                for i in range(self.hparams.n_points):
-                    vertex = self.hparams.vertexes[i]
-                    if np.dot(self.hparams.normals[i], point_wrld - vertex) < 0.0:
-                        outside = True
-                        break
-                if not outside:
+                if not is_outside(point_wrld, self.hparams.vertexes, self.hparams.normals):
                     output_points.append(point_wrld.tolist())
 
         return output_points
@@ -227,7 +222,7 @@ class LaserDetectionManager:
         output_dict['measurements'] = self.measurements_history
         output_dict['robot_config'] = self.robot_config_history
         output_dict['laser_positions'] = self.laser_pos_history
-        output_dict['frequency'] = self.hparams.controller_frequency
+        output_dict['frequency'] = self.hparams.laser_detector_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
         output_dict['n_points'] = self.hparams.n_points
@@ -261,7 +256,7 @@ class LaserDetectionManager:
             json.dump(output_dict, file)     
 
     def run(self):
-        rate = rospy.Rate(self.hparams.controller_frequency)
+        rate = rospy.Rate(self.hparams.laser_detector_frequency)
 
         if self.hparams.n_filters == 0:
             rospy.logwarn("No agent considered, laser detection disabled")

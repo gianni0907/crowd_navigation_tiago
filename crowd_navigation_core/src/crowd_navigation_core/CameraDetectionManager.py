@@ -61,13 +61,22 @@ class CameraDetectionManager:
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
-        # Setup subscriber to image_raw topic
-        image_topic = '/xtion/rgb/image_raw/compressed'
-        rospy.Subscriber(
-            image_topic,
-            sensor_msgs.msg.CompressedImage,
-            self.image_callback
-        )
+        if self.hparams.simulation:
+            # Setup subscriber to image_raw topic
+            image_topic = '/xtion/rgb/image_raw'
+            rospy.Subscriber(
+                image_topic,
+                sensor_msgs.msg.Image,
+                self.image_callback
+            )
+        else:
+            # Setup subscriber to image_raw/compressed topic
+            image_topic = '/xtion/rgb/image_raw/compressed'
+            rospy.Subscriber(
+                image_topic,
+                sensor_msgs.msg.CompressedImage,
+                self.compressed_image_callback
+            )
 
         # Setup subscriber to depth image topic
         depth_topic = '/xtion/depth_registered/image_raw'
@@ -102,6 +111,12 @@ class CameraDetectionManager:
         )
 
     def image_callback(self, data):
+        try:
+            self.rgb_image_nonrt = self.bridge.imgmsg_to_cv2(data, 'bgr8')
+        except Exception as e:
+            rospy.logerr(e)
+
+    def compressed_image_callback(self, data):
         try:
             self.rgb_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data, 'bgr8')
         except Exception as e:
@@ -177,25 +192,25 @@ class CameraDetectionManager:
     def data_extraction(self, rgb_img, depth_img):
         robot_position = self.robot_config.get_q()[:2]
         core_points = []
-        results = self.model(rgb_img, conf=0.5, verbose=False)
+        results = self.model(rgb_img, iou=0.5, conf=0.5, verbose=False)
         for result in results:
-            labels, cords = result.boxes.cls, result.boxes.xyxyn
+            labels, cords = result.boxes.cls, result.boxes.xyxy.cpu().numpy()
             for label, cord in zip(labels, cords):
                 if label == 0:
-                    box_center = torch.tensor([(cord[0] + cord[2]) / 2 * rgb_img.shape[1],
-                                               (cord[1] + cord[3]) / 2 * rgb_img.shape[0]]).to("cpu")
-                    x_c = int(torch.round(box_center[0]).item())
-                    y_c = int(torch.round(box_center[1]).item())
-                    # center = (x_c, y_c)
-                    # cv2.circle(rgb_img, center, radius=5, color=(0, 0, 255), thickness=-1)
-                    depth = depth_img[y_c, x_c]
-                    if not np.isnan(depth):
-                        point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
-                        scale = depth / point_cam[2]
-                        point_cam = point_cam * scale
-                        homo_point_cam = np.append(point_cam, 1)
-                        homo_point_wrld = np.matmul(self.camera_pose, homo_point_cam)
-                        core_points.append(homo_point_wrld[:2])
+                    box_center = np.array([(cord[0] + cord[2]) / 2,
+                                           (cord[1] + cord[3]) / 2])
+                    x_min = int(cord[0])
+                    y_min = int(cord[1])
+                    x_max = int(cord[2])
+                    y_max = int(cord[3])
+                    depth = np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 20)
+                    point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
+                    scale = depth / point_cam[2]
+                    point_cam = point_cam * scale
+                    homo_point_cam = np.append(point_cam, 1)
+                    point_wrld = np.matmul(self.camera_pose, homo_point_cam)[:2]
+                    if not is_outside(point_wrld, self.hparams.vertexes, self.hparams.normals):
+                        core_points.append(point_wrld)
             processed_img = result.plot()
             self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
 
@@ -210,7 +225,7 @@ class CameraDetectionManager:
         output_dict['cpu_time'] = self.time_history
         output_dict['measurements'] = self.measurements_history
         output_dict['robot_config'] = self.robot_config_history
-        output_dict['frequency'] = self.hparams.controller_frequency
+        output_dict['frequency'] = self.hparams.camera_detector_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
         output_dict['n_points'] = self.hparams.n_points
@@ -240,7 +255,7 @@ class CameraDetectionManager:
         self.imgproc = PC()
         self.imgproc.fromCameraInfo(cam_info)
 
-        rate = rospy.Rate(self.hparams.controller_frequency)
+        rate = rospy.Rate(self.hparams.camera_detector_frequency)
 
         if self.hparams.n_filters == 0:
             rospy.logwarn("No agent considered, camera detection disabled")
@@ -255,7 +270,7 @@ class CameraDetectionManager:
             self.fourcc = cv2.VideoWriter_fourcc(*'MP4V')
             self.out = cv2.VideoWriter(os.path.join(self.hparams.log_dir, self.hparams.filename + '_camera_view.mp4'),
                                        self.fourcc,
-                                       self.hparams.controller_frequency,
+                                       self.hparams.camera_detector_frequency,
                                        (cam_info.width, cam_info.height))
             rospy.on_shutdown(self.log_values)
 

@@ -5,6 +5,7 @@ import json
 import threading
 import cProfile
 import rospy
+from scipy.spatial.distance import cdist
 
 from crowd_navigation_core.utils import *
 from crowd_navigation_core.Hparams import *
@@ -29,12 +30,10 @@ class CrowdPredictionManager:
             self.kalman_infos = {}
             kalman_names = ['KF_{}'.format(i + 1) for i in range(self.hparams.n_filters)]
             self.kalman_infos = {key: list() for key in kalman_names}
-            if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
-                self.camera_associations = []
-            if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                self.laser_associations = []
-            if self.hparams.use_kalman:
-                self.estimation_history = []
+            if self.hparams.perception != Perception.FAKE:
+                self.associations = []
+                if self.hparams.use_kalman:
+                    self.estimation_history = []
 
         if self.hparams.perception == Perception.FAKE:
             self.fake_trajectories = None
@@ -117,17 +116,50 @@ class CrowdPredictionManager:
         for i in range(measurements_obj.size):
             measurements[i] = np.array([measurements_obj.positions[i].x,
                                         measurements_obj.positions[i].y])
-                    
+
         return measurements
+
+    def unique_measurements(self, laser_meas, camera_meas):
+
+        if len(laser_meas) == 0 and len(camera_meas)== 0:
+            return np.array([])
+        elif len(laser_meas) == 0:
+            return camera_meas
+        elif len(camera_meas) == 0:
+            return laser_meas
+        
+        distance_matrix = cdist(laser_meas, camera_meas) # [n_laser x n_camera]
+
+        laser_min_indices = np.argmin(distance_matrix, axis=1)
+        camera_min_indices = np.argmin(distance_matrix, axis=0)
+
+        mutual_correspondences = [(i, laser_min_indices[i]) for i in range(len(laser_meas)) \
+                                  if (camera_min_indices[laser_min_indices[i]] == i) and (distance_matrix[i, laser_min_indices[i]] <= 1)]
+
+        correspondence_indices_camera = set([j for _, j in mutual_correspondences])
+        correspondence_indices_laser = set([i for i, _ in mutual_correspondences])
+
+        # take camera measurements
+        corresponded_meas = camera_meas[list(correspondence_indices_camera)]
+        # # take laser measurements
+        # corresponded_meas = laser_meas[list(correspondence_indices_laser)]
+
+        remaining_laser_indices = set(range(len(laser_meas))) - correspondence_indices_laser
+        remaining_camera_indices = set(range(len(camera_meas))) - correspondence_indices_camera
+        
+        remaining_laser_meas = laser_meas[list(remaining_laser_indices)]
+        remaining_camera_meas = camera_meas[list(remaining_camera_indices)]
+        
+        unique_meas = np.vstack((corresponded_meas, remaining_laser_meas, remaining_camera_meas))
+        return unique_meas
 
     def log_values(self):
         output_dict = {}
         output_dict['cpu_time'] = self.time_history
         output_dict['kfs'] = self.kalman_infos
-        if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
-            output_dict['camera_associations'] = self.camera_associations
-        if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-            output_dict['laser_associations'] = self.laser_associations
+        output_dict['frequency'] = self.hparams.predictor_frequency
+        if self.hparams.perception != Perception.FAKE:
+            output_dict['associations'] = self.associations
         output_dict['use_kalman'] = self.hparams.use_kalman
         if self.hparams.use_kalman:
             output_dict['estimations'] = self.estimation_history
@@ -142,7 +174,7 @@ class CrowdPredictionManager:
             json.dump(output_dict, file)
 
     def run(self):
-        rate = rospy.Rate(self.hparams.controller_frequency)
+        rate = rospy.Rate(self.hparams.predictor_frequency)
         N = self.hparams.N_horizon
 
         if self.hparams.n_filters == 0:
@@ -164,7 +196,7 @@ class CrowdPredictionManager:
                 continue
             if (self.hparams.perception == Perception.BOTH) and \
                (self.laser_measurements_stamped_nonrt is None or self.camera_measurements_stamped_nonrt is None):
-                rospy.logwarn("Missing both measurements")
+                rospy.logwarn("Missing measurements")
                 rate.sleep()
                 continue
             if self.hparams.perception == Perception.LASER and self.laser_measurements_stamped_nonrt is None:
@@ -176,12 +208,6 @@ class CrowdPredictionManager:
                 rate.sleep()
                 continue
 
-            with self.data_lock:
-                if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                    laser_measurements = self.laser_measurements_stamped_nonrt
-                if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
-                    camera_measurements = self.camera_measurements_stamped_nonrt
-            
             # Create crowd motion prediction message (based on the perception type)
             crowd_motion_prediction = CrowdMotionPrediction()
 
@@ -207,16 +233,21 @@ class CrowdPredictionManager:
                 if self.current == self.trajectory_length:
                     self.current = 0
             else:
-                if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                        laser_measurements = self.adapt_measurements_format(laser_measurements)
-                if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):       
-                        camera_measurements = self.adapt_measurements_format(camera_measurements)
-
-                # NOTE: sensor fusion is not implemented yet, regardless of the perception mode selected
-                if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                    measurements = laser_measurements
+                if self.hparams.perception == Perception.LASER:
+                    with self.data_lock:
+                        measurements = self.laser_measurements_stamped_nonrt
+                    measurements = self.adapt_measurements_format(measurements)
                 elif self.hparams.perception == Perception.CAMERA:
-                    measurements = camera_measurements
+                    with self.data_lock:    
+                        measurements = self.camera_measurements_stamped_nonrt
+                    measurements = self.adapt_measurements_format(measurements)
+                else:
+                    with self.data_lock:
+                        laser_measurements = self.laser_measurements_stamped_nonrt
+                        camera_measurements = self.camera_measurements_stamped_nonrt
+                    laser_measurements = self.adapt_measurements_format(laser_measurements)
+                    camera_measurements = self.adapt_measurements_format(camera_measurements)
+                    measurements = self.unique_measurements(laser_measurements, camera_measurements)
 
                 if self.hparams.use_kalman:
                     # Perform data association
@@ -243,50 +274,46 @@ class CrowdPredictionManager:
                         next_predicted_positions[i] = predicted_state[:2]
                         next_positions_cov[i] = predicted_cov[:2, :2]
 
-                    if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                        fsm_indices_laser = data_association(next_predicted_positions, next_positions_cov, laser_measurements)
-                        if self.hparams.log:
-                            self.laser_associations.append([fsm_indices_laser.tolist(), start_time])
-                    if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):  
-                        fsm_indices_camera = data_association(next_predicted_positions, next_positions_cov, camera_measurements)
-                        if self.hparams.log:
-                            self.camera_associations.append([fsm_indices_camera.tolist(), start_time])
-
-                    # NOTE: sensor fusion is not implemented yet, regardless of the perception mode selected
-                    if self.hparams.perception in (Perception.LASER, Perception.BOTH):
-                        fsm_indices = fsm_indices_laser
-                    elif self.hparams.perception == Perception.CAMERA:
-                        fsm_indices = fsm_indices_camera
-
-                    # update each fsm based on the associations 
+                    fsm_indices = data_association(next_predicted_positions, next_positions_cov, measurements)
+                    if self.hparams.log:
+                        self.associations.append([fsm_indices.tolist(), start_time])
+ 
                     agents_estimation = np.zeros((self.hparams.n_filters, 4))
-                    for (i, fsm) in enumerate(fsms):
-                        associated = False
-                        for (j,fsm_idx) in enumerate(fsm_indices):
-                            if fsm_idx == i:
-                                measure = measurements[j]
-                                fsm.update(start_time, measure)
-                                associated = True
-                                break
-                        if associated == False:
-                            for (k, fsm_idx) in enumerate(fsm_indices):
-                                if fsm_idx == -1:
-                                    measure = measurements[k]
-                                    fsm.update(start_time, measure)
-                                    fsm_indices[k] = i
-                                    associated = True
-                                    break
-                        if associated == False:
-                            measure = None
-                            fsm.update(start_time, measure)
+                    used_measurements = np.full(measurements.shape[0], False)
 
+                    # First, update FSMs with associated measurements
+                    for i, fsm in enumerate(fsms):
+                        # Find if the FSM has an associated measurement
+                        associated_indices = np.where(fsm_indices == i)[0]
+                        
+                        if associated_indices.size > 0:
+                            j = associated_indices[0]
+                            measure = measurements[j]
+                            fsm.update(start_time, measure)
+                            used_measurements[j] = True
+                        else:
+                            # If no associated measurement, find an unassociated one
+                            unassociated_indices = np.where((fsm_indices == -1) & (~used_measurements))[0]
+                            
+                            if unassociated_indices.size > 0:
+                                k = unassociated_indices[0]
+                                measure = measurements[k]
+                                fsm.update(start_time, measure)
+                                fsm_indices[k] = i
+                                used_measurements[k] = True
+                            else:
+                                # No measurements available, update with None
+                                fsm.update(start_time, None)
+
+                        # Update agents_estimation with the current estimate of the FSM
                         current_estimate = fsm.current_estimate
                         agents_estimation[i] = current_estimate
+
+                        # Propagate state and generate predictions
                         predictions = self.propagate_state(current_estimate, N)
-                        predicted_positions = [Position(0.0, 0.0) for _ in range(N)]
-                        for j in range(N):
-                            predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
-                        
+                        predicted_positions = [Position(pred[0], pred[1]) for pred in predictions]
+
+                        # Append to crowd_motion_prediction
                         crowd_motion_prediction.append(MotionPrediction(predicted_positions))
                 else:
                     for i in range(self.hparams.n_filters):
