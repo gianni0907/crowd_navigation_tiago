@@ -69,6 +69,13 @@ class CameraDetectionManager:
                 sensor_msgs.msg.Image,
                 self.image_callback
             )
+            # Setup subscriber to depth image topic
+            depth_topic = '/xtion/depth_registered/image_raw'
+            rospy.Subscriber(
+                depth_topic,
+                sensor_msgs.msg.Image,
+                self.depth_callback
+            )
         else:
             # Setup subscriber to image_raw/compressed topic
             image_topic = '/xtion/rgb/image_raw/compressed'
@@ -77,14 +84,13 @@ class CameraDetectionManager:
                 sensor_msgs.msg.CompressedImage,
                 self.compressed_image_callback
             )
-
-        # Setup subscriber to depth image topic
-        depth_topic = '/xtion/depth_registered/image_raw'
-        rospy.Subscriber(
-            depth_topic,
-            sensor_msgs.msg.Image,
-            self.depth_callback
-        )
+            # Setup subscriber to depth image topic
+            depth_topic = '/xtion/depth_registered/image/compressed'
+            rospy.Subscriber(
+                depth_topic,
+                sensor_msgs.msg.CompressedImage,
+                self.compressed_depth_callback
+            )
 
         # Setup publisher to the image topic
         processed_image_topic = '/image'
@@ -125,6 +131,12 @@ class CameraDetectionManager:
     def depth_callback(self, data):
         try:
             self.depth_image_nonrt = self.bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+        except Exception as e:
+            rospy.logerr(e)
+
+    def compressed_depth_callback(self, data):
+        try:
+            self.depth_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough')
         except Exception as e:
             rospy.logerr(e)
 
@@ -203,14 +215,25 @@ class CameraDetectionManager:
                     y_min = int(cord[1])
                     x_max = int(cord[2])
                     y_max = int(cord[3])
-                    depth = np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 20)
-                    point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
-                    scale = depth / point_cam[2]
-                    point_cam = point_cam * scale
-                    homo_point_cam = np.append(point_cam, 1)
-                    point_wrld = np.matmul(self.camera_pose, homo_point_cam)[:2]
-                    if not is_outside(point_wrld, self.hparams.vertexes, self.hparams.normals):
-                        core_points.append(point_wrld)
+                    # depth_min = np.nanmin(depth_img[y_min: y_max + 1, x_min: x_max + 1])
+                    # depth_max = np.nanmax(depth_img[y_min: y_max + 1, x_min: x_max + 1])
+                    # depth_mean = np.nanmean(depth_img[y_min: y_max + 1, x_min: x_max + 1])
+                    # depth_median = np.nanmedian(depth_img[y_min: y_max + 1, x_min: x_max + 1])
+                    depth= np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 20)
+                    # print(f"Bbox center: {box_center}")
+                    # print(f"depth: {depth}")
+                    # print(f"depth min: {depth_min}")
+                    # print(f"depth max: {depth_max}")
+                    # print(f"depth mean: {depth_mean}")
+                    # print(f"depth median: {depth_median}")
+                    if depth >= self.hparams.cam_min_range:
+                        point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
+                        scale = depth / point_cam[2]
+                        point_cam = point_cam * scale
+                        homo_point_cam = np.append(point_cam, 1)
+                        point_wrld = np.matmul(self.camera_pose, homo_point_cam)[:2]
+                        if not is_outside(point_wrld, self.hparams.vertexes, self.hparams.normals):
+                            core_points.append(point_wrld)
             processed_img = result.plot()
             self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
 
@@ -229,6 +252,9 @@ class CameraDetectionManager:
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
         output_dict['n_points'] = self.hparams.n_points
+        output_dict['min_range'] = self.hparams.cam_min_range
+        output_dict['max_range'] = self.hparams.cam_min_range
+        output_dict['horz_fov'] = self.hparams.cam_horz_fov
         for i in range(self.hparams.n_points):
             self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
         output_dict['boundary_vertexes'] = self.boundary_vertexes

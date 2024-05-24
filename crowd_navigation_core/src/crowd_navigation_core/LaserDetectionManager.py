@@ -162,7 +162,6 @@ class LaserDetectionManager:
         scans = np.delete(scans, range(len(scans) - offset, len(scans)), 0)
 
         for idx, value in enumerate(scans):
-            outside = False
             if value != np.inf and value >= self.laser_scan.range_min:
                 point_las = self.polar2cartesian((idx + offset, value))
                 homo_point_las = np.append(point_las, np.append(self.laser_pose[2,3], 1))

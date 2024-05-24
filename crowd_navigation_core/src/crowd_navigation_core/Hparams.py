@@ -7,7 +7,7 @@ class Hparams:
     save_video = True
     if log:
         log_dir = '/tmp/crowd_navigation_tiago/data'
-        filename = 'test_both_camerafirst'
+        filename = 'test'
         generator_file = filename + '_generator.json'
         predictor_file = filename + '_predictor.json'
         laser_detector_file = filename + '_laser_detector.json'
@@ -29,7 +29,7 @@ class Hparams:
     # LASER: only lasser sensor enabled
     # CAMERA: only camera enabled
     # BOTH: both laser and camera enabled
-    perception = Perception.BOTH
+    perception = Perception.CAMERA
 
     if perception == Perception.FAKE and not simulation:
         raise ValueError("Cannot use fake perception in real world")
@@ -97,10 +97,10 @@ class Hparams:
         #                      [11.5, -1.5],
         #                      [11.5, 11.5]])
     else:
-        vertexes = np.array([[-3.9, 0.0],
-                             [-3.0, -2.4],
-                             [2.6, -0.2],
-                             [1.8, 2.0]])
+        vertexes = np.array([[0.0, 0.8],
+                             [0.0, -2.5],
+                             [1.5, -2.5],
+                             [1.5, 0.8]])
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
         normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
@@ -169,3 +169,14 @@ class Hparams:
         elif selection_mode == SelectionMode.AVERAGE:
             eps = 0.7
             min_samples = 2
+
+    # Camera Hparams
+    if perception in (Perception.BOTH, Perception.CAMERA):
+        if simulation:
+            cam_min_range = 0.3 # [m]
+            cam_max_range = 8 # [m]
+            cam_horz_fov = 1.0996 # [rad]
+        else:
+            cam_min_range = 0.4 # [m]
+            cam_max_range = 2 # [m]
+            cam_horz_fov = 1.0472 # [rad]

@@ -36,7 +36,6 @@ class NMPC:
         self.n_edges = self.hparams.n_points
         self.vertexes = self.hparams.vertexes
         self.normals = self.hparams.normals
-        self.n_agents = self.hparams.n_agents
         self.n_filters = self.hparams.n_filters
 
         # Setup solver:
