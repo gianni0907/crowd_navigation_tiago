@@ -16,6 +16,8 @@ from crowd_navigation_core.utils import *
 import gazebo_msgs.msg
 import geometry_msgs.msg
 import sensor_msgs.msg
+import std_msgs.msg
+import trajectory_msgs.msg
 import crowd_navigation_msgs.srv
 
 class MotionGenerationManager:
@@ -109,13 +111,27 @@ class MotionGenerationManager:
             self.set_desired_target_position_request
         )
 
+        # Setup ROS Service to set desired head configuration:
+        self.set_desired_head_config_srv = rospy.Service(
+            'SetDesiredHeadConfig',
+            crowd_navigation_msgs.srv.SetDesiredHeadConfig,
+            self.set_desired_head_config_request
+        )
+
         # Setup publisher to cmd_vel topic
         cmd_vel_topic = '/mobile_base_controller/cmd_vel'
         self.cmd_vel_publisher = rospy.Publisher(
             cmd_vel_topic,
             geometry_msgs.msg.Twist,
             queue_size=1
-        )        
+        )
+
+        # Setup publisher to /head_controller/command topic
+        head_command_topic = '/head_controller/command'
+        self.head_config_publisher = rospy.Publisher(
+            head_command_topic,
+            trajectory_msgs.msg.JointTrajectory,
+            queue_size=1)
 
     def init(self):
         # Initialize target position to the current position
@@ -208,6 +224,36 @@ class MotionGenerationManager:
             elif self.status == Status.MOVING:
                 rospy.loginfo(f"Desired target position successfully changed: {self.target_position}")
             return crowd_navigation_msgs.srv.SetDesiredTargetPositionResponse(True)
+        
+    def set_desired_head_config_request(self, request):
+        trajectory = trajectory_msgs.msg.JointTrajectory()
+
+        # Set the header
+        trajectory.header = std_msgs.msg.Header()
+        trajectory.header.stamp = rospy.Time.now()
+        trajectory.header.frame_id = 'xtion_rgb_optical_frame'
+        
+        # Set the joint names for the head
+        trajectory.joint_names = ['head_1_joint', 'head_2_joint']
+        
+        # Create a JointTrajectoryPoint message
+        point = trajectory_msgs.msg.JointTrajectoryPoint()
+
+        # Set the joint positions (pan and tilt)
+        point.positions = [request.pan, request.tilt]
+        
+        # Set the time to reach the target (optional, set to 1 second)
+        point.time_from_start = rospy.Duration(1.0)
+        
+        # Add the point to the trajectory
+        trajectory.points = [point]
+        
+        # Publish the joint state
+        self.head_config_publisher.publish(trajectory)
+        
+        # Return a response indicating success
+        rospy.loginfo(f"Desired head configuration successfully set: {point.positions}")
+        return crowd_navigation_msgs.srv.SetDesiredHeadConfigResponse(success=True)
 
     def publish_command(self, control_input):
         """

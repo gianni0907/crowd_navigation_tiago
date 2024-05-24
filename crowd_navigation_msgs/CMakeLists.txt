@@ -23,6 +23,7 @@ add_service_files(
   FILES
   SetDesiredTargetPosition.srv
   SetAgentsTrajectory.srv
+  SetDesiredHeadConfig.srv
 )
 
 ## Generate added messages and services with any dependencies listed here

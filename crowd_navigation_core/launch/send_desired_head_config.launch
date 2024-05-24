@@ -1,0 +1,12 @@
+<launch>
+  <arg name="pan" default="0.0" />
+  <arg name="tilt" default="0.0" />
+
+
+  <param name="pan" value="$(arg pan)" />
+  <param name="tilt" value="$(arg tilt)" />
+
+  <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="send_desired_head_config" name="send_desired_head_config" output="screen" />
+  </group>
+</launch>

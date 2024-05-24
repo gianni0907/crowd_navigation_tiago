@@ -29,5 +29,6 @@ catkin_install_python(PROGRAMS
   scripts/plotter
   scripts/send_desired_target_position
   scripts/send_agents_trajectory
+  scripts/send_desired_head_config
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
