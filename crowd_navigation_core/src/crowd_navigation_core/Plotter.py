@@ -199,6 +199,8 @@ class Plotter:
         time = np.array(self.camera_detector_dict['cpu_time'])
         measurements = self.camera_detector_dict['measurements']
         robot_config = np.array(self.camera_detector_dict['robot_config'])
+        camera_pos = np.array(self.camera_detector_dict['camera_position'])
+        camera_pan = - np.array(self.camera_detector_dict['camera_pan']) - np.pi / 2
         b = self.camera_detector_dict['b']
         shooting_nodes = robot_config.shape[0]
         robot_center = np.empty((shooting_nodes, 2))
@@ -215,6 +217,9 @@ class Plotter:
             n_agents = self.camera_detector_dict['n_agents']
             agents_pos = np.array(self.camera_detector_dict['agents_pos'])
             agent_radius = self.camera_detector_dict['agent_radius']
+        cam_horz_fov = self.camera_detector_dict['horz_fov']
+        range_min = self.camera_detector_dict['min_range']
+        range_max = self.camera_detector_dict['max_range']
 
         # Plot animation with camera measurements
         fig = plt.figure(figsize=(8, 8))
@@ -225,6 +230,7 @@ class Plotter:
         controlled_pt = ax.scatter([], [], marker='.', color='k')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
         meas, = ax.plot([], [], color='blue', marker='.', markersize=5, linestyle='', label='meas')
+        fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='purple', alpha=0.1)
 
         boundary_line = []
         for i in range(n_points - 1):
@@ -257,6 +263,7 @@ class Plotter:
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
             ax.add_patch(robot)
+            ax.add_patch(fov)
             controlled_pt.set_offsets(robot_config[0, :2])
             robot_label.set_position(robot_center[0])
             if simulation:
@@ -278,6 +285,13 @@ class Plotter:
             controlled_pt.set_offsets(robot_config[frame, :2])
             robot_label.set_position(robot_center[frame])
             current_meas = np.array(measurements[frame])
+            current_cam_angle = - camera_pan[frame]
+            current_cam_pos = camera_pos[frame]
+            fov.set_center(current_cam_pos)
+            fov.set_radius(range_max)
+            fov.set_theta1((current_cam_angle - cam_horz_fov / 2) * 180 / np.pi)
+            fov.set_theta2((current_cam_angle + cam_horz_fov / 2) * 180 / np.pi)
+            fov.set_width(range_max - range_min)
             if current_meas.shape[0] > 0:
                 meas.set_data(current_meas[:, 0], current_meas[:, 1])
             else:
@@ -288,7 +302,7 @@ class Plotter:
                     agents[i].set_offsets(agent_pos)
                     agents_clearance[i].set_center(agent_pos)
                     agents_label[i].set_position(agent_pos)
-                return robot, robot_label, controlled_pt, meas, \
+                return robot, robot_label, controlled_pt, meas, fov,\
                        agents, agents_clearance, agents_label
             return robot, robot_label, controlled_pt, meas
 
@@ -315,7 +329,7 @@ class Plotter:
         laser_scans = self.laser_detector_dict['laser_scans']
         measurements = self.laser_detector_dict['measurements']
         robot_config = np.array(self.laser_detector_dict['robot_config'])
-        laser_pos = np.array(self.laser_detector_dict['laser_positions'])
+        laser_pos = np.array(self.laser_detector_dict['laser_position'])
         b = self.laser_detector_dict['b']
         shooting_nodes = robot_config.shape[0]
         robot_center = np.empty((shooting_nodes, 2))
@@ -625,12 +639,19 @@ class Plotter:
         t = inputs[:, 2]
 
         if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-            range_max = self.laser_detector_dict['range_max']
-            range_min = self.laser_detector_dict['range_min']
+            laser_range_max = self.laser_detector_dict['range_max']
+            laser_range_min = self.laser_detector_dict['range_min']
             angle_inc = self.laser_detector_dict['angle_inc']
             laser_offset = self.laser_detector_dict['laser_offset']
             angle_min = self.laser_detector_dict['angle_min'] + angle_inc * laser_offset
             angle_max = self.laser_detector_dict['angle_max'] - angle_inc * laser_offset
+
+        if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
+            camera_range_max = self.camera_detector_dict['max_range']
+            camera_range_min = self.camera_detector_dict['min_range']
+            cam_horz_fov = self.camera_detector_dict['horz_fov']
+            camera_pos = np.array(self.generator_dict['camera_position'])
+            camera_pan = - np.array(self.generator_dict['camera_pan']) - np.pi / 2
 
         # Configuration figure
         config_fig, config_ax = plt.subplots(4, 1, figsize=(16, 8))
@@ -778,8 +799,10 @@ class Plotter:
                     agents.append(ax_wrld.scatter([], [], marker='.', label='ag{}'.format(i+1), color='k', alpha=0.3))
                     agents_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', linestyle='--', alpha=0.3))
                     agents_label.append(ax_wrld.text(np.nan, np.nan, agents[i].get_label(), fontsize=16, ha='left', va='bottom', alpha=0.3))
-                if self.perception_mode in ('Perception.LASER','Perception.BOTH'):
-                    fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
+                if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
+                    laser_fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
+                if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
+                    camera_fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='purple', alpha=0.1)
             estimates = []
             estimates_label = []
             estimates_clearance = []
@@ -841,11 +864,9 @@ class Plotter:
                         ax_wrld.add_patch(agents_clearance[i])
                         agents_label[i].set_position(agent_pos)
                     if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-                        ax_wrld.add_patch(fov)
-                        return robot, robot_clearance, robot_label, \
-                                controlled_pt, goal, goal_label, \
-                                estimates, estimates_clearance, estimates_label, fov, \
-                                agents, agents_clearance, agents_label
+                        ax_wrld.add_patch(laser_fov)
+                    if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
+                        ax_wrld.add_patch(camera_fov)
                     return robot, robot_clearance, robot_label, \
                             controlled_pt, goal, goal_label, \
                             estimates, estimates_clearance, estimates_label, \
@@ -889,15 +910,19 @@ class Plotter:
                     if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
                         theta = configurations[frame, 2]
                         current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_rel_pos)
-                        fov.set_center(current_laser_pos)
-                        fov.set_radius(range_max)
-                        fov.set_theta1((theta + angle_min) * 180 / np.pi)
-                        fov.set_theta2((theta + angle_max) * 180 / np.pi)
-                        fov.set_width(range_max - range_min)
-                        return robot, robot_clearance, robot_label, goal, goal_label, \
-                               traj_line, robot_pred_line, fov, \
-                               agents, agents_clearance, agents_label, \
-                               estimates, estimates_clearance, estimates_label, prediction
+                        laser_fov.set_center(current_laser_pos)
+                        laser_fov.set_radius(laser_range_max)
+                        laser_fov.set_theta1((theta + angle_min) * 180 / np.pi)
+                        laser_fov.set_theta2((theta + angle_max) * 180 / np.pi)
+                        laser_fov.set_width(laser_range_max - laser_range_min)
+                    if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
+                        current_cam_angle = - camera_pan[frame]
+                        current_cam_pos = camera_pos[frame]
+                        camera_fov.set_center(current_cam_pos)
+                        camera_fov.set_radius(camera_range_max)
+                        camera_fov.set_theta1((current_cam_angle - cam_horz_fov / 2) * 180 / np.pi)
+                        camera_fov.set_theta2((current_cam_angle + cam_horz_fov / 2) * 180 / np.pi)
+                        camera_fov.set_width(camera_range_max - camera_range_min)       
                     return robot, robot_clearance, robot_label, goal, goal_label, \
                             traj_line, robot_pred_line, \
                             agents, agents_clearance, agents_label, \

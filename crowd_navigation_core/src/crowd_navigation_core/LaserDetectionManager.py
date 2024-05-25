@@ -220,7 +220,7 @@ class LaserDetectionManager:
         output_dict['laser_scans'] = self.scans_history
         output_dict['measurements'] = self.measurements_history
         output_dict['robot_config'] = self.robot_config_history
-        output_dict['laser_positions'] = self.laser_pos_history
+        output_dict['laser_position'] = self.laser_pos_history
         output_dict['frequency'] = self.hparams.laser_detector_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters

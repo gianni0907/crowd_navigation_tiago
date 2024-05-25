@@ -140,9 +140,9 @@ class CrowdPredictionManager:
         correspondence_indices_laser = set([i for i, _ in mutual_correspondences])
 
         # take camera measurements
-        corresponded_meas = camera_meas[list(correspondence_indices_camera)]
+        # corresponded_meas = camera_meas[list(correspondence_indices_camera)]
         # # take laser measurements
-        # corresponded_meas = laser_meas[list(correspondence_indices_laser)]
+        corresponded_meas = laser_meas[list(correspondence_indices_laser)]
 
         remaining_laser_indices = set(range(len(laser_meas))) - correspondence_indices_laser
         remaining_camera_indices = set(range(len(camera_meas))) - correspondence_indices_camera

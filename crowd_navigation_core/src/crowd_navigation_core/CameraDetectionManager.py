@@ -48,6 +48,8 @@ class CameraDetectionManager:
             self.time_history = []
             self.measurements_history = []
             self.robot_config_history = []
+            self.camera_pos_history = []
+            self.camera_pan_history = []
             self.boundary_vertexes = []
             if self.hparams.simulation:
                 self.agents_pos_history = []
@@ -181,16 +183,19 @@ class CameraDetectionManager:
             transform = self.tf_buffer.lookup_transform(
                 self.map_frame, self.camera_frame, rospy.Time()
             )
-            quat = np.array([transform.transform.rotation.x,
-                             transform.transform.rotation.y,
-                             transform.transform.rotation.z,
-                             transform.transform.rotation.w])
+            q = np.array([transform.transform.rotation.x,
+                          transform.transform.rotation.y,
+                          transform.transform.rotation.z,
+                          transform.transform.rotation.w])
+            
+            self.pan_angle = math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]),
+                                        1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]))
             
             pos = np.array([transform.transform.translation.x, 
                             transform.transform.translation.y, 
                             transform.transform.translation.z])
             
-            rotation_matrix = R.from_quat(quat).as_matrix()
+            rotation_matrix = R.from_quat(q).as_matrix()
             self.camera_pose = np.eye(4)
             self.camera_pose[:3, :3] = rotation_matrix
             self.camera_pose[:3, 3] = pos
@@ -248,12 +253,14 @@ class CameraDetectionManager:
         output_dict['cpu_time'] = self.time_history
         output_dict['measurements'] = self.measurements_history
         output_dict['robot_config'] = self.robot_config_history
+        output_dict['camera_position'] = self.camera_pos_history
+        output_dict['camera_pan'] = self.camera_pan_history
         output_dict['frequency'] = self.hparams.camera_detector_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
         output_dict['n_points'] = self.hparams.n_points
         output_dict['min_range'] = self.hparams.cam_min_range
-        output_dict['max_range'] = self.hparams.cam_min_range
+        output_dict['max_range'] = self.hparams.cam_max_range
         output_dict['horz_fov'] = self.hparams.cam_horz_fov
         for i in range(self.hparams.n_points):
             self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
@@ -342,6 +349,8 @@ class CameraDetectionManager:
                                                   self.robot_config.y,
                                                   self.robot_config.theta,
                                                   start_time])
+                self.camera_pos_history.append(self.camera_pose[:2, 3].tolist())
+                self.camera_pan_history.append(self.pan_angle)
                 self.measurements_history.append(measurements.tolist())
                 if self.hparams.simulation:
                     self.agents_pos_history.append(agents_pos.tolist())

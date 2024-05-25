@@ -8,6 +8,7 @@ import cProfile
 import tf2_ros
 import rospy
 from numpy.linalg import *
+from scipy.spatial.transform import Rotation as R
 
 from crowd_navigation_core.Hparams import *
 from crowd_navigation_core.NMPC import *
@@ -60,6 +61,8 @@ class MotionGenerationManager:
         if self.hparams.log:
             self.time_history = []
             self.robot_state_history = []
+            self.camera_pos_history = []
+            self.camera_pan_history = []
             self.robot_prediction_history = []
             self.wheels_vel_history = []
             self.inputs_history = []
@@ -75,6 +78,7 @@ class MotionGenerationManager:
         self.map_frame = 'map'
         self.base_footprint_frame = 'base_footprint'
         self.laser_frame = 'base_laser_link'
+        self.camera_frame = 'xtion_rgb_optical_frame'
 
         # Setup TF listener:
         self.tf_buffer = tf2_ros.Buffer()
@@ -211,6 +215,34 @@ class MotionGenerationManager:
             rospy.logwarn("Missing laser pose")
             return False
 
+    def get_camera_pose(self):
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.map_frame, self.camera_frame, rospy.Time()
+            )
+            q = np.array([transform.transform.rotation.x,
+                          transform.transform.rotation.y,
+                          transform.transform.rotation.z,
+                          transform.transform.rotation.w])
+            
+            self.pan_angle = math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]),
+                                        1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]))
+            
+            pos = np.array([transform.transform.translation.x, 
+                            transform.transform.translation.y, 
+                            transform.transform.translation.z])
+            
+            rotation_matrix = R.from_quat(q).as_matrix()
+            self.camera_pose = np.eye(4)
+            self.camera_pose[:3, :3] = rotation_matrix
+            self.camera_pose[:3, 3] = pos
+            return True
+        except(tf2_ros.LookupException,
+               tf2_ros.ConnectivityException,
+               tf2_ros.ExtrapolationException):
+            rospy.logwarn("Missing camera pose")
+            return False
+
     def set_desired_target_position_request(self, request):
         if self.status == Status.WAITING:
             rospy.loginfo("Cannot set desired target position, robot is not READY")
@@ -338,6 +370,9 @@ class MotionGenerationManager:
         output_dict['wheel_radius'] = self.hparams.wheel_radius
         output_dict['wheel_separation'] = self.hparams.wheel_separation
         output_dict['laser_rel_pos'] = self.laser_relative_position.tolist()
+        if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
+            output_dict['camera_position'] = self.camera_pos_history
+            output_dict['camera_pan'] = self.camera_pan_history
 
         # log the data in a .json file
         log_dir = self.hparams.log_dir
@@ -421,6 +456,8 @@ class MotionGenerationManager:
                 if self.hparams.n_filters > 0:
                     self.crowd_motion_prediction_stamped = self.crowd_motion_prediction_stamped_nonrt
                 self.update_state()
+                if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
+                    self.get_camera_pose()
                 wheels_vel = self.wheels_vel_nonrt
                 if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
                     agents_pos = self.agents_pos_nonrt
@@ -438,6 +475,9 @@ class MotionGenerationManager:
                                                  self.state.v,
                                                  self.state.omega,
                                                  start_time])
+                if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
+                    self.camera_pos_history.append(self.camera_pose[:2, 3].tolist())
+                    self.camera_pan_history.append(self.pan_angle)
                 predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
                 for i in range(self.hparams.N_horizon):
                     predicted_trajectory[:, i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')
