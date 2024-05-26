@@ -295,7 +295,7 @@ def euclidean_distance(p1, p2):
     return np.linalg.norm(p1 - p2)
 
 def sort_by_distance(points, reference_point):
-    distances = np.array([euclidean_distance(point, reference_point) for point in points])
+    distances = np.array([euclidean_distance(point[:2], reference_point) for point in points])
     sorted_indices = np.argsort(distances)
     sorted_points = points[sorted_indices]
     sorted_distances = distances[sorted_indices]

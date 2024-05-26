@@ -209,17 +209,21 @@ class CameraDetectionManager:
     def data_extraction(self, rgb_img, depth_img):
         robot_position = self.robot_config.get_q()[:2]
         core_points = []
-        results = self.model(rgb_img, iou=0.5, conf=0.5, verbose=False)
-        for result in results:
-            labels, cords = result.boxes.cls, result.boxes.xyxy.cpu().numpy()
-            for label, cord in zip(labels, cords):
+        results = self.model.track(rgb_img, iou=0.5, conf=0.5, tracker="bytetrack.yaml", persist= True, verbose=False)
+        processed_img = results[0].plot()
+        self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
+        if results[0].boxes.id is not None:
+            labels = results[0].boxes.cls
+            boxes = results[0].boxes.xyxy.cpu()
+            track_ids = results[0].boxes.id.int().cpu().tolist()
+            for label, box, track_id in zip(labels, boxes, track_ids):
                 if label == 0:
-                    box_center = np.array([(cord[0] + cord[2]) / 2,
-                                           (cord[1] + cord[3]) / 2])
-                    x_min = int(cord[0])
-                    y_min = int(cord[1])
-                    x_max = int(cord[2])
-                    y_max = int(cord[3])
+                    box_center = np.array([(box[0] + box[2]) / 2,
+                                           (box[1] + box[3]) / 2])
+                    x_min = int(box[0])
+                    y_min = int(box[1])
+                    x_max = int(box[2])
+                    y_max = int(box[3])
                     # depth_min = np.nanmin(depth_img[y_min: y_max + 1, x_min: x_max + 1])
                     # depth_max = np.nanmax(depth_img[y_min: y_max + 1, x_min: x_max + 1])
                     # depth_mean = np.nanmean(depth_img[y_min: y_max + 1, x_min: x_max + 1])
@@ -238,13 +242,12 @@ class CameraDetectionManager:
                         homo_point_cam = np.append(point_cam, 1)
                         point_wrld = np.matmul(self.camera_pose, homo_point_cam)[:2]
                         if not is_outside(point_wrld, self.hparams.vertexes, self.hparams.normals):
-                            core_points.append(point_wrld)
-            processed_img = result.plot()
-            self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
+                            core_points.append(np.append(point_wrld, track_id))
 
         core_points = np.array(core_points)
         core_points, _ = sort_by_distance(core_points, robot_position)
         core_points = core_points[:self.hparams.n_filters]
+        print(core_points)
 
         return core_points, processed_img
 
