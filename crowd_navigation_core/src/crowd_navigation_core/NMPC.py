@@ -216,10 +216,7 @@ class NMPC:
         x = q[self.hparams.x_idx]
         y = q[self.hparams.y_idx]
 
-        if self.n_filters > 0:
-            h = casadi.SX.zeros(self.n_edges + self.n_filters)
-        else:
-            h = casadi.SX.zeros(self.n_edges)
+        h = casadi.SX.zeros(self.n_edges + self.n_filters)
 
         # Define the safe set wrt the configuration bounds
         robot_position = np.array([x, y])
@@ -284,6 +281,7 @@ class NMPC:
         con_h_expr = h_k1 + np.matmul(gamma_mat - id_mat, h_k)
         
         acados_model.con_h_expr = con_h_expr
+        acados_model.con_h_expr_0 = con_h_expr
 
         # Variables and params:
         acados_model.x = q
@@ -340,12 +338,10 @@ class NMPC:
         acados_constraints.D = D_mat
 
         # Nonlinear constraints (CBFs) (for both agents and configuration bounds):
-        if self.n_filters > 0:
-            acados_constraints.lh = np.zeros(self.n_edges + self.n_filters)
-            acados_constraints.uh = self.hparams.unbounded * np.ones(self.n_edges + self.n_filters)
-        else:
-            acados_constraints.lh = np.zeros(self.n_edges)
-            acados_constraints.uh = self.hparams.unbounded * np.ones(self.n_edges) 
+        acados_constraints.lh = np.zeros(self.n_edges + self.n_filters)
+        acados_constraints.uh = self.hparams.unbounded * np.ones(self.n_edges + self.n_filters)
+        acados_constraints.lh_0 = - self.hparams.unbounded * np.ones(self.n_edges + self.n_filters)
+        acados_constraints.uh_0 = acados_constraints.uh
 
         return acados_constraints
     
