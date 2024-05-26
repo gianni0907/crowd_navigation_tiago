@@ -49,13 +49,11 @@ class Hparams:
     # NMPC parameters
     if perception in (Perception.BOTH, Perception.CAMERA):
         generator_frequency = camera_detector_frequency
-        N_horizon = 75
     elif perception == Perception.LASER:
         generator_frequency = laser_detector_frequency
-        N_horizon = 25
     else:
         generator_frequency = 20
-        N_horizon = 50
+    N_horizon = int(generator_frequency * 2.5)
     predictor_frequency = generator_frequency
     dt = 1.0 / generator_frequency # [s]
     unbounded = 1000
