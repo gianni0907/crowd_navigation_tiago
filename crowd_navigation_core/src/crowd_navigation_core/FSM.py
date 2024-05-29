@@ -17,6 +17,7 @@ class FSM():
         self.innovation_threshold = self.hparams.innovation_threshold
         
         self.kalman_f = None
+        self.id = -1
         self.T_bar = self.hparams.max_pred_time
         self.next_state = FSMStates.IDLE
         self.state = FSMStates.IDLE
@@ -106,7 +107,7 @@ class FSM():
 
         return estimate
     
-    def update(self, time, measure):
+    def update(self, time, measure, id=None):
         self.state = self.next_state
         self.previous_estimate = np.copy(self.current_estimate)
 
@@ -121,6 +122,7 @@ class FSM():
 
         if measure is not None:
             self.last_valid_measure = measure
+            self.id = id
             self.last_valid_time = time
 
         return self.current_estimate

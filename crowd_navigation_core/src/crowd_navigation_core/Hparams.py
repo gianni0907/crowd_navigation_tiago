@@ -7,7 +7,7 @@ class Hparams:
     save_video = True
     if log:
         log_dir = '/tmp/crowd_navigation_tiago/data'
-        filename = 'test_tracking'
+        filename = 'test'
         generator_file = filename + '_generator.json'
         predictor_file = filename + '_predictor.json'
         laser_detector_file = filename + '_laser_detector.json'
@@ -29,7 +29,7 @@ class Hparams:
     # LASER: only lasser sensor enabled
     # CAMERA: only camera enabled
     # BOTH: both laser and camera enabled
-    perception = Perception.CAMERA
+    perception = Perception.BOTH
 
     if perception == Perception.FAKE and not simulation:
         raise ValueError("Cannot use fake perception in real world")

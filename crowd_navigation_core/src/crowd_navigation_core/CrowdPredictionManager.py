@@ -44,7 +44,7 @@ class CrowdPredictionManager:
                 laser_meas_topic = 'laser_measurements'
                 rospy.Subscriber(
                     laser_meas_topic,
-                    crowd_navigation_msgs.msg.MeasurementsStamped,
+                    crowd_navigation_msgs.msg.MeasurementsSetStamped,
                     self.laser_measurements_callback
                 )
 
@@ -54,7 +54,7 @@ class CrowdPredictionManager:
                 camera_meas_topic = 'camera_measurements'
                 rospy.Subscriber(
                     camera_meas_topic,
-                    crowd_navigation_msgs.msg.MeasurementsStamped,
+                    crowd_navigation_msgs.msg.MeasurementsSetStamped,
                     self.camera_measurements_callback
                 )
 
@@ -74,10 +74,10 @@ class CrowdPredictionManager:
         )
 
     def laser_measurements_callback(self, msg):
-        self.laser_measurements_stamped_nonrt = MeasurementsStamped.from_message(msg)
+        self.laser_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
     def camera_measurements_callback(self, msg):
-        self.camera_measurements_stamped_nonrt = MeasurementsStamped.from_message(msg)
+        self.camera_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
     def set_agents_trajectory_request(self, request):
         if self.hparams.perception == Perception.FAKE:           
@@ -110,12 +110,13 @@ class CrowdPredictionManager:
 
         return next_state
 
-    def adapt_measurements_format(self, measurements_stamped):
-        measurements_obj = measurements_stamped.measurements
-        measurements = np.zeros((measurements_obj.size, 2))
-        for i in range(measurements_obj.size):
-            measurements[i] = np.array([measurements_obj.positions[i].x,
-                                        measurements_obj.positions[i].y])
+    def adapt_measurements_format(self, measurements_set_stamped):
+        measurements_set = measurements_set_stamped.measurements_set
+        measurements = np.zeros((measurements_set.size, 3))
+        for i in range(measurements_set.size):
+            measurements[i] = np.array([measurements_set.measurements[i].x,
+                                        measurements_set.measurements[i].y,
+                                        measurements_set.measurements[i].id])
 
         return measurements
 
@@ -128,21 +129,30 @@ class CrowdPredictionManager:
         elif len(camera_meas) == 0:
             return laser_meas
         
-        distance_matrix = cdist(laser_meas, camera_meas) # [n_laser x n_camera]
+        distance_matrix = cdist(laser_meas[:, :2], camera_meas[:, :2]) # [n_laser x n_camera]
 
         laser_min_indices = np.argmin(distance_matrix, axis=1)
         camera_min_indices = np.argmin(distance_matrix, axis=0)
 
         mutual_correspondences = [(i, laser_min_indices[i]) for i in range(len(laser_meas)) \
                                   if (camera_min_indices[laser_min_indices[i]] == i) and (distance_matrix[i, laser_min_indices[i]] <= 1)]
-
+        
         correspondence_indices_camera = set([j for _, j in mutual_correspondences])
         correspondence_indices_laser = set([i for i, _ in mutual_correspondences])
 
-        # take camera measurements
+        # take camera measurements only from correspondences
         # corresponded_meas = camera_meas[list(correspondence_indices_camera)]
-        # # take laser measurements
-        corresponded_meas = laser_meas[list(correspondence_indices_laser)]
+        # take laser measurements only from correspondeces
+        # corresponded_meas = laser_meas[list(correspondence_indices_laser)]
+        # corresponded_meas[:, 2] = camera_meas[list(correspondence_indices_camera)][:, 2]
+        # take the mean of both measurements from correspondeces
+        corresponded_meas = [np.array([(laser_meas[i, 0] + camera_meas[j, 0]) / 2,
+                                       (laser_meas[i, 1] + camera_meas[j, 1]) / 2,
+                                       camera_meas[j, 2]]) for i, j in mutual_correspondences]
+        if corresponded_meas:
+            corresponded_meas = np.array(corresponded_meas)
+        else:
+            corresponded_meas = np.empty((0, 3))
 
         remaining_laser_indices = set(range(len(laser_meas))) - correspondence_indices_laser
         remaining_camera_indices = set(range(len(camera_meas))) - correspondence_indices_camera
@@ -252,7 +262,7 @@ class CrowdPredictionManager:
                 if self.hparams.use_kalman:
                     # Perform data association
                     # predict next positions according to fsms
-                    next_predicted_positions = np.zeros((self.hparams.n_filters, 2))
+                    next_predicted_positions = np.zeros((self.hparams.n_filters, 3))
                     next_positions_cov = np.zeros((self.hparams.n_filters, 2, 2))
 
                     for (i, fsm) in enumerate(fsms):
@@ -271,7 +281,8 @@ class CrowdPredictionManager:
                             predicted_state = self.hparams.nullstate
                             predicted_cov = np.eye(4) * 1e-2
 
-                        next_predicted_positions[i] = predicted_state[:2]
+                        next_predicted_positions[i, :2] = predicted_state[:2]
+                        next_predicted_positions[i, 2] = fsm.id
                         next_positions_cov[i] = predicted_cov[:2, :2]
 
                     fsm_indices = data_association(next_predicted_positions, next_positions_cov, measurements)
@@ -288,8 +299,9 @@ class CrowdPredictionManager:
                         
                         if associated_indices.size > 0:
                             j = associated_indices[0]
-                            measure = measurements[j]
-                            fsm.update(start_time, measure)
+                            measure = measurements[j, :2]
+                            id = measurements[j, 2]
+                            fsm.update(start_time, measure, id)
                             used_measurements[j] = True
                         else:
                             # If no associated measurement, find an unassociated one
@@ -297,8 +309,9 @@ class CrowdPredictionManager:
                             
                             if unassociated_indices.size > 0:
                                 k = unassociated_indices[0]
-                                measure = measurements[k]
-                                fsm.update(start_time, measure)
+                                measure = measurements[k, :2]
+                                id = measurements[k, 2]
+                                fsm.update(start_time, measure, id)
                                 fsm_indices[k] = i
                                 used_measurements[k] = True
                             else:

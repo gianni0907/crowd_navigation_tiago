@@ -114,7 +114,7 @@ class CameraDetectionManager:
         measurements_topic = 'camera_measurements'
         self.measurements_publisher = rospy.Publisher(
             measurements_topic,
-            crowd_navigation_msgs.msg.MeasurementsStamped,
+            crowd_navigation_msgs.msg.MeasurementsSetStamped,
             queue_size=1
         )
 
@@ -209,7 +209,7 @@ class CameraDetectionManager:
     def data_extraction(self, rgb_img, depth_img):
         robot_position = self.robot_config.get_q()[:2]
         core_points = []
-        results = self.model.track(rgb_img, iou=0.5, conf=0.5, tracker="bytetrack.yaml", persist= True, verbose=False)
+        results = self.model.track(rgb_img, iou=0.5, conf=0.5, tracker="bytetrack.yaml", persist=True, verbose=False)
         processed_img = results[0].plot()
         self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
         if results[0].boxes.id is not None:
@@ -247,7 +247,6 @@ class CameraDetectionManager:
         core_points = np.array(core_points)
         core_points, _ = sort_by_distance(core_points, robot_position)
         core_points = core_points[:self.hparams.n_filters]
-        print(core_points)
 
         return core_points, processed_img
 
@@ -336,14 +335,14 @@ class CameraDetectionManager:
             measurements, processed_image = self.data_extraction(rgb_image, depth_image)
 
             # Create measurements message
-            measurements_obj = Measurements()
+            measurements_set = MeasurementsSet()
             for measurement in measurements:
-                measurements_obj.append(Position(measurement[0], measurement[1]))
-            measurements_stamped = MeasurementsStamped(rospy.Time.from_sec(start_time),
-                                                       'map',
-                                                       measurements_obj)
-            measurements_stamped_msg = MeasurementsStamped.to_message(measurements_stamped)
-            self.measurements_publisher.publish(measurements_stamped_msg)
+                measurements_set.append(Measurement(measurement[0], measurement[1], measurement[2]))
+            measurements_set_stamped = MeasurementsSetStamped(rospy.Time.from_sec(start_time),
+                                                              'map',
+                                                              measurements_set)
+            measurements_set_stamped_msg = MeasurementsSetStamped.to_message(measurements_set_stamped)
+            self.measurements_publisher.publish(measurements_set_stamped_msg)
 
             # Update logged data
             if self.hparams.log:

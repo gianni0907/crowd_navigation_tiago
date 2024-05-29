@@ -76,7 +76,7 @@ class LaserDetectionManager:
         measurements_topic = 'laser_measurements'
         self.measurements_publisher = rospy.Publisher(
             measurements_topic,
-            crowd_navigation_msgs.msg.MeasurementsStamped,
+            crowd_navigation_msgs.msg.MeasurementsSetStamped,
             queue_size=1
         )
 
@@ -209,6 +209,7 @@ class LaserDetectionManager:
 
             core_points, _ = sort_by_distance(core_points, robot_position)
             core_points = core_points[:self.hparams.n_filters]
+            core_points = np.column_stack((core_points, np.full(core_points.shape[0], -1)))
         else:
             core_points = np.array([])
 
@@ -296,14 +297,14 @@ class LaserDetectionManager:
             measurements = self.data_clustering(observations)
 
             # Create measurements message
-            measurements_obj = Measurements()
+            measurements_set = MeasurementsSet()
             for measurement in measurements:
-                measurements_obj.append(Position(measurement[0], measurement[1]))
-            measurements_stamped = MeasurementsStamped(rospy.Time.from_sec(start_time),
-                                                       'map',
-                                                       measurements_obj)
-            measurements_stamped_msg = MeasurementsStamped.to_message(measurements_stamped)
-            self.measurements_publisher.publish(measurements_stamped_msg)
+                measurements_set.append(Measurement(measurement[0], measurement[1], measurement[2]))
+            measurements_set_stamped = MeasurementsSetStamped(rospy.Time.from_sec(start_time),
+                                                              'map',
+                                                              measurements_set)
+            measurements_set_stamped_msg = MeasurementsSetStamped.to_message(measurements_set_stamped)
+            self.measurements_publisher.publish(measurements_set_stamped_msg)
 
             # Update logged data
             if self.hparams.log:
