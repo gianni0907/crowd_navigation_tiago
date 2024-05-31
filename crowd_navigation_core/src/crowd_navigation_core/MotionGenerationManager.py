@@ -263,7 +263,6 @@ class MotionGenerationManager:
         # Set the header
         trajectory.header = std_msgs.msg.Header()
         trajectory.header.stamp = rospy.Time.now()
-        trajectory.header.frame_id = 'xtion_rgb_optical_frame'
         
         # Set the joint names for the head
         trajectory.joint_names = ['head_1_joint', 'head_2_joint']
@@ -273,6 +272,8 @@ class MotionGenerationManager:
 
         # Set the joint positions (pan and tilt)
         point.positions = [request.pan, request.tilt]
+        
+        point.velocities = [0.0, 0.0]
         
         # Set the time to reach the target (optional, set to 1 second)
         point.time_from_start = rospy.Duration(1.0)
