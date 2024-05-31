@@ -19,6 +19,7 @@ import geometry_msgs.msg
 import sensor_msgs.msg
 import std_msgs.msg
 import trajectory_msgs.msg
+import control_msgs.msg
 import crowd_navigation_msgs.srv
 
 class MotionGenerationManager:
@@ -137,6 +138,13 @@ class MotionGenerationManager:
             trajectory_msgs.msg.JointTrajectory,
             queue_size=1)
 
+        # Setup publisher to /head_controller/point_head_action topic
+        point_head_action_topic = '/head_controller/point_head_action/goal'
+        self.point_head_action_publisher = rospy.Publisher(
+            point_head_action_topic,
+            control_msgs.msg.PointHeadActionGoal,
+            queue_size=1)
+
     def init(self):
         # Initialize target position to the current position
         self.target_position = np.array([self.state.x,
@@ -164,10 +172,13 @@ class MotionGenerationManager:
             self.agents_pos_nonrt = agents_pos
 
     def tf2q(self, transform):
-        q = transform.transform.rotation
+        q = np.array([transform.transform.rotation.x,
+                      transform.transform.rotation.y,
+                      transform.transform.rotation.z,
+                      transform.transform.rotation.w])
         theta = math.atan2(
-            2.0 * (q.w * q.z + q.x * q.y),
-            1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+            2.0 * (q[3] * q[2] + q[0] * q[1]),
+            1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2])
         )
         product = self.previous_theta * theta
         if product < - 8:
@@ -182,6 +193,14 @@ class MotionGenerationManager:
         self.state.theta = theta + self.k * 2 * math.pi
         self.state.x = transform.transform.translation.x + self.hparams.b * math.cos(self.state.theta)
         self.state.y = transform.transform.translation.y + self.hparams.b * math.sin(self.state.theta)
+        
+        pos = np.array([transform.transform.translation.x,
+                        transform.transform.translation.y,
+                        transform.transform.translation.z])
+        rotation_matrix = R.from_quat(q).as_matrix().T
+        self.base_pose = np.eye(4)
+        self.base_pose[:3, :3] = rotation_matrix
+        self.base_pose[:3, 3] = - np.matmul(rotation_matrix, pos)
 
     def update_state(self):
         try:
@@ -426,6 +445,28 @@ class MotionGenerationManager:
             self.target_position = np.array([self.state.x,
                                              self.state.y])
         return control_input
+    
+    def point_head(self, map_point):
+            # Point head towards the target position
+            homo_map_point = np.append(np.append(map_point, self.camera_pose[2, 3]), 1)
+            print(f"Map point: {homo_map_point}")
+            point = np.matmul(self.base_pose, homo_map_point)
+            print(f"Base footprint point: {point}")
+            point_head_msg = control_msgs.msg.PointHeadActionGoal()
+
+            point_head_msg.goal.target.header.frame_id = self.base_footprint_frame
+            point_head_msg.goal.target.point.x = point[0]
+            point_head_msg.goal.target.point.y = point[1]
+            point_head_msg.goal.target.point.z = point[2]
+            point_head_msg.goal.pointing_axis.x = 0.0
+            point_head_msg.goal.pointing_axis.y = 0.0
+            point_head_msg.goal.pointing_axis.z = 1.0
+            point_head_msg.goal.pointing_frame = self.camera_frame
+
+            point_head_msg.goal.min_duration = rospy.Duration(0.5)
+            point_head_msg.goal.max_velocity = 0.5
+
+            self.point_head_action_publisher.publish(point_head_msg)
             
     def run(self):
         rate = rospy.Rate(self.hparams.generator_frequency)
@@ -457,11 +498,13 @@ class MotionGenerationManager:
                 if self.hparams.n_filters > 0:
                     self.crowd_motion_prediction_stamped = self.crowd_motion_prediction_stamped_nonrt
                 self.update_state()
-                if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
-                    self.get_camera_pose()
+                self.get_camera_pose()
                 wheels_vel = self.wheels_vel_nonrt
                 if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
                     agents_pos = self.agents_pos_nonrt
+
+            # Point the head to the target position (2d point expressed in the map frame)
+            self.point_head(self.target_position)
 
             # Generate control inputs (wheels accelerations)
             control_input = self.update_control_input()
