@@ -446,25 +446,36 @@ class MotionGenerationManager:
                                              self.state.y])
         return control_input
     
-    def point_head(self, map_point):
-            # Point head towards the target position
-            homo_map_point = np.append(np.append(map_point, self.camera_pose[2, 3]), 1)
-            print(f"Map point: {homo_map_point}")
-            point = np.matmul(self.base_pose, homo_map_point)
-            print(f"Base footprint point: {point}")
+    def point_head(self):
+            # Select the target to point: the closest agent, if any, or the target position
+            agents_pos = []
+            for i in range(self.hparams.n_filters):
+                agents_pos.append([self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions[i].positions[0].x,
+                                   self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions[i].positions[0].y])
+            agents_pos = np.array(agents_pos)
+            sorted_agents, _ = sort_by_distance(agents_pos, self.state.get_state()[:2])
+            if all(coord == self.hparams.nullpos for coord in sorted_agents[0]):
+                if self.status == Status.MOVING:
+                    point = self.target_position
+                else:
+                    return
+            else:
+                point = sorted_agents[0]
+            homo_point = np.append(np.append(point, self.camera_pose[2, 3]), 1)
+            baseframe_point = np.matmul(self.base_pose, homo_point)
             point_head_msg = control_msgs.msg.PointHeadActionGoal()
 
             point_head_msg.goal.target.header.frame_id = self.base_footprint_frame
-            point_head_msg.goal.target.point.x = point[0]
-            point_head_msg.goal.target.point.y = point[1]
-            point_head_msg.goal.target.point.z = point[2]
+            point_head_msg.goal.target.point.x = baseframe_point[0]
+            point_head_msg.goal.target.point.y = baseframe_point[1]
+            point_head_msg.goal.target.point.z = baseframe_point[2]
             point_head_msg.goal.pointing_axis.x = 0.0
             point_head_msg.goal.pointing_axis.y = 0.0
             point_head_msg.goal.pointing_axis.z = 1.0
             point_head_msg.goal.pointing_frame = self.camera_frame
 
-            point_head_msg.goal.min_duration = rospy.Duration(0.5)
-            point_head_msg.goal.max_velocity = 0.5
+            point_head_msg.goal.min_duration = rospy.Duration(0.1)
+            point_head_msg.goal.max_velocity = 2
 
             self.point_head_action_publisher.publish(point_head_msg)
             
@@ -504,7 +515,7 @@ class MotionGenerationManager:
                     agents_pos = self.agents_pos_nonrt
 
             # Point the head to the target position (2d point expressed in the map frame)
-            self.point_head(self.target_position)
+            self.point_head()
 
             # Generate control inputs (wheels accelerations)
             control_input = self.update_control_input()
