@@ -209,7 +209,7 @@ class CameraDetectionManager:
     def data_extraction(self, rgb_img, depth_img):
         robot_position = self.robot_config.get_q()[:2]
         core_points = []
-        results = self.model.track(rgb_img, iou=0.5, conf=0.5, tracker="bytetrack.yaml", persist=True, verbose=False)
+        results = self.model.track(rgb_img, iou=0.25, conf=0.5, tracker="bytetrack.yaml", persist=True, verbose=False)
         processed_img = results[0].plot()
         self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
         if results[0].boxes.id is not None:
@@ -228,7 +228,7 @@ class CameraDetectionManager:
                     # depth_max = np.nanmax(depth_img[y_min: y_max + 1, x_min: x_max + 1])
                     # depth_mean = np.nanmean(depth_img[y_min: y_max + 1, x_min: x_max + 1])
                     # depth_median = np.nanmedian(depth_img[y_min: y_max + 1, x_min: x_max + 1])
-                    depth= np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 20)
+                    depth= np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 25)
                     # print(f"Bbox center: {box_center}")
                     # print(f"depth: {depth}")
                     # print(f"depth min: {depth_min}")

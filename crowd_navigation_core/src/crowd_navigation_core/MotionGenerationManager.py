@@ -149,6 +149,7 @@ class MotionGenerationManager:
         # Initialize target position to the current position
         self.target_position = np.array([self.state.x,
                                          self.state.y])
+        self.error = np.zeros((4,1))
         # Initialize the NMPC controller
         self.nmpc_controller.init(self.state)
 
@@ -270,9 +271,11 @@ class MotionGenerationManager:
             self.target_position[self.hparams.x_idx] = request.x
             self.target_position[self.hparams.y_idx] = request.y
             if self.status == Status.READY:
-                self.status = Status.MOVING        
+                self.status = Status.MOVING
+                self.point_head()
                 rospy.loginfo(f"Desired target position successfully set: {self.target_position}")
             elif self.status == Status.MOVING:
+                self.point_head()
                 rospy.loginfo(f"Desired target position successfully changed: {self.target_position}")
             return crowd_navigation_msgs.srv.SetDesiredTargetPositionResponse(True)
         
@@ -412,12 +415,12 @@ class MotionGenerationManager:
 
         if self.status == Status.MOVING:
             # Compute the position and velocity error
-            error = np.array([self.target_position[self.hparams.x_idx] - self.state.x, 
-                              self.target_position[self.hparams.y_idx] - self.state.y,
-                              0.0 - self.state.v,
-                              0.0 - self.state.omega])
+            self.error = np.array([self.target_position[self.hparams.x_idx] - self.state.x, 
+                                   self.target_position[self.hparams.y_idx] - self.state.y,
+                                   0.0 - self.state.v,
+                                   0.0 - self.state.omega])
             
-            if norm(error) < self.hparams.error_tol:
+            if norm(self.error) < self.hparams.nmpc_error_tol:
                 control_input = np.zeros(self.nmpc_controller.nu)
                 print("Stop state ###############################")
                 print(self.state)
@@ -454,8 +457,8 @@ class MotionGenerationManager:
                                    self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions[i].positions[0].y])
             agents_pos = np.array(agents_pos)
             sorted_agents, _ = sort_by_distance(agents_pos, self.state.get_state()[:2])
-            if all(coord == self.hparams.nullpos for coord in sorted_agents[0]):
-                if self.status == Status.MOVING:
+            if all(coord == self.hparams.nullpos for coord in sorted_agents[0]) or self.hparams.perception == Perception.CAMERA:
+                if norm(self.error) > self.hparams.pointing_error_tol:
                     point = self.target_position
                 else:
                     return
@@ -516,7 +519,6 @@ class MotionGenerationManager:
 
             # Point the head to the target position (2d point expressed in the map frame)
             self.point_head()
-
             # Generate control inputs (wheels accelerations)
             control_input = self.update_control_input()
             # Publish commands (robot pseudovelocities)

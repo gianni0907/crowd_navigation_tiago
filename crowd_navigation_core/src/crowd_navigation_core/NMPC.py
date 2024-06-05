@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.linalg
 
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions, AcadosOcpSolver
 from numpy.linalg import *

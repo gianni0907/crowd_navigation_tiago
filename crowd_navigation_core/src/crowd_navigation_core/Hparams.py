@@ -19,14 +19,14 @@ class Hparams:
     # Specify the frequency of the sensors' modules
     if simulation:
         laser_detector_frequency = 10 # [Hz]
-        camera_detector_frequency = 30 # [Hz]
+        camera_detector_frequency = 15 # [Hz]
     else:
         laser_detector_frequency = 15 # [Hz]
-        camera_detector_frequency = 30 # TBD [Hz]
+        camera_detector_frequency = 15 # TBD [Hz]
 
     # Specify the type of sensing, 4 possibilities:
     # FAKE: no sensors, the robot knows the fake trajectory assigned to agents (not visible in Gazebo)
-    # LASER: only lasser sensor enabled
+    # LASER: only laser sensor enabled
     # CAMERA: only camera enabled
     # BOTH: both laser and camera enabled
     perception = Perception.BOTH
@@ -115,8 +115,9 @@ class Hparams:
     r_wheel_idx = 0
     l_wheel_idx = 1
 
-    # Tolerance on the position error
-    error_tol = 0.1
+    # Tolerances on the (position and velocity) error
+    nmpc_error_tol = 0.1
+    pointing_error_tol = 0.4
 
     # Cost function weights
     if simulation:

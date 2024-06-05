@@ -369,7 +369,7 @@ def data_association(predictions, covariances, measurements):
     n_fsms = predictions.shape[0]
 
     # Heuristics parameters
-    gating_tau = 10 # maximum Mahalanobis distance threshold
+    gating_tau = np.sqrt(1e2) # maximum Mahalanobis distance threshold
     gamma_threshold = 1e-1 # lonely best friends threshold
 
     # Initialize association info arrays
