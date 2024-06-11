@@ -50,6 +50,8 @@ class CameraDetectionManager:
             self.robot_config_history = []
             self.camera_pos_history = []
             self.camera_pan_history = []
+            self.depth_mean_history = []
+            self.depth_history = []
             self.boundary_vertexes = []
             if self.hparams.simulation:
                 self.agents_pos_history = []
@@ -114,17 +116,19 @@ class CameraDetectionManager:
         measurements_topic = 'camera_measurements'
         self.measurements_publisher = rospy.Publisher(
             measurements_topic,
-            crowd_navigation_msgs.msg.MeasurementsStamped,
+            crowd_navigation_msgs.msg.MeasurementsSetStamped,
             queue_size=1
         )
 
     def image_callback(self, data):
+        self.timestamp = data.header.stamp
         try:
             self.rgb_image_nonrt = self.bridge.imgmsg_to_cv2(data, 'bgr8')
         except Exception as e:
             rospy.logerr(e)
 
     def compressed_image_callback(self, data):
+        self.timestamp = data.header.stamp
         try:
             self.rgb_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data, 'bgr8')
         except Exception as e:
@@ -132,13 +136,13 @@ class CameraDetectionManager:
 
     def depth_callback(self, data):
         try:
-            self.depth_image_nonrt = self.bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
+            self.depth_image_nonrt = self.bridge.imgmsg_to_cv2(data)
         except Exception as e:
             rospy.logerr(e)
 
     def compressed_depth_callback(self, data):
         try:
-            self.depth_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='passthrough')
+            self.depth_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data)
         except Exception as e:
             rospy.logerr(e)
 
@@ -178,10 +182,10 @@ class CameraDetectionManager:
             rospy.logwarn("Missing current configuration")
             return False
 
-    def get_camera_pose(self):
+    def get_camera_pose(self, time):
         try:
             transform = self.tf_buffer.lookup_transform(
-                self.map_frame, self.camera_frame, rospy.Time()
+                self.map_frame, self.camera_frame, time
             )
             q = np.array([transform.transform.rotation.x,
                           transform.transform.rotation.y,
@@ -209,38 +213,40 @@ class CameraDetectionManager:
     def data_extraction(self, rgb_img, depth_img):
         robot_position = self.robot_config.get_q()[:2]
         core_points = []
-        results = self.model(rgb_img, iou=0.5, conf=0.5, verbose=False)
-        for result in results:
-            labels, cords = result.boxes.cls, result.boxes.xyxy.cpu().numpy()
-            for label, cord in zip(labels, cords):
-                if label == 0:
-                    box_center = np.array([(cord[0] + cord[2]) / 2,
-                                           (cord[1] + cord[3]) / 2])
-                    x_min = int(cord[0])
-                    y_min = int(cord[1])
-                    x_max = int(cord[2])
-                    y_max = int(cord[3])
-                    # depth_min = np.nanmin(depth_img[y_min: y_max + 1, x_min: x_max + 1])
-                    # depth_max = np.nanmax(depth_img[y_min: y_max + 1, x_min: x_max + 1])
-                    # depth_mean = np.nanmean(depth_img[y_min: y_max + 1, x_min: x_max + 1])
-                    # depth_median = np.nanmedian(depth_img[y_min: y_max + 1, x_min: x_max + 1])
-                    depth= np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 20)
-                    # print(f"Bbox center: {box_center}")
-                    # print(f"depth: {depth}")
-                    # print(f"depth min: {depth_min}")
-                    # print(f"depth max: {depth_max}")
-                    # print(f"depth mean: {depth_mean}")
-                    # print(f"depth median: {depth_median}")
-                    if depth >= self.hparams.cam_min_range:
-                        point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
-                        scale = depth / point_cam[2]
-                        point_cam = point_cam * scale
-                        homo_point_cam = np.append(point_cam, 1)
-                        point_wrld = np.matmul(self.camera_pose, homo_point_cam)[:2]
-                        if not is_outside(point_wrld, self.hparams.vertexes, self.hparams.normals):
-                            core_points.append(point_wrld)
-            processed_img = result.plot()
-            self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
+        results = self.model(rgb_img, iou=0.1, conf=0.5, verbose=False)
+        processed_img = results[0].plot()
+        self.processed_image_publisher.publish(self.bridge.cv2_to_imgmsg(processed_img))
+        labels = results[0].boxes.cls
+        boxes = results[0].boxes.xyxy.cpu()
+        for label, box in zip(labels, boxes):
+            if label == 0:
+                box_center = np.array([(box[0] + box[2]) / 2,
+                                       (box[1] + box[3]) / 2])
+                x_min = int(box[0])
+                y_min = int(box[1])
+                x_max = int(box[2])
+                y_max = int(box[3])
+                # depth_min = np.nanmin(depth_img[y_min: y_max + 1, x_min: x_max + 1])
+                # depth_max = np.nanmax(depth_img[y_min: y_max + 1, x_min: x_max + 1])
+                depth_mean = np.nanmean(depth_img[y_min: y_max + 1, x_min: x_max + 1])
+                # depth_median = np.nanmedian(depth_img[y_min: y_max + 1, x_min: x_max + 1])
+                depth = np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 20)
+                # print(f"Bbox center: {box_center}")
+                # print(f"depth: {depth}")
+                # print(f"depth: {depth_comp}")
+                # print(f"depth min: {depth_min}")
+                # print(f"depth max: {depth_max}")
+                # print(f"depth median: {depth_median}")
+                self.depth_mean_history.append(depth_mean.tolist())
+                self.depth_history.append(depth.tolist())
+                if depth >= self.hparams.cam_min_range:
+                    point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
+                    scale = depth / point_cam[2]
+                    point_cam = point_cam * scale
+                    homo_point_cam = np.append(point_cam, 1)
+                    point_wrld = np.matmul(self.camera_pose, homo_point_cam)[:2]
+                    if not is_outside(point_wrld, self.hparams.vertexes, self.hparams.normals):
+                        core_points.append(point_wrld)
 
         core_points = np.array(core_points)
         core_points, _ = sort_by_distance(core_points, robot_position)
@@ -255,6 +261,8 @@ class CameraDetectionManager:
         output_dict['robot_config'] = self.robot_config_history
         output_dict['camera_position'] = self.camera_pos_history
         output_dict['camera_pan'] = self.camera_pan_history
+        output_dict['depth_mean'] = self.depth_mean_history
+        output_dict['depth'] = self.depth_history
         output_dict['frequency'] = self.hparams.camera_detector_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
@@ -311,7 +319,7 @@ class CameraDetectionManager:
             start_time = time.time()
 
             if self.status == Status.WAITING:
-                if self.update_configuration() and self.get_camera_pose():
+                if self.update_configuration() and self.get_camera_pose(rospy.Time()):
                     self.status = Status.READY
                 else:
                     rate.sleep()
@@ -324,7 +332,7 @@ class CameraDetectionManager:
 
             with self.data_lock:
                 self.update_configuration()
-                self.get_camera_pose()
+                self.get_camera_pose(self.timestamp)
                 rgb_image = self.rgb_image_nonrt
                 depth_image = self.depth_image_nonrt
                 if self.hparams.simulation:
@@ -333,14 +341,14 @@ class CameraDetectionManager:
             measurements, processed_image = self.data_extraction(rgb_image, depth_image)
 
             # Create measurements message
-            measurements_obj = Measurements()
+            measurements_set = MeasurementsSet()
             for measurement in measurements:
-                measurements_obj.append(Position(measurement[0], measurement[1]))
-            measurements_stamped = MeasurementsStamped(rospy.Time.from_sec(start_time),
-                                                       'map',
-                                                       measurements_obj)
-            measurements_stamped_msg = MeasurementsStamped.to_message(measurements_stamped)
-            self.measurements_publisher.publish(measurements_stamped_msg)
+                measurements_set.append(Measurement(measurement[0], measurement[1]))
+            measurements_set_stamped = MeasurementsSetStamped(rospy.Time.from_sec(start_time),
+                                                              'map',
+                                                              measurements_set)
+            measurements_set_stamped_msg = MeasurementsSetStamped.to_message(measurements_set_stamped)
+            self.measurements_publisher.publish(measurements_set_stamped_msg)
 
             # Update logged data
             if self.hparams.log:

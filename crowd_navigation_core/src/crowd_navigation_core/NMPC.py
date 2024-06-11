@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.linalg
 
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpConstraints, AcadosOcpCost, AcadosOcpOptions, AcadosOcpSolver
 from numpy.linalg import *
@@ -385,19 +384,19 @@ class NMPC:
             crowd_motion_prediction : CrowdMotionPrediction
             ):
         # Set parameters
+        velocities = [Velocity() for _ in range(self.n_filters)]
+        for j, motion_prediction in enumerate(crowd_motion_prediction.motion_predictions):
+            velocities[j].x = (motion_prediction.positions[1].x - motion_prediction.positions[0].x) / self.dt
+            velocities[j].y = (motion_prediction.positions[1].y - motion_prediction.positions[0].y) / self.dt
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
             agents_state = np.zeros((self.hparams.n_filters * self.agent_state_size))
-            for j in range(self.n_filters):
+            for j, motion_prediction in enumerate(crowd_motion_prediction.motion_predictions):
                 position = crowd_motion_prediction.motion_predictions[j].positions[k]
-                velocity = Velocity(
-                    (crowd_motion_prediction.motion_predictions[j].positions[1].x - crowd_motion_prediction.motion_predictions[j].positions[0].x) / self.dt ,
-                    (crowd_motion_prediction.motion_predictions[j].positions[1].y - crowd_motion_prediction.motion_predictions[j].positions[0].y) / self.dt
-                )
                 agents_state[j*self.agent_state_size + 0] = position.x
                 agents_state[j*self.agent_state_size + 1] = position.y
-                agents_state[j*self.agent_state_size + 2] = velocity.x
-                agents_state[j*self.agent_state_size + 3] = velocity.y
+                agents_state[j*self.agent_state_size + 2] = velocities[j].x
+                agents_state[j*self.agent_state_size + 3] = velocities[j].y
             self.acados_ocp_solver.set(k, 'p', agents_state)
         self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])
 

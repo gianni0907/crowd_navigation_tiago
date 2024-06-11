@@ -47,7 +47,7 @@ class Position:
         return Position(position_msg.x, position_msg.y)
 
 class Velocity:
-    def __init__(self, x, y):
+    def __init__(self, x=0, y=0):
         self.x = x
         self.y = y
 
@@ -62,58 +62,69 @@ class Velocity:
     def from_message(velocity_msg):
         return Velocity(velocity_msg.x, velocity_msg.y)
     
-class Measurements:
+class Measurement:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __repr__(self):
+        return '({}, {})'.format(self.x, self.y)
+    
+    @staticmethod
+    def to_message(meas):
+        return crowd_navigation_msgs.msg.Measurement(meas.x, meas.y)
+    
+    @staticmethod
+    def from_message(meas_msg):
+        return Measurement(meas_msg.x, meas_msg.y)
+class MeasurementsSet:
     def __init__(self):
-        self.positions = []
+        self.measurements = []
         self.size = 0
 
-    def append(self, core_point):
-        self.positions.append(core_point)
+    def append(self, measurement):
+        self.measurements.append(measurement)
         self.size += 1
     
     @staticmethod
-    def to_message(measurements):
-        measurements_msg = crowd_navigation_msgs.msg.Measurements()
-        for core_point in measurements.positions:
-            measurements_msg.positions.append(Position.to_message(core_point))
+    def to_message(measurements_set):
+        measurements_set_msg = crowd_navigation_msgs.msg.MeasurementsSet()
+        for measurement in measurements_set.measurements:
+            measurements_set_msg.measurements.append(Measurement.to_message(measurement))
 
-        return measurements_msg
+        return measurements_set_msg
 
     @staticmethod
-    def from_message(measurements_msg):
-        measurements = Measurements()
-        for position_msg in measurements_msg.positions:
-            measurements.append(Position.from_message(position_msg))
+    def from_message(measurements_set_msg):
+        measurements_set = MeasurementsSet()
+        for measurement_msg in measurements_set_msg.measurements:
+            measurements_set.append(Measurement.from_message(measurement_msg))
             
-        return measurements
+        return measurements_set
     
-class MeasurementsStamped:
-    def __init__(self, time, frame_id, measurements):
+class MeasurementsSetStamped:
+    def __init__(self, time, frame_id, measurements_set):
         self.time = time
         self.frame_id = frame_id
-        self.measurements = measurements
+        self.measurements_set = measurements_set
 
     @staticmethod
-    def to_message(measurements_stamped):
-        measurements_stamped_msg = \
-            crowd_navigation_msgs.msg.MeasurementsStamped()
-        measurements_stamped_msg.header.stamp = \
-            measurements_stamped.time
-        measurements_stamped_msg.header.frame_id = \
-            measurements_stamped.frame_id
-        measurements_stamped_msg.measurements= \
-            Measurements.to_message(
-                measurements_stamped.measurements
+    def to_message(measurements_set_stamped):
+        measurements_set_stamped_msg = crowd_navigation_msgs.msg.MeasurementsSetStamped()
+        measurements_set_stamped_msg.header.stamp = measurements_set_stamped.time
+        measurements_set_stamped_msg.header.frame_id = measurements_set_stamped.frame_id
+        measurements_set_stamped_msg.measurements_set= MeasurementsSet.to_message(
+                measurements_set_stamped.measurements_set
             )
-        return measurements_stamped_msg
+        return measurements_set_stamped_msg
 
     @staticmethod
-    def from_message(measurements_stamped_msg):
-        return MeasurementsStamped(
-            measurements_stamped_msg.header.stamp,
-            measurements_stamped_msg.header.frame_id,
-            Measurements.from_message(
-                measurements_stamped_msg.measurements
+    def from_message(measurements_set_stamped_msg):
+        return MeasurementsSetStamped(
+            measurements_set_stamped_msg.header.stamp,
+            measurements_set_stamped_msg.header.frame_id,
+            MeasurementsSet.from_message(
+                measurements_set_stamped_msg.measurements_set
             )
         )
  
@@ -148,8 +159,7 @@ class CrowdMotionPrediction:
 
     @staticmethod
     def to_message(crowd_motion_prediction):
-        crowd_motion_prediction_msg = \
-            crowd_navigation_msgs.msg.CrowdMotionPrediction()
+        crowd_motion_prediction_msg = crowd_navigation_msgs.msg.CrowdMotionPrediction()
         for motion_prediction in crowd_motion_prediction.motion_predictions:
             crowd_motion_prediction_msg.motion_predictions.append(
                 MotionPrediction.to_message(motion_prediction)
@@ -159,8 +169,7 @@ class CrowdMotionPrediction:
     @staticmethod
     def from_message(crowd_motion_prediction_msg):
         crowd_motion_prediction = CrowdMotionPrediction()
-        for motion_prediction_msg in \
-            crowd_motion_prediction_msg.motion_predictions:
+        for motion_prediction_msg in crowd_motion_prediction_msg.motion_predictions:
             crowd_motion_prediction.append(
                 MotionPrediction.from_message(motion_prediction_msg)
             )
@@ -174,16 +183,12 @@ class CrowdMotionPredictionStamped:
 
     @staticmethod
     def to_message(crowd_motion_prediction_stamped):
-        crowd_motion_prediction_stamped_msg = \
-            crowd_navigation_msgs.msg.CrowdMotionPredictionStamped()
-        crowd_motion_prediction_stamped_msg.header.stamp = \
-            crowd_motion_prediction_stamped.time
-        crowd_motion_prediction_stamped_msg.header.frame_id = \
-            crowd_motion_prediction_stamped.frame_id
-        crowd_motion_prediction_stamped_msg.crowd_motion_prediction = \
-            CrowdMotionPrediction.to_message(
+        crowd_motion_prediction_stamped_msg = crowd_navigation_msgs.msg.CrowdMotionPredictionStamped()
+        crowd_motion_prediction_stamped_msg.header.stamp = crowd_motion_prediction_stamped.time
+        crowd_motion_prediction_stamped_msg.header.frame_id = crowd_motion_prediction_stamped.frame_id
+        crowd_motion_prediction_stamped_msg.crowd_motion_prediction = CrowdMotionPrediction.to_message(
                 crowd_motion_prediction_stamped.crowd_motion_prediction
-              )
+            )
         return crowd_motion_prediction_stamped_msg
 
     @staticmethod
@@ -392,27 +397,29 @@ def data_association(predictions, covariances, measurements):
         if fsm_indices[j] != -1:
             col_min = np.min(A_mat[:, fsm_indices[j]])
             if distances[j] != col_min:
+                print(f"Best friend criterion: {fsm_indices[j]}")
                 fsm_indices[j] = -1
 
     # Step 4: apply the lonely best friend criterion
-    if n_fsms > 1 and n_measurements > 1:
-        for j in range(n_measurements):
-            proposed_est = fsm_indices[j]
-            if proposed_est == -1:
-                continue
+    # if n_fsms > 1 and n_measurements > 1:
+    #     for j in range(n_measurements):
+    #         proposed_est = fsm_indices[j]
+    #         if proposed_est == -1:
+    #             continue
 
-            d_ji = distances[j]
+    #         d_ji = distances[j]
 
-            # find the second best value of the row
-            row = A_mat[j, :]
-            second_min_row = np.partition(row, 1)[1]
+    #         # find the second best value of the row
+    #         row = A_mat[j, :]
+    #         second_min_row = np.partition(row, 1)[1]
 
-            # find the second best value of the col
-            col = A_mat[:, proposed_est]
-            second_min_col = np.partition(col, 1)[1]
+    #         # find the second best value of the col
+    #         col = A_mat[:, proposed_est]
+    #         second_min_col = np.partition(col, 1)[1]
 
-            # check association ambiguity
-            if (second_min_row - d_ji) < gamma_threshold or (second_min_col - d_ji) < gamma_threshold:
-                fsm_indices[j] = -1
+    #         # check association ambiguity
+    #         if (second_min_row - d_ji) < gamma_threshold or (second_min_col - d_ji) < gamma_threshold:
+    #             print(f"Lonely best friend criterion: {proposed_est}")
+    #             fsm_indices[j] = -1
     
     return fsm_indices

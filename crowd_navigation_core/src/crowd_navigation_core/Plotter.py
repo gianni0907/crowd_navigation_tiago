@@ -201,6 +201,8 @@ class Plotter:
         robot_config = np.array(self.camera_detector_dict['robot_config'])
         camera_pos = np.array(self.camera_detector_dict['camera_position'])
         camera_pan = - np.array(self.camera_detector_dict['camera_pan']) - np.pi / 2
+        depth = np.array(self.camera_detector_dict['depth'])
+        depth_mean = np.array(self.camera_detector_dict['depth_mean'])
         b = self.camera_detector_dict['b']
         shooting_nodes = robot_config.shape[0]
         robot_center = np.empty((shooting_nodes, 2))
@@ -220,6 +222,28 @@ class Plotter:
         cam_horz_fov = self.camera_detector_dict['horz_fov']
         range_min = self.camera_detector_dict['min_range']
         range_max = self.camera_detector_dict['max_range']
+
+        fig, axs = plt.subplots(3, 1, figsize=(10, 8))
+
+        axs[0].plot(- camera_pan - np.pi / 2, label='Camera Pan')
+        axs[0].set_title('Camera Pan')
+        axs[0].set_ylim([-np.pi, np.pi])
+        axs[0].grid(True)
+
+        axs[1].plot(depth, label='Depth', color='orange')
+        axs[1].set_title('Depth')
+        axs[1].grid(True)
+
+
+        axs[2].plot(depth_mean, label='Depth Mean', color='green')
+        axs[2].set_title('Depth Mean')
+        axs[2].grid(True)
+
+        # Adjust layout to prevent overlap
+        plt.tight_layout()
+
+        # Show the plots
+        plt.show()
 
         # Plot animation with camera measurements
         fig = plt.figure(figsize=(8, 8))
@@ -799,10 +823,10 @@ class Plotter:
                     agents.append(ax_wrld.scatter([], [], marker='.', label='ag{}'.format(i+1), color='k', alpha=0.3))
                     agents_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', linestyle='--', alpha=0.3))
                     agents_label.append(ax_wrld.text(np.nan, np.nan, agents[i].get_label(), fontsize=16, ha='left', va='bottom', alpha=0.3))
-                if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-                    laser_fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
-                if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-                    camera_fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='purple', alpha=0.1)
+            if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
+                laser_fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
+            if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
+                camera_fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='purple', alpha=0.1)
             estimates = []
             estimates_label = []
             estimates_clearance = []
@@ -863,14 +887,14 @@ class Plotter:
                         agents_clearance[i].set_radius(agent_radius)
                         ax_wrld.add_patch(agents_clearance[i])
                         agents_label[i].set_position(agent_pos)
-                    if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-                        ax_wrld.add_patch(laser_fov)
-                    if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-                        ax_wrld.add_patch(camera_fov)
                     return robot, robot_clearance, robot_label, \
                             controlled_pt, goal, goal_label, \
                             estimates, estimates_clearance, estimates_label, \
                             agents, agents_clearance, agents_label
+                if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
+                    ax_wrld.add_patch(laser_fov)
+                if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
+                    ax_wrld.add_patch(camera_fov)
                 return robot, robot_clearance, robot_label, \
                        controlled_pt, goal, goal_label, \
                        estimates, estimates_clearance, estimates_label
@@ -906,27 +930,27 @@ class Plotter:
                         agent_pos = agents_pos[frame, i, :]
                         agents[i].set_offsets(agent_pos)
                         agents_clearance[i].set_center(agent_pos)
-                        agents_label[i].set_position(agent_pos)
-                    if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-                        theta = configurations[frame, 2]
-                        current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_rel_pos)
-                        laser_fov.set_center(current_laser_pos)
-                        laser_fov.set_radius(laser_range_max)
-                        laser_fov.set_theta1((theta + angle_min) * 180 / np.pi)
-                        laser_fov.set_theta2((theta + angle_max) * 180 / np.pi)
-                        laser_fov.set_width(laser_range_max - laser_range_min)
-                    if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-                        current_cam_angle = - camera_pan[frame]
-                        current_cam_pos = camera_pos[frame]
-                        camera_fov.set_center(current_cam_pos)
-                        camera_fov.set_radius(camera_range_max)
-                        camera_fov.set_theta1((current_cam_angle - cam_horz_fov / 2) * 180 / np.pi)
-                        camera_fov.set_theta2((current_cam_angle + cam_horz_fov / 2) * 180 / np.pi)
-                        camera_fov.set_width(camera_range_max - camera_range_min)       
+                        agents_label[i].set_position(agent_pos)       
                     return robot, robot_clearance, robot_label, goal, goal_label, \
                             traj_line, robot_pred_line, \
                             agents, agents_clearance, agents_label, \
                             estimates, estimates_clearance, estimates_label, prediction
+                if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
+                    theta = configurations[frame, 2]
+                    current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_rel_pos)
+                    laser_fov.set_center(current_laser_pos)
+                    laser_fov.set_radius(laser_range_max)
+                    laser_fov.set_theta1((theta + angle_min) * 180 / np.pi)
+                    laser_fov.set_theta2((theta + angle_max) * 180 / np.pi)
+                    laser_fov.set_width(laser_range_max - laser_range_min)
+                if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
+                    current_cam_angle = - camera_pan[frame]
+                    current_cam_pos = camera_pos[frame]
+                    camera_fov.set_center(current_cam_pos)
+                    camera_fov.set_radius(camera_range_max)
+                    camera_fov.set_theta1((current_cam_angle - cam_horz_fov / 2) * 180 / np.pi)
+                    camera_fov.set_theta2((current_cam_angle + cam_horz_fov / 2) * 180 / np.pi)
+                    camera_fov.set_width(camera_range_max - camera_range_min)
                 return robot, robot_clearance, robot_label, goal, goal_label, \
                         traj_line, robot_pred_line, \
                         estimates, estimates_clearance, estimates_label, prediction
