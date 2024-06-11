@@ -332,7 +332,7 @@ class CameraDetectionManager:
 
             with self.data_lock:
                 self.update_configuration()
-                self.get_camera_pose(self.timestamp)
+                self.get_camera_pose(rospy.Time())
                 rgb_image = self.rgb_image_nonrt
                 depth_image = self.depth_image_nonrt
                 if self.hparams.simulation:

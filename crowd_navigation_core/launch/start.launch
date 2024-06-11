@@ -1,13 +1,13 @@
 <launch>
-    <arg name="x_des" default="10.0" />
-    <arg name="y_des" default="10.0" />
+    <arg name="x_des" default="5.0" />
+    <arg name="y_des" default="5.0" />
     <arg name="delay1" default="20.0" />
     <arg name="delay2" default="25.0"/>
 
     <param name="x_des" value="$(arg x_des)" />
     <param name="y_des" value="$(arg y_des)" />
 
-    <arg name="world"  default="labrob_2_humans"/>  <!-- empty, ... (see ../worlds) -->
+    <arg name="world"  default="labrob_5_humans"/>  <!-- empty, ... (see ../worlds) -->
     <!--deprecated argument, you should specify the parameters below-->
     <!-- They are described in tiago.urdf.xacro -->
     <arg name="robot"  default="titanium"/>
@@ -95,7 +95,7 @@
         <node pkg="crowd_navigation_core" type="laser_detection" name="laser_detection" output="screen" launch-prefix="bash -c 'sleep $(arg delay1); $0 $@' "/>
         <node pkg="crowd_navigation_core" type="crowd_prediction" name="crowd_prediction" output="screen" launch-prefix="bash -c 'sleep $(arg delay1); $0 $@' "/>
         <node pkg="crowd_navigation_core" type="motion_generation" name="motion_generation" output="screen" launch-prefix="bash -c 'sleep $(arg delay1); $0 $@' "/>
-        <!-- <node pkg="crowd_navigation_core" type="send_desired_target_position" name="send_desired_target_position" output="screen" launch-prefix="bash -c 'sleep $(arg delay2); $0 $@' " /> -->
+        <node pkg="crowd_navigation_core" type="send_desired_target_position" name="send_desired_target_position" output="screen" launch-prefix="bash -c 'sleep $(arg delay2); $0 $@' " />
     </group>
 
 </launch>
