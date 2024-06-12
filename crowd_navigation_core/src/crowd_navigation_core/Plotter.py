@@ -854,7 +854,10 @@ class Plotter:
                     estimates_clearance[i].set_radius(agent_radius)
                     ax_wrld.add_patch(estimates_clearance[i])
                     estimates_label[i].set_position(agent_estimate)
-
+                if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
+                    ax_wrld.add_patch(laser_fov)
+                if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
+                    ax_wrld.add_patch(camera_fov)
                 if simulation and self.perception_mode != 'Perception.FAKE':
                     for i in range(n_agents):
                         agent_pos = agents_pos[0, i, :]
@@ -867,10 +870,6 @@ class Plotter:
                             controlled_pt, goal, goal_label, \
                             estimates, estimates_clearance, estimates_label, \
                             agents, agents_clearance, agents_label
-                if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-                    ax_wrld.add_patch(laser_fov)
-                if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-                    ax_wrld.add_patch(camera_fov)
                 return robot, robot_clearance, robot_label, \
                        controlled_pt, goal, goal_label, \
                        estimates, estimates_clearance, estimates_label
@@ -900,17 +899,6 @@ class Plotter:
                     estimates_clearance[i].set_center(agent_estimate)
                     estimates_label[i].set_position(agent_estimate)
                     predictions[i].set_data(agent_prediction[0, :], agent_prediction[1, :])
-
-                if simulation and self.perception_mode != 'Perception.FAKE':
-                    for i in range(n_agents):
-                        agent_pos = agents_pos[frame, i, :]
-                        agents[i].set_offsets(agent_pos)
-                        agents_clearance[i].set_center(agent_pos)
-                        agents_label[i].set_position(agent_pos)
-                    return robot, robot_clearance, robot_label, goal, goal_label, \
-                            traj_line, robot_pred_line, \
-                            agents, agents_clearance, agents_label, \
-                            estimates, estimates_clearance, estimates_label, prediction
                 if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
                     theta = configurations[frame, 2]
                     current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_rel_pos)
@@ -926,7 +914,17 @@ class Plotter:
                     camera_fov.set_radius(camera_range_max)
                     camera_fov.set_theta1((current_cam_angle - cam_horz_fov / 2) * 180 / np.pi)
                     camera_fov.set_theta2((current_cam_angle + cam_horz_fov / 2) * 180 / np.pi)
-                    camera_fov.set_width(camera_range_max - camera_range_min)       
+                    camera_fov.set_width(camera_range_max - camera_range_min)   
+                if simulation and self.perception_mode != 'Perception.FAKE':
+                    for i in range(n_agents):
+                        agent_pos = agents_pos[frame, i, :]
+                        agents[i].set_offsets(agent_pos)
+                        agents_clearance[i].set_center(agent_pos)
+                        agents_label[i].set_position(agent_pos)
+                    return robot, robot_clearance, robot_label, goal, goal_label, \
+                            traj_line, robot_pred_line, \
+                            agents, agents_clearance, agents_label, \
+                            estimates, estimates_clearance, estimates_label, prediction    
                 return robot, robot_clearance, robot_label, goal, goal_label, \
                         traj_line, robot_pred_line, \
                         estimates, estimates_clearance, estimates_label, prediction
