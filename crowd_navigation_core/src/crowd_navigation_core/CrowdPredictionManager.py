@@ -73,6 +73,7 @@ class CrowdPredictionManager:
             queue_size=1
         )
 
+    def laser_measurements_callback(self, msg):
         with self.data_lock:
             self.laser_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
