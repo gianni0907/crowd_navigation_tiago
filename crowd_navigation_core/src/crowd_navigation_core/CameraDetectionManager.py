@@ -8,7 +8,6 @@ import cProfile
 import tf2_ros
 import rospy
 import cv2
-import torch
 from cv_bridge import CvBridge
 from ultralytics import YOLO
 from scipy.spatial.transform import Rotation as R
@@ -49,9 +48,7 @@ class CameraDetectionManager:
             self.measurements_history = []
             self.robot_config_history = []
             self.camera_pos_history = []
-            self.camera_pan_history = []
-            self.depth_mean_history = []
-            self.depth_history = []
+            self.camera_horz_angle_history = []
             self.boundary_vertexes = []
             if self.hparams.simulation:
                 self.agents_pos_history = []
@@ -197,7 +194,7 @@ class CameraDetectionManager:
                           transform.transform.rotation.z,
                           transform.transform.rotation.w])
             
-            self.pan_angle = math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]),
+            self.camera_horz_angle = math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]),
                                         1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]))
             
             pos = np.array([transform.transform.translation.x, 
@@ -231,19 +228,7 @@ class CameraDetectionManager:
                 y_min = int(box[1])
                 x_max = int(box[2])
                 y_max = int(box[3])
-                # depth_min = np.nanmin(depth_img[y_min: y_max + 1, x_min: x_max + 1])
-                # depth_max = np.nanmax(depth_img[y_min: y_max + 1, x_min: x_max + 1])
-                depth_mean = np.nanmean(depth_img[y_min: y_max + 1, x_min: x_max + 1])
-                # depth_median = np.nanmedian(depth_img[y_min: y_max + 1, x_min: x_max + 1])
                 depth = np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 20)
-                # print(f"Bbox center: {box_center}")
-                # print(f"depth: {depth}")
-                # print(f"depth: {depth_comp}")
-                # print(f"depth min: {depth_min}")
-                # print(f"depth max: {depth_max}")
-                # print(f"depth median: {depth_median}")
-                self.depth_mean_history.append(depth_mean.tolist())
-                self.depth_history.append(depth.tolist())
                 if depth >= self.hparams.cam_min_range:
                     point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
                     scale = depth / point_cam[2]
@@ -265,9 +250,7 @@ class CameraDetectionManager:
         output_dict['measurements'] = self.measurements_history
         output_dict['robot_config'] = self.robot_config_history
         output_dict['camera_position'] = self.camera_pos_history
-        output_dict['camera_pan'] = self.camera_pan_history
-        output_dict['depth_mean'] = self.depth_mean_history
-        output_dict['depth'] = self.depth_history
+        output_dict['camera_horz_angle'] = self.camera_horz_angle_history
         output_dict['frequency'] = self.hparams.camera_detector_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
@@ -363,7 +346,7 @@ class CameraDetectionManager:
                                                   self.robot_config.theta,
                                                   start_time])
                 self.camera_pos_history.append(self.camera_pose[:2, 3].tolist())
-                self.camera_pan_history.append(self.pan_angle)
+                self.camera_horz_angle_history.append(self.camera_horz_angle)
                 self.measurements_history.append(measurements.tolist())
                 if self.hparams.simulation:
                     self.agents_pos_history.append(agents_pos.tolist())

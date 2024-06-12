@@ -63,7 +63,7 @@ class MotionGenerationManager:
             self.time_history = []
             self.robot_state_history = []
             self.camera_pos_history = []
-            self.camera_pan_history = []
+            self.camera_horz_angle_history = []
             self.robot_prediction_history = []
             self.wheels_vel_history = []
             self.inputs_history = []
@@ -250,7 +250,7 @@ class MotionGenerationManager:
                           transform.transform.rotation.z,
                           transform.transform.rotation.w])
             
-            self.pan_angle = math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]),
+            self.camera_horz_angle = math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]),
                                         1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]))
             
             pos = np.array([transform.transform.translation.x, 
@@ -400,7 +400,7 @@ class MotionGenerationManager:
         output_dict['laser_rel_pos'] = self.laser_relative_position.tolist()
         if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
             output_dict['camera_position'] = self.camera_pos_history
-            output_dict['camera_pan'] = self.camera_pan_history
+            output_dict['camera_horz_angle'] = self.camera_horz_angle_history
 
         # log the data in a .json file
         log_dir = self.hparams.log_dir
@@ -537,7 +537,7 @@ class MotionGenerationManager:
                                                  start_time])
                 if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
                     self.camera_pos_history.append(self.camera_pose[:2, 3].tolist())
-                    self.camera_pan_history.append(self.pan_angle)
+                    self.camera_horz_angle_history.append(self.camera_horz_angle)
                 predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
                 for i in range(self.hparams.N_horizon):
                     predicted_trajectory[:, i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')
