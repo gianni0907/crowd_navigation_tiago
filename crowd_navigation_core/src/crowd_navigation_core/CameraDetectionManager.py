@@ -328,7 +328,7 @@ class CameraDetectionManager:
                     agents_pos = self.agents_pos_nonrt
 
             self.update_configuration()
-            self.get_camera_pose()
+            self.get_camera_pose(rospy.Time())
             measurements, processed_image = self.data_extraction(rgb_image, depth_image)
 
             # Create measurements message

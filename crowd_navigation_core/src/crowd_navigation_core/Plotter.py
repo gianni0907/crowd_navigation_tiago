@@ -200,7 +200,7 @@ class Plotter:
         measurements = self.camera_detector_dict['measurements']
         robot_config = np.array(self.camera_detector_dict['robot_config'])
         camera_pos = np.array(self.camera_detector_dict['camera_position'])
-        camera_pan = - np.array(self.camera_detector_dict['camera_pan']) - np.pi / 2
+        camera_angle = - np.array(self.camera_detector_dict['camera_horz_angle']) - np.pi / 2
         b = self.camera_detector_dict['b']
         shooting_nodes = robot_config.shape[0]
         robot_center = np.empty((shooting_nodes, 2))
@@ -285,7 +285,7 @@ class Plotter:
             controlled_pt.set_offsets(robot_config[frame, :2])
             robot_label.set_position(robot_center[frame])
             current_meas = np.array(measurements[frame])
-            current_cam_angle = - camera_pan[frame]
+            current_cam_angle = - camera_angle[frame]
             current_cam_pos = camera_pos[frame]
             fov.set_center(current_cam_pos)
             fov.set_radius(range_max)
@@ -651,7 +651,7 @@ class Plotter:
             camera_range_min = self.camera_detector_dict['min_range']
             cam_horz_fov = self.camera_detector_dict['horz_fov']
             camera_pos = np.array(self.generator_dict['camera_position'])
-            camera_pan = - np.array(self.generator_dict['camera_pan']) - np.pi / 2
+            camera_angle = - np.array(self.generator_dict['camera_horz_angle']) - np.pi / 2
 
         # Configuration figure
         config_fig, config_ax = plt.subplots(4, 1, figsize=(16, 8))
@@ -920,7 +920,7 @@ class Plotter:
                     laser_fov.set_theta2((theta + angle_max) * 180 / np.pi)
                     laser_fov.set_width(laser_range_max - laser_range_min)
                 if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-                    current_cam_angle = - camera_pan[frame]
+                    current_cam_angle = - camera_angle[frame]
                     current_cam_pos = camera_pos[frame]
                     camera_fov.set_center(current_cam_pos)
                     camera_fov.set_radius(camera_range_max)
