@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+
+import crowd_navigation_core.SendDesiredHeadConfig as SendDesiredHeadConfig
+if __name__ == '__main__':
+    SendDesiredHeadConfig.main()

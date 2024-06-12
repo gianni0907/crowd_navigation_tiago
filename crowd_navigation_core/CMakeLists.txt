@@ -22,10 +22,13 @@ include_directories(
 )
 
 catkin_install_python(PROGRAMS
+  scripts/laser_detection
+  scripts/camera_detection
   scripts/motion_generation
   scripts/crowd_prediction
   scripts/plotter
   scripts/send_desired_target_position
-  scripts/send_actors_trajectory
+  scripts/send_agents_trajectory
+  scripts/send_desired_head_config
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

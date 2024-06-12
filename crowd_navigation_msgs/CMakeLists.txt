@@ -14,13 +14,17 @@ add_message_files(
   CrowdMotionPrediction.msg
   CrowdMotionPredictionStamped.msg
   MotionPrediction.msg
+  Measurement.msg
+  MeasurementsSet.msg
+  MeasurementsSetStamped.msg
 )
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
   SetDesiredTargetPosition.srv
-  SetActorsTrajectory.srv
+  SetAgentsTrajectory.srv
+  SetDesiredHeadConfig.srv
 )
 
 ## Generate added messages and services with any dependencies listed here

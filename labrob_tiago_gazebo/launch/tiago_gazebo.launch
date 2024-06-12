@@ -78,9 +78,7 @@
       <node name="tuck_arm" pkg="tiago_gazebo" type="tuck_arm.py" output="screen"/>
   </group>
   <node name="image_proc" pkg="image_proc" type="image_proc" ns="xtion/rgb"/>
-
-
-   <node pkg="labrob_tiago_gazebo" type="Localization.py" name="localization" output="screen"/>
-
+  <node pkg="labrob_tiago_gazebo" type="Localization.py" name="localization" output="screen"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find tiago_2dnav)/config/rviz/advanced_navigation.rviz"/>
 
 </launch>

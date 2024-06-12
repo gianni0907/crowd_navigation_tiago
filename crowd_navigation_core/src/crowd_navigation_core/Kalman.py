@@ -6,7 +6,7 @@ class Kalman:
     Vk: covariance matrix of the state
     Wk: covariance matrix of the output
     Pk: corrected covariance
-    X_k: state of the actor at k-th instant
+    X_k: state of the agent at k-th instant
     '''
 
     def __init__(self,

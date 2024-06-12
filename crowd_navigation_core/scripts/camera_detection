@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+
+import crowd_navigation_core.CameraDetectionManager as CameraDetectionManager
+if __name__ == '__main__':
+    CameraDetectionManager.main()

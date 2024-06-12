@@ -1,5 +1,7 @@
 <launch>
   <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="camera_detection" name="camera_detection" output="screen" />
+      <node pkg="crowd_navigation_core" type="laser_detection" name="laser_detection" output="screen" />
       <node pkg="crowd_navigation_core" type="crowd_prediction" name="crowd_prediction" output="screen" />
       <node pkg="crowd_navigation_core" type="motion_generation" name="motion_generation" output="screen" />
   </group>
