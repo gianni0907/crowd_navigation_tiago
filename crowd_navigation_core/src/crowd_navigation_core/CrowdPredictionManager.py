@@ -73,11 +73,12 @@ class CrowdPredictionManager:
             queue_size=1
         )
 
-    def laser_measurements_callback(self, msg):
-        self.laser_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
+        with self.data_lock:
+            self.laser_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
     def camera_measurements_callback(self, msg):
-        self.camera_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
+        with self.data_lock:
+            self.camera_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
     def set_agents_trajectory_request(self, request):
         if self.hparams.perception == Perception.FAKE:           
@@ -135,17 +136,17 @@ class CrowdPredictionManager:
         camera_min_indices = np.argmin(distance_matrix, axis=0)
 
         mutual_correspondences = [(i, laser_min_indices[i]) for i in range(len(laser_meas)) \
-                                  if (camera_min_indices[laser_min_indices[i]] == i) and (distance_matrix[i, laser_min_indices[i]] <= 1)]
+                                  if (camera_min_indices[laser_min_indices[i]] == i) and (distance_matrix[i, laser_min_indices[i]] <= self.hparams.ds_cbf)]
         
         correspondence_indices_camera = set([j for _, j in mutual_correspondences])
         correspondence_indices_laser = set([i for i, _ in mutual_correspondences])
 
         # take camera measurements only from correspondences
         # corresponded_meas = camera_meas[list(correspondence_indices_camera)]
-        # take laser measurements only from correspondeces
+        # take laser measurements only from correspondences
         # corresponded_meas = laser_meas[list(correspondence_indices_laser)]
         # corresponded_meas[:, 2] = camera_meas[list(correspondence_indices_camera)][:, 2]
-        # take the mean of both measurements from correspondeces
+        # take the mean of both measurements from correspondences
         corresponded_meas = [np.array([(laser_meas[i, 0] + camera_meas[j, 0]) / 2,
                                        (laser_meas[i, 1] + camera_meas[j, 1]) / 2,
                                        camera_meas[j, 2]]) for i, j in mutual_correspondences]

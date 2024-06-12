@@ -30,11 +30,11 @@
     <!-- Actors -->
     <actor name="actor_0">
       <skin>
-        <filename>talk_a.dae</filename>
+        <filename>walk.dae</filename>
         <scale>1.0</scale>
       </skin>
       <animation name="walking">
-        <filename>talk_a.dae</filename>
+        <filename>walk.dae</filename>
         <scale>1.0</scale>
         <interpolate_x>true</interpolate_x>
       </animation>
@@ -63,11 +63,11 @@
     </actor>
     <actor name="actor_1">
       <skin>
-        <filename>talk_b.dae</filename>
+        <filename>walk.dae</filename>
         <scale>1.0</scale>
       </skin>
       <animation name="walking">
-        <filename>talk_b.dae</filename>
+        <filename>walk.dae</filename>
         <scale>1.0</scale>
         <interpolate_x>true</interpolate_x>
       </animation>
@@ -95,11 +95,11 @@
     </actor>
     <actor name="actor_2">
       <skin>
-        <filename>moonwalk.dae</filename>
+        <filename>walk.dae</filename>
         <scale>1.0</scale>
       </skin>
       <animation name="walking">
-        <filename>talk_b.dae</filename>
+        <filename>walk.dae</filename>
         <scale>1.0</scale>
         <interpolate_x>true</interpolate_x>
       </animation>
@@ -131,7 +131,7 @@
         <scale>1.0</scale>
       </skin>
       <animation name="walking">
-        <filename>talk_b.dae</filename>
+        <filename>walk.dae</filename>
         <scale>1.0</scale>
         <interpolate_x>true</interpolate_x>
       </animation>
@@ -159,11 +159,11 @@
     </actor>
     <actor name="actor_4">
       <skin>
-        <filename>moonwalk.dae</filename>
+        <filename>walk.dae</filename>
         <scale>1.0</scale>
       </skin>
       <animation name="walking">
-        <filename>talk_b.dae</filename>
+        <filename>walk.dae</filename>
         <scale>1.0</scale>
         <interpolate_x>true</interpolate_x>
       </animation>

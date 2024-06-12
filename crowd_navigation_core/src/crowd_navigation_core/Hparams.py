@@ -29,7 +29,7 @@ class Hparams:
     # LASER: only laser sensor enabled
     # CAMERA: only camera enabled
     # BOTH: both laser and camera enabled
-    perception = Perception.BOTH
+    perception = Perception.CAMERA
 
     if perception == Perception.FAKE and not simulation:
         raise ValueError("Cannot use fake perception in real world")
@@ -95,10 +95,10 @@ class Hparams:
         #                      [11.5, -1.5],
         #                      [11.5, 11.5]])
     else:
-        vertexes = np.array([[0.0, 0.8],
-                             [0.0, -2.5],
-                             [1.5, -2.5],
-                             [1.5, 0.8]])
+        vertexes = np.array([[-0.6, -4],
+                             [4.5, -4],
+                             [4.5, 1.8],
+                             [-0.6, 1.8]])
     normals = np.zeros((n_points, 2))
     for i in range(n_points - 1):
         normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
@@ -139,7 +139,7 @@ class Hparams:
 
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
-    ds_cbf = 0.4 # safety clearance
+    ds_cbf = 0.5 # safety clearance
     gamma_agent = 0.1 # in (0,1], hyperparameter for the h function associated to agent
     gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
@@ -162,11 +162,11 @@ class Hparams:
         # Clustering hparams
         selection_mode = SelectionMode.AVERAGE
         if selection_mode == SelectionMode.CLOSEST:
-            eps = 0.7
+            eps = 0.8
             min_samples = 2
             avg_win_size = 5
         elif selection_mode == SelectionMode.AVERAGE:
-            eps = 0.7
+            eps = 0.8
             min_samples = 2
 
     # Camera Hparams
@@ -177,5 +177,5 @@ class Hparams:
             cam_horz_fov = 1.0996 # [rad]
         else:
             cam_min_range = 0.4 # [m]
-            cam_max_range = 2 # [m]
+            cam_max_range = 8 # [m]
             cam_horz_fov = 1.0472 # [rad]

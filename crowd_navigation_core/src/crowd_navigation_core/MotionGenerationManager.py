@@ -154,10 +154,14 @@ class MotionGenerationManager:
         self.nmpc_controller.init(self.state)
 
     def joint_states_callback(self, msg):
-        self.wheels_vel_nonrt = np.array([msg.velocity[13], msg.velocity[12]])
+        left_wheel_idx = msg.name.index('wheel_left_joint')
+        right_wheel_idx = msg.name.index('wheel_right_joint')
+        with self.data_lock:
+            self.wheels_vel_nonrt = np.array([msg.velocity[right_wheel_idx], msg.velocity[left_wheel_idx]])
 
     def crowd_motion_prediction_stamped_callback(self, msg):
-        self.crowd_motion_prediction_stamped_nonrt = CrowdMotionPredictionStamped.from_message(msg)
+        with self.data_lock:
+            self.crowd_motion_prediction_stamped_nonrt = CrowdMotionPredictionStamped.from_message(msg)
 
     def gazebo_model_states_callback(self, msg):
         if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
@@ -170,7 +174,8 @@ class MotionGenerationManager:
                     agent_pos = np.array([p.x, p.y])
                     agents_pos[idx] = agent_pos
                     idx += 1
-            self.agents_pos_nonrt = agents_pos
+            with self.data_lock:
+                self.agents_pos_nonrt = agents_pos
 
     def tf2q(self, transform):
         q = np.array([transform.transform.rotation.x,
@@ -448,7 +453,7 @@ class MotionGenerationManager:
             self.target_position = np.array([self.state.x,
                                              self.state.y])
         return control_input
-    
+
     def point_head(self):
             # Select the target to point: the closest agent, if any, or the target position
             agents_pos = []
@@ -457,7 +462,7 @@ class MotionGenerationManager:
                                    self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions[i].positions[0].y])
             agents_pos = np.array(agents_pos)
             sorted_agents, _ = sort_by_distance(agents_pos, self.state.get_state()[:2])
-            if all(coord == self.hparams.nullpos for coord in sorted_agents[0]) or self.hparams.perception == Perception.CAMERA:
+            if all(coord == self.hparams.nullpos for coord in sorted_agents[0]): # or self.hparams.perception == Perception.CAMERA:
                 if norm(self.error) > self.hparams.pointing_error_tol:
                     point = self.target_position
                 else:
@@ -511,13 +516,12 @@ class MotionGenerationManager:
             with self.data_lock:
                 if self.hparams.n_filters > 0:
                     self.crowd_motion_prediction_stamped = self.crowd_motion_prediction_stamped_nonrt
-                self.update_state()
-                self.get_camera_pose()
                 wheels_vel = self.wheels_vel_nonrt
                 if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
                     agents_pos = self.agents_pos_nonrt
 
-            # Point the head to the target position (2d point expressed in the map frame)
+            self.update_state()
+            self.get_camera_pose()
             self.point_head()
             # Generate control inputs (wheels accelerations)
             control_input = self.update_control_input()
