@@ -121,30 +121,34 @@ class CameraDetectionManager:
         )
 
     def image_callback(self, data):
-        self.timestamp = data.header.stamp
-        try:
-            self.rgb_image_nonrt = self.bridge.imgmsg_to_cv2(data, 'bgr8')
-        except Exception as e:
-            rospy.logerr(e)
+        with self.data_lock:
+            try:
+                self.timestamp = data.header.stamp
+                self.rgb_image_nonrt = self.bridge.imgmsg_to_cv2(data, 'bgr8')
+            except Exception as e:
+                rospy.logerr(e)
 
     def compressed_image_callback(self, data):
-        self.timestamp = data.header.stamp
-        try:
-            self.rgb_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data, 'bgr8')
-        except Exception as e:
-            rospy.logerr(e)
+        with self.data_lock:
+            try:
+                self.timestamp = data.header.stamp
+                self.rgb_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data, 'bgr8')
+            except Exception as e:
+                rospy.logerr(e)
 
     def depth_callback(self, data):
-        try:
-            self.depth_image_nonrt = self.bridge.imgmsg_to_cv2(data)
-        except Exception as e:
-            rospy.logerr(e)
+        with self.data_lock:
+            try:
+                self.depth_image_nonrt = self.bridge.imgmsg_to_cv2(data)
+            except Exception as e:
+                rospy.logerr(e)
 
     def compressed_depth_callback(self, data):
-        try:
-            self.depth_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data)
-        except Exception as e:
-            rospy.logerr(e)
+        with self.data_lock:
+            try:
+                self.depth_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data)
+            except Exception as e:
+                rospy.logerr(e)
 
     def gazebo_model_states_callback(self, msg):
         if self.hparams.simulation:
@@ -157,7 +161,8 @@ class CameraDetectionManager:
                     agent_pos = np.array([p.x, p.y])
                     agents_pos[idx] = agent_pos
                     idx += 1
-            self.agents_pos_nonrt = agents_pos
+            with self.data_lock:
+                self.agents_pos_nonrt = agents_pos
 
     def tf2q(self, transform):
         q = transform.transform.rotation
@@ -331,13 +336,13 @@ class CameraDetectionManager:
                 continue
 
             with self.data_lock:
-                self.update_configuration()
-                self.get_camera_pose(rospy.Time())
                 rgb_image = self.rgb_image_nonrt
                 depth_image = self.depth_image_nonrt
                 if self.hparams.simulation:
                     agents_pos = self.agents_pos_nonrt
 
+            self.update_configuration()
+            self.get_camera_pose(rospy.Time())
             measurements, processed_image = self.data_extraction(rgb_image, depth_image)
 
             # Create measurements message

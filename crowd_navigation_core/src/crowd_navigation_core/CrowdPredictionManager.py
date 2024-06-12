@@ -74,10 +74,12 @@ class CrowdPredictionManager:
         )
 
     def laser_measurements_callback(self, msg):
-        self.laser_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
+        with self.data_lock:
+            self.laser_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
     def camera_measurements_callback(self, msg):
-        self.camera_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
+        with self.data_lock:
+            self.camera_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
     def set_agents_trajectory_request(self, request):
         if self.hparams.perception == Perception.FAKE:           

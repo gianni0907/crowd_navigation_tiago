@@ -81,7 +81,8 @@ class LaserDetectionManager:
         )
 
     def laser_scan_callback(self, msg):
-        self.laser_scan_nonrt = LaserScan.from_message(msg)
+        with self.data_lock:
+            self.laser_scan_nonrt = LaserScan.from_message(msg)
 
     def gazebo_model_states_callback(self, msg):
         if self.hparams.simulation:
@@ -94,7 +95,8 @@ class LaserDetectionManager:
                     agent_pos = np.array([p.x, p.y])
                     agents_pos[idx] = agent_pos
                     idx += 1
-            self.agents_pos_nonrt = agents_pos
+            with self.data_lock:
+                self.agents_pos_nonrt = agents_pos
 
     def tf2q(self, transform):
         q = transform.transform.rotation
@@ -284,12 +286,12 @@ class LaserDetectionManager:
                 continue
 
             with self.data_lock:
-                self.update_configuration()
-                self.get_laser_pose()
                 self.laser_scan = self.laser_scan_nonrt
                 if self.hparams.simulation:
                     agents_pos = self.agents_pos_nonrt
 
+            self.update_configuration()
+            self.get_laser_pose()
             # Perform data preprocessing
             observations = self.data_preprocessing()
             # Perform data clustering
