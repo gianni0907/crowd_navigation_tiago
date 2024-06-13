@@ -228,7 +228,7 @@ class CameraDetectionManager:
                 y_min = int(box[1])
                 x_max = int(box[2])
                 y_max = int(box[3])
-                depth = np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 20)
+                depth = np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 30)
                 if depth >= self.hparams.cam_min_range:
                     point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
                     scale = depth / point_cam[2]

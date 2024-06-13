@@ -101,6 +101,16 @@ class MotionGenerationManager:
             self.crowd_motion_prediction_stamped_callback
         )
 
+        # setup subscriber to measurements topic
+        if self.hparams.perception != Perception.FAKE:
+            self.measurements_stamped_nonrt = None
+            meas_topic = 'measurements'
+            rospy.Subscriber(
+                meas_topic,
+                crowd_navigation_msgs.msg.MeasurementsSetStamped,
+                self.measurements_callback
+            )
+
         # Setup subscriber to model_states topic
         model_states_topic = "/gazebo/model_states"
         rospy.Subscriber(
@@ -162,6 +172,10 @@ class MotionGenerationManager:
     def crowd_motion_prediction_stamped_callback(self, msg):
         with self.data_lock:
             self.crowd_motion_prediction_stamped_nonrt = CrowdMotionPredictionStamped.from_message(msg)
+
+    def measurements_callback(self, msg):
+        with self.data_lock:
+            self.measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
     def gazebo_model_states_callback(self, msg):
         if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
@@ -268,6 +282,15 @@ class MotionGenerationManager:
             rospy.logwarn("Missing camera pose")
             return False
 
+    def adapt_measurements_format(self, measurements_set_stamped):
+        measurements_set = measurements_set_stamped.measurements_set
+        measurements = np.zeros((measurements_set.size, 2))
+        for i in range(measurements_set.size):
+            measurements[i] = np.array([measurements_set.measurements[i].x,
+                                        measurements_set.measurements[i].y])
+
+        return measurements
+    
     def set_desired_target_position_request(self, request):
         if self.status == Status.WAITING:
             rospy.loginfo("Cannot set desired target position, robot is not READY")
@@ -277,10 +300,10 @@ class MotionGenerationManager:
             self.target_position[self.hparams.y_idx] = request.y
             if self.status == Status.READY:
                 self.status = Status.MOVING
-                self.point_head()   
+                self.point_head(self.adapt_measurements_format(self.measurements_stamped_nonrt))   
                 rospy.loginfo(f"Desired target position successfully set: {self.target_position}")
             elif self.status == Status.MOVING:
-                self.point_head()
+                self.point_head(self.adapt_measurements_format(self.measurements_stamped_nonrt))
                 rospy.loginfo(f"Desired target position successfully changed: {self.target_position}")
             return crowd_navigation_msgs.srv.SetDesiredTargetPositionResponse(True)
         
@@ -449,26 +472,19 @@ class MotionGenerationManager:
                     print("##########################################")  
         else:
             control_input = np.zeros(self.nmpc_controller.nu)
-            # Reset target position to the current position
-            self.target_position = np.array([self.state.x,
-                                             self.state.y])
+
         return control_input
 
-    def point_head(self):
+    def point_head(self, measurements = None):
             # Select the target to point: the closest agent, if any, or the target position
-            agents_pos = []
-            for i in range(self.hparams.n_filters):
-                agents_pos.append([self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions[i].positions[0].x,
-                                   self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions[i].positions[0].y])
-            agents_pos = np.array(agents_pos)
-            sorted_agents, _ = sort_by_distance(agents_pos, self.state.get_state()[:2])
-            if all(coord == self.hparams.nullpos for coord in sorted_agents[0]): #or self.hparams.perception == Perception.CAMERA:
+            if measurements is None or len(measurements) == 0 or self.hparams.perception == Perception.CAMERA:
                 if norm(self.error) > self.hparams.pointing_error_tol:
                     point = self.target_position
                 else:
-                    return
+                    return                
             else:
-                point = sorted_agents[0]
+                sorted_measures, _ = sort_by_distance(np.array(measurements), self.state.get_state()[:2])
+                point = sorted_measures[0]
             homo_point = np.append(np.append(point, self.camera_pose[2, 3]), 1)
             baseframe_point = np.matmul(self.base_pose, homo_point)
             point_head_msg = control_msgs.msg.PointHeadActionGoal()
@@ -516,12 +532,14 @@ class MotionGenerationManager:
                 if self.hparams.n_filters > 0:
                     self.crowd_motion_prediction_stamped = self.crowd_motion_prediction_stamped_nonrt
                 wheels_vel = self.wheels_vel_nonrt
-                if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
-                    agents_pos = self.agents_pos_nonrt
+                if self.hparams.perception != Perception.FAKE:
+                    measurements = self.adapt_measurements_format(self.measurements_stamped_nonrt)
+                    if self.hparams.simulation:
+                        agents_pos = self.agents_pos_nonrt
 
             self.update_state()
             self.get_camera_pose()
-            self.point_head()
+            self.point_head(measurements)
             # Generate control inputs (wheels accelerations)
             control_input = self.update_control_input()
             # Publish commands (robot pseudovelocities)

@@ -73,6 +73,14 @@ class CrowdPredictionManager:
             queue_size=1
         )
 
+        # Setup publisher to measurements topic
+        measurements_topic = 'measurements'
+        self.measurements_publisher = rospy.Publisher(
+            measurements_topic,
+            crowd_navigation_msgs.msg.MeasurementsSetStamped,
+            queue_size=1
+        )
+
     def laser_measurements_callback(self, msg):
         with self.data_lock:
             self.laser_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
@@ -256,6 +264,16 @@ class CrowdPredictionManager:
                     laser_measurements = self.adapt_measurements_format(laser_measurements)
                     camera_measurements = self.adapt_measurements_format(camera_measurements)
                     measurements = self.unique_measurements(laser_measurements, camera_measurements)
+
+                # Create measurements message
+                measurements_set = MeasurementsSet()
+                for measurement in measurements:
+                    measurements_set.append(Measurement(measurement[0], measurement[1]))
+                measurements_set_stamped = MeasurementsSetStamped(rospy.Time.from_sec(start_time),
+                                                                'map',
+                                                                measurements_set)
+                measurements_set_stamped_msg = MeasurementsSetStamped.to_message(measurements_set_stamped)
+                self.measurements_publisher.publish(measurements_set_stamped_msg)        
 
                 if self.hparams.use_kalman:
                     # Perform data association

@@ -29,7 +29,7 @@ class Hparams:
     # LASER: only laser sensor enabled
     # CAMERA: only camera enabled
     # BOTH: both laser and camera enabled
-    perception = Perception.CAMERA
+    perception = Perception.BOTH
 
     if perception == Perception.FAKE and not simulation:
         raise ValueError("Cannot use fake perception in real world")
