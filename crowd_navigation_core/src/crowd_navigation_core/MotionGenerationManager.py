@@ -255,7 +255,7 @@ class MotionGenerationManager:
                tf2_ros.ConnectivityException,
                tf2_ros.ExtrapolationException):
             rospy.logwarn("Missing laser pose")
-            return False
+            return None
 
     def get_camera_pose(self):
         try:
