@@ -7,7 +7,6 @@ import casadi
 
 from crowd_navigation_core.Hparams import *
 from crowd_navigation_core.utils import *
-from crowd_navigation_core.KinematicModel import *
 
 class NMPC:
     def __init__(self,
@@ -15,9 +14,6 @@ class NMPC:
         # Size of state and input:
         self.nq = 5
         self.nu = 2 # right and left wheel angular accelerations
-
-        # Size of agents state:
-        self.agent_state_size = 4
 
         # Parameters:
         self.hparams = hparams
@@ -29,13 +25,13 @@ class NMPC:
         self.dt = self.hparams.dt
         self.T = self.dt * self.N # [s]
 
-        # Setup kinematic model
-        self.kinematic_model = KinematicModel()
-
-        self.n_edges = self.hparams.n_points
-        self.vertexes = self.hparams.vertexes
-        self.normals = self.hparams.normals
+        self.n_areas = self.hparams.n_areas
+        self.max_vertexes = self.hparams.max_vertexes
+        self.areas = self.hparams.areas
         self.n_filters = self.hparams.n_filters
+        
+        # Number of parameters:
+        self.np = 4 * self.n_filters + 3 * self.max_vertexes
 
         # Setup solver:
         self.acados_ocp_solver = self.__create_acados_ocp_solver(self.N,self.T)
@@ -90,10 +86,10 @@ class NMPC:
             self.acados_ocp_solver.set(k, 'u', np.zeros(self.nu))
         self.acados_ocp_solver.set(self.N, 'x', x0.get_state())
 
-    def __Euler(self, f, x0, u, dt):
+    def Euler(self, f, x0, u, dt):
         return x0 + f(x0,u)*dt
 
-    def __RK4(self, f, x0, u ,dt):
+    def RK4(self, f, x0, u ,dt):
         k1 = f(x0, u)
         k2 = f(x0 + k1 * dt / 2.0, u)
         k3 = f(x0 + k2 * dt / 2.0, u)
@@ -101,22 +97,12 @@ class NMPC:
         yf = x0 + dt / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
         return yf
 
-    def __integrate(self, f, x0, u, integration_method='RK4'):
+    def integrate(self, f, x0, u, integration_method='RK4'):
         dt = self.dt
         if integration_method == 'RK4':
-            return self.__RK4(f, x0, u, dt)
+            return self.RK4(f, x0, u, dt)
         else:
-            return self.__Euler(f, x0, u, dt)
-
-    def __next_agent_state(self, state):
-        dt = self.dt
-        F = np.array([[1.0, 0.0, dt, 0.0],
-                      [0.0, 1.0, 0.0, dt],
-                      [0.0, 0.0, 1.0, 0.0],
-                      [0.0, 0.0, 0.0, 1.0]])
-        F_complete= np.kron(np.eye(self.n_filters), F)
-        next_state = np.matmul(F_complete, state)
-        return next_state
+            return self.Euler(f, x0, u, dt)
 
     def __psi_expr(self, r):
         # Given a variable s, es = s - s_des 
@@ -210,27 +196,6 @@ class NMPC:
         wheel_radius = self.hparams.wheel_radius
         wheel_separation = self.hparams.wheel_separation
         return (wheel_radius / wheel_separation) * (alpha_r - alpha_l)
-    
-    def __h(self, q, p):
-        x = q[self.hparams.x_idx]
-        y = q[self.hparams.y_idx]
-
-        h = casadi.SX.zeros(self.n_edges + self.n_filters)
-
-        # Define the safe set wrt the configuration bounds
-        robot_position = np.array([x, y])
-        for i in range(self.n_edges):
-            vertex = self.vertexes[i]
-            h[i] = np.dot(self.normals[i], robot_position - vertex) - self.hparams.rho_cbf
-        
-        # Consider the robot distance from agents, if agents are present
-        if self.n_filters > 0:
-            cbf_radius = self.hparams.rho_cbf + self.hparams.ds_cbf
-            for i in range(self.n_filters):
-                sx = x - p[i*self.agent_state_size + self.hparams.x_idx]
-                sy = y - p[i*self.agent_state_size + self.hparams.y_idx]
-                h[i + self.n_edges] = sx**2 + sy**2 - cbf_radius**2
-        return h
 
     def __create_acados_model(self) -> AcadosModel:
         # Setup CasADi expressions:
@@ -239,7 +204,7 @@ class NMPC:
         u = casadi.SX.sym('u', self.nu)
         r = casadi.SX.sym('r', self.nq + self.nu)
         r_e = casadi.SX.sym('r_e', self.nq)
-        p = casadi.SX.sym('p', self.n_filters * self.agent_state_size)
+        p = casadi.SX.sym('p', self.np)
         f_expl = self.__f(q, u)
         f_impl = qdot - f_expl
 
@@ -261,26 +226,8 @@ class NMPC:
         # System dynamics:
         acados_model.f_impl_expr = f_impl
         acados_model.f_expl_expr = f_expl
-
-        # CBF constraints:
-        gamma_mat = np.zeros((self.n_edges + self.n_filters, self.n_edges + self.n_filters))
-        id_mat = np.eye(self.n_edges + self.n_filters)
-        np.fill_diagonal(gamma_mat[:self.n_edges, :self.n_edges], self.hparams.gamma_bound)
-        if self.n_filters > 0:
-            np.fill_diagonal(gamma_mat[self.n_edges:, self.n_edges:], self.hparams.gamma_agent)
-
-        h_k = self.__h(q, p)
         
-        q_k1 = self.__integrate(self.kinematic_model, q, u)
-        if self.n_filters > 0:
-            p_k1 = self.__next_agent_state(p)
-        else:
-            p_k1 = p # just for consistency, it is not used in case of 0 agents
-        h_k1 = self.__h(q_k1, p_k1)
-        con_h_expr = h_k1 + np.matmul(gamma_mat - id_mat, h_k)
-        
-        acados_model.con_h_expr = con_h_expr
-        acados_model.con_h_expr_0 = con_h_expr
+        acados_model.con_h_expr = self.cbf_constraint(q, u, p)
 
         # Variables and params:
         acados_model.x = q
@@ -337,10 +284,8 @@ class NMPC:
         acados_constraints.D = D_mat
 
         # Nonlinear constraints (CBFs) (for both agents and configuration bounds):
-        acados_constraints.lh = np.zeros(self.n_edges + self.n_filters)
-        acados_constraints.uh = self.hparams.unbounded * np.ones(self.n_edges + self.n_filters)
-        acados_constraints.lh_0 = - self.hparams.unbounded * np.ones(self.n_edges + self.n_filters)
-        acados_constraints.uh_0 = acados_constraints.uh
+        acados_constraints.lh = np.zeros(self.n_filters + self.max_vertexes)
+        acados_constraints.uh = self.hparams.unbounded * np.ones(self.n_filters + self.max_vertexes)
 
         return acados_constraints
     
@@ -360,7 +305,7 @@ class NMPC:
         acados_ocp = AcadosOcp()
         acados_ocp.model = self.__create_acados_model()
         acados_ocp.dims.N = N
-        acados_ocp.parameter_values = np.zeros((self.n_filters * self.agent_state_size,))
+        acados_ocp.parameter_values = np.zeros(self.np)
         acados_ocp.cost = self.__create_acados_cost()
         acados_ocp.constraints = self.__create_acados_constraints()
         acados_ocp.solver_options = self.__create_acados_solver_options(T)
@@ -375,29 +320,84 @@ class NMPC:
             return AcadosOcpSolver.create_cython_solver('acados_ocp_nlp.json')
         else:
             return AcadosOcpSolver(acados_ocp)
+        
+    def compute_agent_cbf(self,
+                          robot_state,
+                          agent_position):
+        robot_position = casadi.vertcat(robot_state[self.hparams.x_idx],
+                                        robot_state[self.hparams.y_idx])
+        distance = casadi.norm_2(robot_position - agent_position)
+        h = distance**2 - (self.hparams.rho_cbf + self.hparams.ds_cbf)**2
+        return h
+    
+    def compute_area_cbf(self,
+                         robot_state,
+                         coefs):
+        robot_position = casadi.vertcat(robot_state[self.hparams.x_idx],
+                                        robot_state[self.hparams.y_idx])
+        a = coefs[0]
+        b = coefs[1]
+        c = coefs[2]
+        h = - a * robot_position[0] - b * robot_position[1] + c - self.hparams.rho_cbf
+        return h
+    
+    def cbf_constraint(self, x, u, p):
+        h_constraints = []
+        next_x = self.integrate(self.__f, x, u)
+        for i in range(self.n_filters):
+            current_agent_position = p[4*i:4*i+2]
+            next_agent_position = p[4*i+2:4*i+4]
+            current_h = self.compute_agent_cbf(x, current_agent_position)
+            next_h = self.compute_agent_cbf(next_x, next_agent_position)
+            cbf_condition = next_h + (self.hparams.gamma_agent - 1) * current_h
+            h_constraints.append(cbf_condition)
+
+        area_p = p[4*self.n_filters:]
+        for i in range(self.max_vertexes):
+            coefs = area_p[3*i:3*i+3]
+            current_h = self.compute_area_cbf(x, coefs)
+            next_h = self.compute_area_cbf(next_x, coefs)
+            cbf_condition = next_h + (self.hparams.gamma_area - 1) * current_h
+            h_constraints.append(cbf_condition)
+        return casadi.vertcat(*h_constraints)
+
+    def predict_trajectory(self, position, velocity):
+        predicted_trajectory = np.zeros((self.N+1, 2))
+        dt = self.hparams.dt
+        state = np.array([position.x,
+                          position.y,
+                          velocity.x,
+                          velocity.y])
+        for i in range(self.N+1):
+            time = dt * (i + 1)
+            predicted_trajectory[i] = predict_next_position(state, time)
+
+        return predicted_trajectory
 
     def update(
             self,
             state: State,
             q_ref: np.array,
             u_ref: np.array,
-            crowd_motion_prediction : CrowdMotionPrediction
+            area_index,
+            crowd_motion_predictions
             ):
         # Set parameters
-        velocities = [Velocity() for _ in range(self.n_filters)]
-        for j, motion_prediction in enumerate(crowd_motion_prediction.motion_predictions):
-            velocities[j].x = (motion_prediction.positions[1].x - motion_prediction.positions[0].x) / self.dt
-            velocities[j].y = (motion_prediction.positions[1].y - motion_prediction.positions[0].y) / self.dt
+        self.predicted_agent_trajectories = []
+        for motion_prediction in crowd_motion_predictions:
+            self.predicted_agent_trajectories.append(self.predict_trajectory(motion_prediction.position,
+                                                                             motion_prediction.velocity))
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
-            agents_state = np.zeros((self.hparams.n_filters * self.agent_state_size))
-            for j, motion_prediction in enumerate(crowd_motion_prediction.motion_predictions):
-                position = crowd_motion_prediction.motion_predictions[j].positions[k]
-                agents_state[j*self.agent_state_size + 0] = position.x
-                agents_state[j*self.agent_state_size + 1] = position.y
-                agents_state[j*self.agent_state_size + 2] = velocities[j].x
-                agents_state[j*self.agent_state_size + 3] = velocities[j].y
-            self.acados_ocp_solver.set(k, 'p', agents_state)
+            parameters = []
+            for agent_trajectory in self.predicted_agent_trajectories:
+                current_agent_position = agent_trajectory[k]
+                next_agent_position = agent_trajectory[k+1]
+                parameters.extend(current_agent_position)
+                parameters.extend(next_agent_position)
+            for a,b,c in zip(self.hparams.a_coefs[area_index[k]], self.hparams.b_coefs[area_index[k]], self.hparams.c_coefs[area_index[k]]):
+                parameters.extend([a, b, c])
+            self.acados_ocp_solver.set(k, 'p', np.array(parameters))
         self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])
 
         # Solve NLP
@@ -405,3 +405,6 @@ class NMPC:
 
     def get_control_input(self):
         return self.u0
+
+    def get_predicted_agent_trajectories(self):
+        return self.predicted_agent_trajectories

@@ -3,7 +3,9 @@ import math
 import crowd_navigation_msgs.msg
 import geometry_msgs.msg
 from enum import Enum
+from numpy.linalg import norm
 
+from shapely.geometry import Polygon, Point
 class State:
     def __init__(self, x, y, theta, v, omega):
         self.x = x
@@ -24,6 +26,19 @@ class Configuration:
         self.y = y
         self.theta = theta
 
+    @staticmethod
+    def set_from_tf_transform(transform):
+        
+        x = transform.transform.translation.x
+        y = transform.transform.translation.y
+        q = transform.transform.rotation
+        theta = math.atan2(
+          2.0 * (q.w * q.z + q.x * q.y),
+          1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        )
+        config = Configuration(x, y, theta)
+        return config
+
     def __repr__(self):
         return '({}, {}, {})'.format(self.x, self.y, self.theta)
     
@@ -31,36 +46,38 @@ class Configuration:
         return np.array([self.x, self.y, self.theta])
 
 class Position:
-    def __init__(self, x, y):
+    def __init__(self, x, y, z):
         self.x = x
         self.y = y
+        self.z = z
     
     def __repr__(self):
-        return '({}, {})'.format(self.x, self.y)
+        return '({}, {}, {})'.format(self.x, self.y, self.z)
 
     @staticmethod
     def to_message(position):
-        return geometry_msgs.msg.Point(position.x, position.y, 0.0)
+        return geometry_msgs.msg.Point(position.x, position.y, position.z)
     
     @staticmethod
     def from_message(position_msg):
-        return Position(position_msg.x, position_msg.y)
+        return Position(position_msg.x, position_msg.y, position_msg.z)
 
 class Velocity:
-    def __init__(self, x=0, y=0):
+    def __init__(self, x, y, z):
         self.x = x
         self.y = y
+        self.z = z
 
     def __repr__(self):
-        return '({}, {})'.format(self.x, self.y)
+        return '({}, {}, {})'.format(self.x, self.y, self.z)
     
     @staticmethod
     def to_message(velocity):
-        return geometry_msgs.msg.Vector3(velocity.x, velocity.y, 0.0)
+        return geometry_msgs.msg.Vector3(velocity.x, velocity.y, velocity.z)
     
     @staticmethod
     def from_message(velocity_msg):
-        return Velocity(velocity_msg.x, velocity_msg.y)
+        return Velocity(velocity_msg.x, velocity_msg.y, velocity_msg.z)
     
 class Measurement:
     def __init__(self, x, y):
@@ -129,24 +146,23 @@ class MeasurementsSetStamped:
         )
  
 class MotionPrediction:
-    def __init__(self, positions):
-        self.positions = positions
+    def __init__(self, position, velocity):
+        self.position = position
+        self.velocity = velocity
     
     @staticmethod
     def to_message(motion_prediction):
-        positions_msg = []
-        for i in range(len(motion_prediction.positions)):
-            positions_msg.append(Position.to_message(motion_prediction.positions[i]))
-
-        return crowd_navigation_msgs.msg.MotionPrediction(positions_msg)
+        return crowd_navigation_msgs.msg.MotionPrediction(
+            Position.to_message(motion_prediction.position),
+            Velocity.to_message(motion_prediction.velocity)
+        )
 
     @staticmethod
     def from_message(motion_prediction_msg):
-        positions = []
-        for i in range(len(motion_prediction_msg.positions)):
-            positions.append(Position.from_message(motion_prediction_msg.positions[i]))
-            
-        return MotionPrediction(positions)
+        return MotionPrediction(
+            Position.from_message(motion_prediction_msg.position),
+            Velocity.from_message(motion_prediction_msg.velocity)
+        )
     
 class CrowdMotionPrediction:
     def __init__(self):
@@ -239,7 +255,7 @@ class Status(Enum):
     MOVING = 2
 
 class Perception(Enum):
-    FAKE = 0
+    GTRUTH = 0
     LASER = 1
     CAMERA = 2
     BOTH = 3
@@ -260,22 +276,18 @@ class FSMStates(Enum):
     def print(state):
         return f'{state}'
     
-def Euler(f, x0, u, dt):
-    return x0 + f(x0,u)*dt
+class WorldType(Enum):
+    EMPTY = 0
+    TWO_ROOMS = 1
+    THREE_ROOMS = 2
+    CORRIDOR = 3
 
-def RK4(f, x0, u ,dt):
-    k1 = f(x0, u)
-    k2 = f(x0 + k1 * dt / 2.0, u)
-    k3 = f(x0 + k2 * dt / 2.0, u)
-    k4 = f(x0 + k3 * dt, u)
-    yf = x0 + dt / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
-    return yf
+def predict_next_position(state, dt):
+    F = np.array([[1.0, 0.0, dt, 0.0],
+                  [0.0, 1.0, 0.0, dt]])
+    next_position = np.matmul(F, state)
 
-def integrate(f, x0, u, dt, integration_method='RK4'):
-    if integration_method == 'RK4':
-        return RK4(f, x0, u, dt)
-    else:
-        return Euler(f, x0, u, dt)
+    return next_position
 
 def moving_average(points, window_size=1):
     smoothed_points = np.zeros(points.shape)
@@ -296,11 +308,8 @@ def z_rotation(angle, point2d):
     rotated_point2d = np.matmul(R, point3d)[:2]
     return rotated_point2d
 
-def euclidean_distance(p1, p2):
-    return np.linalg.norm(p1 - p2)
-
 def sort_by_distance(points, reference_point):
-    distances = np.array([euclidean_distance(point, reference_point) for point in points])
+    distances = np.array([norm(point - reference_point) for point in points])
     sorted_indices = np.argsort(distances)
     sorted_points = points[sorted_indices]
     sorted_distances = distances[sorted_indices]
@@ -341,25 +350,47 @@ def linear_trajectory(p_i : Position, p_f : Position, n_steps):
 
     return positions, velocities
 
-def compute_normal_vector(p1, p2):
-    x_p1 = p1[0]
-    y_p1 = p1[1]
-    x_p2 = p2[0]
-    y_p2 = p2[1]
-    # Compute the direction vector and its magnitude
-    direction_vector = np.array([x_p2 - x_p1, y_p2 - y_p1])
-    magnitude = np.linalg.norm(direction_vector)
+def get_areas_coefficients(areas, max_vertexes):
+    a_coefs = []
+    b_coefs = []
+    c_coefs = []
+    for area in areas:
+        n_vertexes = area.shape[0]
+        shifted_area = np.append(area[1:n_vertexes], [area[0]], axis=0)
+        delta_x = shifted_area[:n_vertexes, 0] - area[:n_vertexes, 0]
+        delta_y = shifted_area[:n_vertexes, 1] - area[:n_vertexes, 1]
+        norms = norm([delta_x, delta_y], axis=0)
 
-    # Compute the normalized normal vector
-    normal_vector = np.array([- direction_vector[1], direction_vector[0]])
-    normalized_normal_vector = normal_vector / magnitude
+        a = np.append(np.divide(delta_y, norms), np.zeros(max_vertexes - n_vertexes))
+        b = np.append(-np.divide(delta_x, norms), np.zeros(max_vertexes - n_vertexes))
+        c = np.append(np.divide(np.multiply(area[:n_vertexes, 0], shifted_area[:n_vertexes, 1]) - \
+                                np.multiply(area[:n_vertexes, 1], shifted_area[:n_vertexes, 0]),
+                                norms),
+                      10000 * np.ones(max_vertexes - n_vertexes))
 
-    return normalized_normal_vector
+        a_coefs.append(a)
+        b_coefs.append(b)
+        c_coefs.append(c)
+    return a_coefs, b_coefs, c_coefs
 
-def is_outside(point, vertexes, normals):
-    for i, vertex in enumerate(vertexes):
-        if np.dot(normals[i], point - vertex) < 0.0:
+def get_area_index(areas, a_coefs, b_coefs, c_coefs, predicted_motion, threshold=0):
+    area_index = None
+    for idx, area in enumerate(areas):
+        if is_inside_area(predicted_motion[0], a_coefs[idx], b_coefs[idx], c_coefs[idx], threshold):
+            area_index = [idx] * len(predicted_motion)
+    return area_index
+
+def is_inside_areas(point, a_coefs, b_coefs, c_coefs, threshold=0.0):
+    for a,b,c in zip(a_coefs, b_coefs, c_coefs):
+        lhs = a * point[0] + b * point[1]
+        if np.all(lhs <= c - threshold):
             return True
+    return False
+
+def is_inside_area(point, a, b, c, threshold=0):
+    lhs = a * point[0] + b * point[1]
+    if np.all(lhs <= c - threshold):
+        return True
     return False
 
 def data_association(predictions, covariances, measurements):

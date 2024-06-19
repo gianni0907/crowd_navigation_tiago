@@ -20,7 +20,7 @@ import gazebo_msgs.msg
 import sensor_msgs.msg
 import crowd_navigation_msgs.msg
 
-class CameraDetectionManager:
+class CameraPerceptionManager:
     '''
     Extract the agents' representative 2D-point from the RGB-D camera
     '''
@@ -49,7 +49,6 @@ class CameraDetectionManager:
             self.robot_config_history = []
             self.camera_pos_history = []
             self.camera_horz_angle_history = []
-            self.boundary_vertexes = []
             if self.hparams.simulation:
                 self.agents_pos_history = []
 
@@ -161,22 +160,12 @@ class CameraDetectionManager:
             with self.data_lock:
                 self.agents_pos_nonrt = agents_pos
 
-    def tf2q(self, transform):
-        q = transform.transform.rotation
-        theta = math.atan2(
-            2.0 * (q.w * q.z + q.x * q.y),
-            1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-        )
-        self.robot_config.theta = theta
-        self.robot_config.x = transform.transform.translation.x + self.hparams.b * math.cos(theta)
-        self.robot_config.y = transform.transform.translation.y + self.hparams.b * math.sin(theta)
-
     def update_configuration(self):
         try:
             transform = self.tf_buffer.lookup_transform(
                 self.map_frame, self.base_footprint_frame, rospy.Time()
             )
-            self.tf2q(transform)
+            self.robot_config = Configuration.set_from_tf_transform(transform)
             return True
         except(tf2_ros.LookupException,
                tf2_ros.ConnectivityException,
@@ -235,7 +224,7 @@ class CameraDetectionManager:
                     point_cam = point_cam * scale
                     homo_point_cam = np.append(point_cam, 1)
                     point_wrld = np.matmul(self.camera_pose, homo_point_cam)[:2]
-                    if not is_outside(point_wrld, self.hparams.vertexes, self.hparams.normals):
+                    if is_inside_areas(point_wrld, self.hparams.a_coefs, self.hparams.b_coefs, self.hparams.c_coefs):
                         core_points.append(point_wrld)
 
         core_points = np.array(core_points)
@@ -251,16 +240,12 @@ class CameraDetectionManager:
         output_dict['robot_config'] = self.robot_config_history
         output_dict['camera_position'] = self.camera_pos_history
         output_dict['camera_horz_angle'] = self.camera_horz_angle_history
-        output_dict['frequency'] = self.hparams.camera_detector_frequency
+        output_dict['frequency'] = self.hparams.camera_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
-        output_dict['n_points'] = self.hparams.n_points
         output_dict['min_range'] = self.hparams.cam_min_range
         output_dict['max_range'] = self.hparams.cam_max_range
         output_dict['horz_fov'] = self.hparams.cam_horz_fov
-        for i in range(self.hparams.n_points):
-            self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
-        output_dict['boundary_vertexes'] = self.boundary_vertexes
         output_dict['base_radius'] = self.hparams.base_radius
         output_dict['simulation'] = self.hparams.simulation
         if self.hparams.simulation:
@@ -270,7 +255,7 @@ class CameraDetectionManager:
 
         # log the data in a .json file
         log_dir = self.hparams.log_dir
-        filename = self.hparams.camera_detector_file
+        filename = self.hparams.camera_file
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         log_path = os.path.join(log_dir, filename)
@@ -280,26 +265,26 @@ class CameraDetectionManager:
         self.out.release()
 
     def run(self):
+        if self.hparams.perception == Perception.GTRUTH or self.hparams.perception == Perception.LASER:
+            rospy.logwarn("Camera perception disabled")
+            return
+        
+        if self.hparams.n_filters == 0:
+            rospy.logwarn("No agent considered, camera perception disabled")
+            return
+
         cam_info = rospy.wait_for_message("/xtion/rgb/camera_info", sensor_msgs.msg.CameraInfo, timeout=None)
         self.imgproc = PC()
         self.imgproc.fromCameraInfo(cam_info)
 
-        rate = rospy.Rate(self.hparams.camera_detector_frequency)
-
-        if self.hparams.n_filters == 0:
-            rospy.logwarn("No agent considered, camera detection disabled")
-            return
-
-        if self.hparams.perception == Perception.FAKE or self.hparams.perception == Perception.LASER:
-            rospy.logwarn("Camera detection disabled")
-            return
-
+        rate = rospy.Rate(self.hparams.camera_frequency)
+        
         if self.hparams.log:
             # Setup variables to create a video
             self.fourcc = cv2.VideoWriter_fourcc(*'MP4V')
             self.out = cv2.VideoWriter(os.path.join(self.hparams.log_dir, self.hparams.filename + '_camera_view.mp4'),
                                        self.fourcc,
-                                       self.hparams.camera_detector_frequency,
+                                       self.hparams.camera_frequency,
                                        (cam_info.width, cam_info.height))
             rospy.on_shutdown(self.log_values)
 
@@ -357,13 +342,13 @@ class CameraDetectionManager:
             rate.sleep()
 
 def main():
-    rospy.init_node('tiago_camera_detection', log_level=rospy.INFO)
-    rospy.loginfo('TIAGo camera detection module [OK]')
+    rospy.init_node('tiago_camera_perception', log_level=rospy.INFO)
+    rospy.loginfo('TIAGo camera perception module [OK]')
 
-    camera_detection_manager = CameraDetectionManager()
-    prof_filename = '/tmp/camera_detection.prof'
+    camera_perception_manager = CameraPerceptionManager()
+    prof_filename = '/tmp/camera_perception.prof'
     cProfile.runctx(
-        'camera_detection_manager.run()',
+        'camera_perception_manager.run()',
         globals=globals(),
         locals=locals(),
         filename=prof_filename

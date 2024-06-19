@@ -7,7 +7,6 @@ import threading
 import cProfile
 import tf2_ros
 import rospy
-from numpy.linalg import *
 from scipy.spatial.transform import Rotation as R
 
 from crowd_navigation_core.Hparams import *
@@ -50,7 +49,7 @@ class MotionGenerationManager:
         self.v = 0.0
         self.omega = 0.0
         self.wheels_vel_nonrt = np.zeros(2) # [w_r, w_l]
-        if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
+        if self.hparams.simulation:
             self.agents_pos_nonrt = np.zeros((self.hparams.n_agents, 2))
             self.agents_name = ['actor_{}'.format(i) for i in range(self.hparams.n_agents)]
         self.crowd_motion_prediction_stamped_nonrt = None
@@ -69,10 +68,9 @@ class MotionGenerationManager:
             self.inputs_history = []
             self.commands_history = []
             self.target_history = []
-            self.boundary_vertexes = []
             if self.hparams.n_filters > 0:
                 self.agents_prediction_history = []
-            if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
+            if self.hparams.simulation:
                 self.agents_pos_history = []
 
         # Setup reference frames:
@@ -102,14 +100,13 @@ class MotionGenerationManager:
         )
 
         # setup subscriber to measurements topic
-        if self.hparams.perception != Perception.FAKE:
-            self.measurements_stamped_nonrt = None
-            meas_topic = 'measurements'
-            rospy.Subscriber(
-                meas_topic,
-                crowd_navigation_msgs.msg.MeasurementsSetStamped,
-                self.measurements_callback
-            )
+        self.measurements_stamped_nonrt = None
+        meas_topic = 'measurements'
+        rospy.Subscriber(
+            meas_topic,
+            crowd_navigation_msgs.msg.MeasurementsSetStamped,
+            self.measurements_callback
+        )
 
         # Setup subscriber to model_states topic
         model_states_topic = "/gazebo/model_states"
@@ -162,6 +159,12 @@ class MotionGenerationManager:
         self.error = np.zeros((4,1))
         # Initialize the NMPC controller
         self.nmpc_controller.init(self.state)
+        self.predicted_trajectory = np.tile(self.target_position, (self.hparams.N_horizon+1, 1))
+        self.area_index = get_area_index(self.hparams.areas,
+                                         self.hparams.a_coefs,
+                                         self.hparams.b_coefs,
+                                         self.hparams.c_coefs,
+                                         self.predicted_trajectory)
 
     def joint_states_callback(self, msg):
         left_wheel_idx = msg.name.index('wheel_left_joint')
@@ -178,7 +181,7 @@ class MotionGenerationManager:
             self.measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
     def gazebo_model_states_callback(self, msg):
-        if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
+        if self.hparams.simulation:
             agents_pos = np.zeros((self.hparams.n_agents, 2))
             idx = 0
             for agent_name in self.agents_name:
@@ -265,7 +268,7 @@ class MotionGenerationManager:
                           transform.transform.rotation.w])
             
             self.camera_horz_angle = math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]),
-                                        1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]))
+                                                1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]))
             
             pos = np.array([transform.transform.translation.x, 
                             transform.transform.translation.y, 
@@ -283,13 +286,16 @@ class MotionGenerationManager:
             return False
 
     def adapt_measurements_format(self, measurements_set_stamped):
-        measurements_set = measurements_set_stamped.measurements_set
-        measurements = np.zeros((measurements_set.size, 2))
-        for i in range(measurements_set.size):
-            measurements[i] = np.array([measurements_set.measurements[i].x,
-                                        measurements_set.measurements[i].y])
+        if measurements_set_stamped is not None:
+            measurements_set = measurements_set_stamped.measurements_set
+            measurements = np.zeros((measurements_set.size, 2))
+            for i in range(measurements_set.size):
+                measurements[i] = np.array([measurements_set.measurements[i].x,
+                                            measurements_set.measurements[i].y])
 
-        return measurements
+            return measurements
+        else:
+            return None
     
     def set_desired_target_position_request(self, request):
         if self.status == Status.WAITING:
@@ -388,13 +394,11 @@ class MotionGenerationManager:
             output_dict['agents_predictions'] = self.agents_prediction_history
         output_dict['simulation'] = self.hparams.simulation
         output_dict['perception'] = Perception.print(self.hparams.perception)
-        if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
+        if self.hparams.simulation:
             output_dict['n_agents'] = self.hparams.n_agents
             output_dict['agents_pos'] = self.agents_pos_history
-        output_dict['n_points'] = self.hparams.n_points
-        for i in range(self.hparams.n_points):
-            self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
-        output_dict['boundary_vertexes'] = self.boundary_vertexes  
+        output_dict['n_areas'] = self.hparams.n_areas
+        output_dict['areas'] = [arr.tolist() for arr in self.hparams.areas]
         output_dict['input_bounds'] = [self.hparams.alpha_min, self.hparams.alpha_max]
         output_dict['v_bounds'] = [self.hparams.driving_vel_min, self.hparams.driving_vel_max]
         output_dict['omega_bounds'] = [self.hparams.steering_vel_max_neg, self.hparams.steering_vel_max]
@@ -404,7 +408,7 @@ class MotionGenerationManager:
 
         output_dict['robot_radius'] = self.hparams.rho_cbf
         output_dict['agent_radius'] = self.hparams.ds_cbf
-        output_dict['gamma_bound'] = self.hparams.gamma_bound
+        output_dict['gamma_area'] = self.hparams.gamma_area
         output_dict['gamma_agent'] = self.hparams.gamma_agent
         output_dict['frequency'] = self.hparams.generator_frequency
         output_dict['dt'] = self.hparams.dt
@@ -435,6 +439,14 @@ class MotionGenerationManager:
             json.dump(output_dict, file)
 
     def update_control_input(self):
+        area_index = get_area_index(self.hparams.areas,
+                                    self.hparams.a_coefs,
+                                    self.hparams.b_coefs,
+                                    self.hparams.c_coefs,
+                                    self.predicted_trajectory,
+                                    self.hparams.rho_cbf)
+        if area_index is not None:
+            self.area_index = area_index
         q_ref = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
         for k in range(self.hparams.N_horizon):
             q_ref[:self.hparams.y_idx + 1, k] = self.target_position
@@ -460,7 +472,8 @@ class MotionGenerationManager:
                         self.state,
                         q_ref,
                         u_ref,
-                        self.crowd_motion_prediction_stamped.crowd_motion_prediction
+                        self.area_index,
+                        self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions
                     )
                     control_input = self.nmpc_controller.get_control_input()
                 except Exception as e:
@@ -531,11 +544,10 @@ class MotionGenerationManager:
             with self.data_lock:
                 if self.hparams.n_filters > 0:
                     self.crowd_motion_prediction_stamped = self.crowd_motion_prediction_stamped_nonrt
+                measurements = self.adapt_measurements_format(self.measurements_stamped_nonrt)
                 wheels_vel = self.wheels_vel_nonrt
-                if self.hparams.perception != Perception.FAKE:
-                    measurements = self.adapt_measurements_format(self.measurements_stamped_nonrt)
-                    if self.hparams.simulation:
-                        agents_pos = self.agents_pos_nonrt
+                if self.hparams.simulation:
+                    agents_pos = self.agents_pos_nonrt
 
             self.update_state()
             self.get_camera_pose()
@@ -556,12 +568,11 @@ class MotionGenerationManager:
                 if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
                     self.camera_pos_history.append(self.camera_pose[:2, 3].tolist())
                     self.camera_horz_angle_history.append(self.camera_horz_angle)
-                predicted_trajectory = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
                 for i in range(self.hparams.N_horizon):
-                    predicted_trajectory[:, i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')
-                predicted_trajectory[:, self.hparams.N_horizon] = \
-                    self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')
-                self.robot_prediction_history.append(predicted_trajectory.tolist())
+                    self.predicted_trajectory[i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')[:2]
+                self.predicted_trajectory[self.hparams.N_horizon] = \
+                    self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')[:2]
+                self.robot_prediction_history.append(self.predicted_trajectory.tolist())
                 self.wheels_vel_history.append([wheels_vel[self.hparams.r_wheel_idx],
                                                 wheels_vel[self.hparams.l_wheel_idx],
                                                 start_time])
@@ -574,16 +585,16 @@ class MotionGenerationManager:
                                             start_time])
 
                 if self.hparams.n_filters > 0:
-                    predicted_trajectory = np.zeros((self.hparams.n_filters, 2, self.hparams.N_horizon))
-                    for i in range(self.hparams.n_filters):
-                        motion_prediction = self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions[i]
-                        for j in range(self.hparams.N_horizon):
-                            predicted_trajectory[i, 0, j] = motion_prediction.positions[j].x
-                            predicted_trajectory[i, 1, j] = motion_prediction.positions[j].y
-                    self.agents_prediction_history.append(predicted_trajectory.tolist())
+                    predicted_agent_trajectories = []
+                    for motion_prediction in self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions:
+                        predicted_agent_trajectories.append([motion_prediction.position.x,
+                                                             motion_prediction.position.y,
+                                                             motion_prediction.velocity.x,
+                                                             motion_prediction.velocity.y])
+                    self.agents_prediction_history.append(predicted_agent_trajectories)
 
-                if self.hparams.simulation and self.hparams.perception != Perception.FAKE:
-                        self.agents_pos_history.append(agents_pos.tolist())
+                if self.hparams.simulation:
+                    self.agents_pos_history.append(agents_pos.tolist())
                 end_time = time.time()        
                 deltat = end_time - start_time
                 self.time_history.append([deltat, start_time])

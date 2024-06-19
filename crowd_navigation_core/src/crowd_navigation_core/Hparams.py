@@ -1,44 +1,44 @@
 import numpy as np
 from crowd_navigation_core.utils import *
 
+from shapely.geometry import Polygon
+
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
     save_video = True
+    world_type = WorldType.TWO_ROOMS
     if log:
         log_dir = '/tmp/crowd_navigation_tiago/data'
         filename = 'test'
         generator_file = filename + '_generator.json'
         predictor_file = filename + '_predictor.json'
-        laser_detector_file = filename + '_laser_detector.json'
-        camera_detector_file = filename + '_camera_detector.json'
+        laser_file = filename + '_laser.json'
+        camera_file = filename + '_camera.json'
 
     # Specify whether to use gazebo (simulation = True) or real robot
     simulation = True
 
     # Specify the frequency of the sensors' modules
     if simulation:
-        laser_detector_frequency = 10 # [Hz]
-        camera_detector_frequency = 15 # [Hz]
+        laser_frequency = 10 # [Hz]
+        camera_frequency = 15 # [Hz]
     else:
-        laser_detector_frequency = 15 # [Hz]
-        camera_detector_frequency = 15 # TBD [Hz]
+        laser_frequency = 15 # [Hz]
+        camera_frequency = 15 # TBD [Hz]
 
     # Specify the type of sensing, 4 possibilities:
-    # FAKE: no sensors, the robot knows the fake trajectory assigned to agents (not visible in Gazebo)
+    # GTRUTH: no sensors, the robot knows the ground truth agents' position
     # LASER: only laser sensor enabled
     # CAMERA: only camera enabled
     # BOTH: both laser and camera enabled
-    perception = Perception.BOTH
+    perception = Perception.GTRUTH
 
-    if perception == Perception.FAKE and not simulation:
-        raise ValueError("Cannot use fake perception in real world")
+    if perception == Perception.GTRUTH and not simulation:
+        raise ValueError("Cannot use ground truth in real world")
 
     # Specify whether to process measurement with KFs
     use_kalman = True
-
-    if perception == Perception.FAKE and use_kalman == True:
-        raise ValueError("Cannot use KFs with fake sensing")
 
     # Kinematic parameters
     base_radius = 0.27 # [m]
@@ -48,10 +48,10 @@ class Hparams:
 
     # NMPC parameters
     if perception in (Perception.BOTH, Perception.CAMERA):
-        generator_frequency = camera_detector_frequency
+        generator_frequency = camera_frequency
     elif perception == Perception.LASER:
-        generator_frequency = laser_detector_frequency
-    else:
+        generator_frequency = laser_frequency
+    elif perception == Perception.GTRUTH: 
         generator_frequency = 20
     N_horizon = int(generator_frequency * 2.5)
     predictor_frequency = generator_frequency
@@ -82,27 +82,41 @@ class Hparams:
     w_max = driving_vel_max / wheel_radius # 10.1523 [rad/s]
     w_max_neg = - w_max
 
-    # Set n points to be the vertexes of the admitted region
+    # Define the navigable areas
     ### NOTE: define the points in a counter-clockwise order
-    n_points = 4
-    if simulation:
-        vertexes = np.array([[-6, 6],
-                             [-6, -6],
-                             [6, -6],
-                             [6, 6]])
-        # vertexes = np.array([[-1.5, 11.5],
-        #                      [-1.5, -1.5],
-        #                      [11.5, -1.5],
-        #                      [11.5, 11.5]])
-    else:
-        vertexes = np.array([[-0.6, -4],
-                             [4.5, -4],
-                             [4.5, 1.8],
-                             [-0.6, 1.8]])
-    normals = np.zeros((n_points, 2))
-    for i in range(n_points - 1):
-        normals[i] = compute_normal_vector(vertexes[i], vertexes[i + 1])
-    normals[n_points - 1] = compute_normal_vector(vertexes[n_points - 1], vertexes[0])
+    max_vertexes = 6
+    if world_type == WorldType.EMPTY:
+        n_areas = 1
+        if simulation:
+            area0 = np.array([[-6, 6], [-6, -6], [6, -6], [6, 6]])
+        else:
+            area0 = np.array([[-0.6, -4], [4.5, -4], [4.5, 1.8], [-0.6, 1.8]])
+        areas = [area0]
+    elif world_type == WorldType.TWO_ROOMS:
+        n_areas = 3
+        area0 = np.array([[4.7, -4.7], [4.7, 4.7], [-4.7, 4.7], [-4.7, -4.7]])
+        area1 = np.array([[1, -4], [2, -4], [2, 9], [1, 9]])
+        area2 = np.array([[4.7, 5.3], [4.7, 9.7], [-4.7, 9.7], [-4.7, 5.3]])
+        areas = [area0, area1, area2]
+    elif world_type == WorldType.THREE_ROOMS:
+        n_areas = 7
+        area0 = np.array([[0, -3.5], [0, -0.3], [-4.7, -0.3], [-4.7, -4.7], [-3,-4.7]])
+        area1 = np.array([[4.7, -4.7], [4.7, -2.5], [-3.0, -2.5], [0.0, -4.7]])
+        area2 = np.array([[4.7, -4.7], [4.7, -0.2], [1.5, -0.2], [2.5, -4.7]])
+        area3 = np.array([[3, -2.0], [3, 4.7], [2, 4.7], [2, -2.0]])
+        area4 = np.array([[4.7, 0.5], [4.7, 3.0], [-1.0, 4.7], [-4.7, 4.7], [-4.7, 0.5]])
+        area5 = np.array([[-2.0, 0.5], [-2.0, 9.7], [-3.0, 9.7], [-3.0, 0.5]])
+        area6 = np.array([[4.7, 5.5], [4.7, 9.5], [-0.5, 9.5], [-4.7, 6.5], [-4.7, 5.5]])
+        areas = [area0, area1, area2, area3, area4, area5, area6]
+    elif world_type == WorldType.CORRIDOR:
+        n_areas = 4
+        area0 = np.array([[-2.0, 0.0], [-9.0, 0.0], [-9.0, -2.5], [-4.0, -4.7], [-2.0, -4.7]])
+        area1 = np.array([[-8.7, -4.0], [-6.2, -4.0], [-6.2, 4.7], [-7.7, 4.7], [-8.7, 3.7]])
+        area2 = np.array([[-7.7, 0.2], [-5.2, 0.2], [-5.2, 9.7], [-6.2, 9.7], [-7.7, 6.0]])
+        area3 = np.array([[-4.0, 5.2], [-0.2, 7.0], [-0.2, 8.2], [-3.0, 9.7], [-7.0, 9.7], [-9.7, 5.2]])
+        areas = [area0, area1, area2, area3]
+
+    a_coefs, b_coefs, c_coefs = get_areas_coefficients(areas, max_vertexes)
     
     # State indices:
     x_idx = 0
@@ -141,12 +155,12 @@ class Hparams:
     rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
     gamma_agent = 0.1 # in (0,1], hyperparameter for the h function associated to agent
-    gamma_bound = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
+    gamma_area = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
     n_filters = 5 # maximum number of simultaneously tracked agents
     if simulation:
         n_agents = 5 # number of total agents involved, for plotting purpose
-        if perception == Perception.FAKE:
+        if perception == Perception.GTRUTH:
             n_filters = n_agents
 
     # Parameters for the crowd prediction

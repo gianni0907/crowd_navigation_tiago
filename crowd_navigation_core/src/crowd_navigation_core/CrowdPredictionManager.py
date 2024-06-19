@@ -11,6 +11,7 @@ from crowd_navigation_core.utils import *
 from crowd_navigation_core.Hparams import *
 from crowd_navigation_core.FSM import *
 
+import gazebo_msgs.msg
 import crowd_navigation_msgs.srv
 import crowd_navigation_msgs.msg
 
@@ -30,40 +31,39 @@ class CrowdPredictionManager:
             self.kalman_infos = {}
             kalman_names = ['KF_{}'.format(i + 1) for i in range(self.hparams.n_filters)]
             self.kalman_infos = {key: list() for key in kalman_names}
-            if self.hparams.perception != Perception.FAKE:
+            if self.hparams.use_kalman:
                 self.associations = []
-                if self.hparams.use_kalman:
-                    self.estimation_history = []
+                self.estimation_history = []
 
-        if self.hparams.perception == Perception.FAKE:
-            self.fake_trajectories = None
+        if self.hparams.perception == Perception.GTRUTH and self.hparams.simulation:
+            self.agents_pos_nonrt = None
+            self.agents_name = ['actor_{}'.format(i) for i in range(self.hparams.n_agents)]
+            # Setup subscriber to model_states topic
+            model_states_topic = "/gazebo/model_states"
+            rospy.Subscriber(
+                model_states_topic,
+                gazebo_msgs.msg.ModelStates,
+                self.gazebo_model_states_callback
+            )
         else:
-            # Setup subscriber to laser_measurements topic
             if self.hparams.perception in (Perception.LASER, Perception.BOTH):  
                 self.laser_measurements_stamped_nonrt = None
+                # Setup subscriber to laser_measurements topic
                 laser_meas_topic = 'laser_measurements'
                 rospy.Subscriber(
                     laser_meas_topic,
                     crowd_navigation_msgs.msg.MeasurementsSetStamped,
                     self.laser_measurements_callback
                 )
-
-            # Setup subscriber to camera_measurements topic
             if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
                 self.camera_measurements_stamped_nonrt = None
+                # Setup subscriber to camera_measurements topic
                 camera_meas_topic = 'camera_measurements'
                 rospy.Subscriber(
                     camera_meas_topic,
                     crowd_navigation_msgs.msg.MeasurementsSetStamped,
                     self.camera_measurements_callback
                 )
-
-        # Setup ROS Service to set agents trajectories:
-        self.set_agents_trajectory_srv = rospy.Service(
-            'SetAgentsTrajectory',
-            crowd_navigation_msgs.srv.SetAgentsTrajectory,
-            self.set_agents_trajectory_request
-        )
 
         # Setup publisher to crowd_motion_prediction topic
         crowd_prediction_topic = 'crowd_motion_prediction'
@@ -89,36 +89,19 @@ class CrowdPredictionManager:
         with self.data_lock:
             self.camera_measurements_stamped_nonrt = MeasurementsSetStamped.from_message(msg)
 
-    def set_agents_trajectory_request(self, request):
-        if self.hparams.perception == Perception.FAKE:           
-            if self.fake_trajectories is None:
-                self.fake_trajectories = CrowdMotionPrediction.from_message(request.trajectories)
-                self.current = 0
-                self.trajectory_length = len(self.fake_trajectories.motion_predictions[0].positions)
-                rospy.loginfo("Agents trajectory successfully set")
-                return crowd_navigation_msgs.srv.SetAgentsTrajectoryResponse(True)
-            else:
-                rospy.loginfo("Cannot set agents trajectory, agents are already moving")
-                return crowd_navigation_msgs.srv.SetAgentsTrajectoryResponse(False)
-
-    def propagate_state(self, state, N):
-        predictions = [self.hparams.nullstate for _ in range(N)]
-        time = 0
-        dt = self.hparams.dt
-        for i in range(N):
-            time = dt * (i + 1)
-            predictions[i] = self.predict_next_state(state, time)
-
-        return predictions
-
-    def predict_next_state(self, state, dt):
-        F = np.array([[1.0, 0.0, dt, 0.0],
-                      [0.0, 1.0, 0.0, dt],
-                      [0.0, 0.0, 1.0, 0.0],
-                      [0.0, 0.0, 0.0, 1.0]])
-        next_state = np.matmul(F, state)
-
-        return next_state
+    def gazebo_model_states_callback(self, msg):
+        if self.hparams.simulation:
+            agents_pos = np.zeros((self.hparams.n_agents, 2))
+            idx = 0
+            for agent_name in self.agents_name:
+                if agent_name in msg.name:
+                    agent_idx = msg.name.index(agent_name)
+                    p = msg.pose[agent_idx].position
+                    agent_pos = np.array([p.x, p.y])
+                    agents_pos[idx] = agent_pos
+                    idx += 1
+            with self.data_lock:
+                self.agents_pos_nonrt = agents_pos
 
     def adapt_measurements_format(self, measurements_set_stamped):
         measurements_set = measurements_set_stamped.measurements_set
@@ -130,7 +113,6 @@ class CrowdPredictionManager:
         return measurements
 
     def unique_measurements(self, laser_meas, camera_meas):
-
         if len(laser_meas) == 0 and len(camera_meas)== 0:
             return np.array([])
         elif len(laser_meas) == 0:
@@ -174,10 +156,9 @@ class CrowdPredictionManager:
         output_dict['cpu_time'] = self.time_history
         output_dict['kfs'] = self.kalman_infos
         output_dict['frequency'] = self.hparams.predictor_frequency
-        if self.hparams.perception != Perception.FAKE:
-            output_dict['associations'] = self.associations
         output_dict['use_kalman'] = self.hparams.use_kalman
         if self.hparams.use_kalman:
+            output_dict['associations'] = self.associations
             output_dict['estimations'] = self.estimation_history
         
         # log the data in a .json file
@@ -190,12 +171,12 @@ class CrowdPredictionManager:
             json.dump(output_dict, file)
 
     def run(self):
-        rate = rospy.Rate(self.hparams.predictor_frequency)
-        N = self.hparams.N_horizon
-
         if self.hparams.n_filters == 0:
             rospy.logwarn("Crowd prediction disabled")
             return
+
+        rate = rospy.Rate(self.hparams.predictor_frequency)
+        N = self.hparams.N_horizon
         
         if self.hparams.use_kalman:
             fsms = [FSM(self.hparams) for _ in range(self.hparams.n_filters)]
@@ -206,8 +187,8 @@ class CrowdPredictionManager:
         while not rospy.is_shutdown():
             start_time = time.time()
 
-            if self.hparams.perception == Perception.FAKE and self.fake_trajectories is None:
-                rospy.logwarn("Missing fake measurements")
+            if self.hparams.perception == Perception.GTRUTH and self.agents_pos_nonrt is None:
+                rospy.logwarn("Missing ground truth")
                 rate.sleep()
                 continue
             if (self.hparams.perception == Perception.BOTH) and \
@@ -227,136 +208,117 @@ class CrowdPredictionManager:
             # Create crowd motion prediction message (based on the perception type)
             crowd_motion_prediction = CrowdMotionPrediction()
 
-            if self.hparams.perception == Perception.FAKE:
-                for i in range(self.hparams.n_filters):
-                    positions = [Position(0.0, 0.0) for _ in range(N)]
-                    # Create the prediction within the horizon
-                    if self.current + N <= self.trajectory_length:
-                        positions = self.fake_trajectories.motion_predictions[i].positions[self.current : self.current + N]
-                    elif self.current < self.trajectory_length:
-                        positions[:self.trajectory_length - self.current] = \
-                            self.fake_trajectories.motion_predictions[i].positions[self.current : self.trajectory_length]
-                        for j in range(N - self.trajectory_length + self.current):
-                            positions[self.trajectory_length - self.current + j] = \
-                                self.fake_trajectories.motion_predictions[i].positions[-1]
-                    else:
-                        for j in range(N):
-                            positions[j] = self.fake_trajectories.motion_predictions[i].positions[-1]
-
-                    crowd_motion_prediction.append(MotionPrediction(positions))
-                        
-                self.current += 1
-                if self.current == self.trajectory_length:
-                    self.current = 0
+            if self.hparams.perception == Perception.GTRUTH:
+                measurements = self.agents_pos_nonrt
+            elif self.hparams.perception == Perception.LASER:
+                with self.data_lock:
+                    measurements = self.laser_measurements_stamped_nonrt
+                measurements = self.adapt_measurements_format(measurements)
+            elif self.hparams.perception == Perception.CAMERA:
+                with self.data_lock:    
+                    measurements = self.camera_measurements_stamped_nonrt
+                measurements = self.adapt_measurements_format(measurements)
             else:
-                if self.hparams.perception == Perception.LASER:
-                    with self.data_lock:
-                        measurements = self.laser_measurements_stamped_nonrt
-                    measurements = self.adapt_measurements_format(measurements)
-                elif self.hparams.perception == Perception.CAMERA:
-                    with self.data_lock:    
-                        measurements = self.camera_measurements_stamped_nonrt
-                    measurements = self.adapt_measurements_format(measurements)
-                else:
-                    with self.data_lock:
-                        laser_measurements = self.laser_measurements_stamped_nonrt
-                        camera_measurements = self.camera_measurements_stamped_nonrt
-                    laser_measurements = self.adapt_measurements_format(laser_measurements)
-                    camera_measurements = self.adapt_measurements_format(camera_measurements)
-                    measurements = self.unique_measurements(laser_measurements, camera_measurements)
+                with self.data_lock:
+                    laser_measurements = self.laser_measurements_stamped_nonrt
+                    camera_measurements = self.camera_measurements_stamped_nonrt
+                laser_measurements = self.adapt_measurements_format(laser_measurements)
+                camera_measurements = self.adapt_measurements_format(camera_measurements)
+                measurements = self.unique_measurements(laser_measurements, camera_measurements)
 
-                # Create measurements message
-                measurements_set = MeasurementsSet()
-                for measurement in measurements:
-                    measurements_set.append(Measurement(measurement[0], measurement[1]))
-                measurements_set_stamped = MeasurementsSetStamped(rospy.Time.from_sec(start_time),
-                                                                'map',
-                                                                measurements_set)
-                measurements_set_stamped_msg = MeasurementsSetStamped.to_message(measurements_set_stamped)
-                self.measurements_publisher.publish(measurements_set_stamped_msg)        
+            # Create measurements message
+            measurements_set = MeasurementsSet()
+            for measurement in measurements:
+                measurements_set.append(Measurement(measurement[0], measurement[1]))
+            measurements_set_stamped = MeasurementsSetStamped(rospy.Time.from_sec(start_time),
+                                                            'map',
+                                                            measurements_set)
+            measurements_set_stamped_msg = MeasurementsSetStamped.to_message(measurements_set_stamped)
+            self.measurements_publisher.publish(measurements_set_stamped_msg)        
 
-                if self.hparams.use_kalman:
-                    # Perform data association
-                    # predict next positions according to fsms
-                    next_predicted_positions = np.zeros((self.hparams.n_filters, 2))
-                    next_positions_cov = np.zeros((self.hparams.n_filters, 2, 2))
+            if self.hparams.use_kalman:
+                # Perform data association
+                # predict next positions according to fsms
+                next_predicted_positions = np.zeros((self.hparams.n_filters, 2))
+                next_positions_cov = np.zeros((self.hparams.n_filters, 2, 2))
 
-                    for (i, fsm) in enumerate(fsms):
-                        fsm_next_state = fsm.next_state
-                        if self.hparams.log:
-                            self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
-                                                                             FSMStates.print(fsm_next_state),
-                                                                             start_time])
-                        if fsm_next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
-                            predicted_state = self.propagate_state(fsm.current_estimate, 1)[0]
-                            predicted_cov = fsm.kalman_f.Pk
-                        elif fsm_next_state is FSMStates.START:
-                            predicted_state = fsm.current_estimate
-                            predicted_cov = np.eye(4) * 1e-2
-                        else:
-                            predicted_state = self.hparams.nullstate
-                            predicted_cov = np.eye(4) * 1e-2
-
-                        next_predicted_positions[i] = predicted_state[:2]
-                        next_positions_cov[i] = predicted_cov[:2, :2]
-
-                    fsm_indices = data_association(next_predicted_positions, next_positions_cov, measurements)
+                for (i, fsm) in enumerate(fsms):
+                    fsm_next_state = fsm.next_state
                     if self.hparams.log:
-                        self.associations.append([fsm_indices.tolist(), start_time])
- 
-                    agents_estimation = np.zeros((self.hparams.n_filters, 4))
-                    used_measurements = np.full(measurements.shape[0], False)
+                        self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
+                                                                            FSMStates.print(fsm_next_state),
+                                                                            start_time])
+                    if fsm_next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
+                        predicted_position = predict_next_position(fsm.current_estimate, self.hparams.dt)
+                        predicted_cov = fsm.kalman_f.Pk
+                    elif fsm_next_state is FSMStates.START:
+                        predicted_position = fsm.current_estimate[:2]
+                        predicted_cov = np.eye(4) * 1e-2
+                    else:
+                        predicted_position = self.hparams.nullstate[:2]
+                        predicted_cov = np.eye(4) * 1e-2
 
-                    # First, update FSMs with associated measurements
-                    for i, fsm in enumerate(fsms):
-                        # Find if the FSM has an associated measurement
-                        associated_indices = np.where(fsm_indices == i)[0]
-                        
-                        if associated_indices.size > 0:
-                            j = associated_indices[0]
-                            measure = measurements[j]
-                            fsm.update(start_time, measure)
-                            used_measurements[j] = True
-                        else:
-                            # If no associated measurement, find an unassociated one
-                            unassociated_indices = np.where((fsm_indices == -1) & (~used_measurements))[0]
-                            
-                            if unassociated_indices.size > 0:
-                                k = unassociated_indices[0]
-                                measure = measurements[k]
-                                fsm.update(start_time, measure)
-                                fsm_indices[k] = i
-                                used_measurements[k] = True
-                            else:
-                                # No measurements available, update with None
-                                fsm.update(start_time, None)
+                    next_predicted_positions[i] = predicted_position
+                    next_positions_cov[i] = predicted_cov[:2, :2]
 
-                        # Update agents_estimation with the current estimate of the FSM
-                        current_estimate = fsm.current_estimate
-                        agents_estimation[i] = current_estimate
+                fsm_indices = data_association(next_predicted_positions, next_positions_cov, measurements)
+                if self.hparams.log:
+                    self.associations.append([fsm_indices.tolist(), start_time])
 
-                        # Propagate state and generate predictions
-                        predictions = self.propagate_state(current_estimate, N)
-                        predicted_positions = [Position(pred[0], pred[1]) for pred in predictions]
+                agents_estimation = np.zeros((self.hparams.n_filters, 4))
+                used_measurements = np.full(measurements.shape[0], False)
 
-                        # Append to crowd_motion_prediction
-                        crowd_motion_prediction.append(MotionPrediction(predicted_positions))
-                else:
-                    for i in range(self.hparams.n_filters):
-                        if i < measurements.shape[0]:
-                            current_estimate = np.array([measurements[i, 0],
-                                                         measurements[i, 1],
-                                                         0.0,
-                                                         0.0])
-                        else:
-                            current_estimate = self.hparams.nullstate
-
-                        predictions = self.propagate_state(current_estimate, N)
-                        predicted_positions = [Position(0.0, 0.0) for _ in range(N)]
-                        for j in range(N):
-                            predicted_positions[j] = Position(predictions[j][0], predictions[j][1])
+                # First, update FSMs with associated measurements
+                for i, fsm in enumerate(fsms):
+                    # Find if the FSM has an associated measurement
+                    associated_indices = np.where(fsm_indices == i)[0]
                     
-                        crowd_motion_prediction.append(MotionPrediction(predicted_positions))
+                    if associated_indices.size > 0:
+                        j = associated_indices[0]
+                        measure = measurements[j]
+                        fsm.update(start_time, measure)
+                        used_measurements[j] = True
+                    else:
+                        # If no associated measurement, find an unassociated one
+                        unassociated_indices = np.where((fsm_indices == -1) & (~used_measurements))[0]
+                        
+                        if unassociated_indices.size > 0:
+                            k = unassociated_indices[0]
+                            measure = measurements[k]
+                            fsm.update(start_time, measure)
+                            fsm_indices[k] = i
+                            used_measurements[k] = True
+                        else:
+                            # No measurements available, update with None
+                            fsm.update(start_time, None)
+
+                    # Update agents_estimation with the current estimate of the FSM
+                    current_estimate = fsm.current_estimate
+                    agents_estimation[i] = current_estimate
+
+                    # Append to crowd_motion_prediction
+                    crowd_motion_prediction.append(MotionPrediction(Position(current_estimate[0],
+                                                                                current_estimate[1],
+                                                                                0.0),
+                                                                    Velocity(current_estimate[2],
+                                                                                current_estimate[3],
+                                                                                0.0)))
+            else:
+                for i in range(self.hparams.n_filters):
+                    if i < measurements.shape[0]:
+                        current_estimate = np.array([measurements[i, 0],
+                                                        measurements[i, 1],
+                                                        0.0,
+                                                        0.0])
+                    else:
+                        current_estimate = self.hparams.nullstate
+                
+                    crowd_motion_prediction.append(MotionPrediction(Position(current_estimate[0],
+                                                                                current_estimate[1],
+                                                                                0.0),
+                                                                    Velocity(current_estimate[2],
+                                                                                current_estimate[3],
+                                                                                0.0)))
 
             crowd_motion_prediction_stamped = CrowdMotionPredictionStamped(rospy.Time.from_sec(start_time),
                                                                            'map',

@@ -6,6 +6,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.patches import Circle, Wedge
+from matplotlib.patches import Polygon as Area
 from  matplotlib.animation import FuncAnimation
 
 from crowd_navigation_core.utils import *
@@ -19,6 +20,7 @@ class Plotter:
     def __init__(self, filename):
         self.filename = filename
         self.save_video = Hparams.save_video
+        plt.style.use('seaborn-darkgrid')
 
         # Specify logging directory
         log_dir = Hparams.log_dir
@@ -43,13 +45,14 @@ class Plotter:
             )
 
         # Extract the predictor dictionary
-        if os.path.exists(self.log_predictor):
-            with open(self.log_predictor, 'r') as file:
-                self.predictor_dict = json.load(file)
-        else:
-            raise Exception(
-                f"Predictor logfile not found"
-            )
+        if self.n_filters > 0:
+            if os.path.exists(self.log_predictor):
+                with open(self.log_predictor, 'r') as file:
+                    self.predictor_dict = json.load(file)
+            else:
+                raise Exception(
+                    f"Predictor logfile not found"
+                )
 
         if self.perception_mode in ('Perception.BOTH', 'Perception.CAMERA'):
             # Extract the camera detector dictionary
@@ -80,6 +83,20 @@ class Plotter:
         self.animation_dir = '/tmp/crowd_navigation_tiago/animations'
         if not os.path.exists(self.animation_dir):
             os.makedirs(self.animation_dir)
+
+    def _plot_areas(self, ax, areas):
+        color = 'r'
+        for i, vertexes in enumerate(areas):
+            area = Area(vertexes,
+                              closed=True,
+                              fill=True,
+                              facecolor=color,
+                              alpha=0.05,
+                              edgecolor=color,
+                              linestyle='--',
+                              linewidth=5,
+                              label=f'Area {i}')
+            ax.add_patch(area)
 
     def plot_times(self):
         # Specify the saving path
@@ -209,8 +226,6 @@ class Plotter:
             robot_center[i, 1] = robot_config[i, 1] - b * math.sin(robot_config[i, 2])
 
         frequency = self.camera_detector_dict['frequency']
-        n_points = self.camera_detector_dict['n_points']
-        boundary_vertexes = np.array(self.camera_detector_dict['boundary_vertexes'])
         base_radius = self.camera_detector_dict['base_radius']
         simulation = self.camera_detector_dict['simulation']
         if simulation:
@@ -231,17 +246,6 @@ class Plotter:
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
         meas, = ax.plot([], [], color='blue', marker='.', markersize=5, linestyle='', label='meas')
         fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='purple', alpha=0.1)
-
-        boundary_line = []
-        for i in range(n_points - 1):
-            x_values = [boundary_vertexes[i, 0], boundary_vertexes [i + 1, 0]]
-            y_values = [boundary_vertexes[i, 1], boundary_vertexes [i + 1, 1]]
-            line, = ax.plot(x_values, y_values, color='red', linestyle='--')
-            boundary_line.append(line)
-        x_values = [boundary_vertexes[n_points - 1, 0], boundary_vertexes [0, 0]]
-        y_values = [boundary_vertexes[n_points - 1, 1], boundary_vertexes [0, 1]]
-        line, = ax.plot(x_values, y_values, color='red', linestyle='--')
-        boundary_line.append(line)
 
         if simulation:
             agents = []
@@ -338,8 +342,6 @@ class Plotter:
             robot_center[i, 1] = robot_config[i, 1] - b * math.sin(robot_config[i, 2])
 
         frequency = self.laser_detector_dict['frequency']
-        n_points = self.laser_detector_dict['n_points']
-        boundary_vertexes = np.array(self.laser_detector_dict['boundary_vertexes'])
         base_radius = self.laser_detector_dict['base_radius']
         simulation = self.laser_detector_dict['simulation']
         if simulation:
@@ -364,17 +366,6 @@ class Plotter:
         scans, = ax.plot([], [], color='magenta', marker='.', markersize=3, linestyle='', label='scans') 
         meas, = ax.plot([], [], color='blue', marker='.', markersize=5, linestyle='', label='meas')
         fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
-
-        boundary_line = []
-        for i in range(n_points - 1):
-            x_values = [boundary_vertexes[i, 0], boundary_vertexes [i + 1, 0]]
-            y_values = [boundary_vertexes[i, 1], boundary_vertexes [i + 1, 1]]
-            line, = ax.plot(x_values, y_values, color='red', linestyle='--')
-            boundary_line.append(line)
-        x_values = [boundary_vertexes[n_points - 1, 0], boundary_vertexes [0, 0]]
-        y_values = [boundary_vertexes[n_points - 1, 1], boundary_vertexes [0, 1]]
-        line, = ax.plot(x_values, y_values, color='red', linestyle='--')
-        boundary_line.append(line)
 
         if simulation:
             agents = []
@@ -614,9 +605,8 @@ class Plotter:
         inputs = np.array(self.generator_dict['inputs'])
         driving_acc = wheel_radius * 0.5 * (inputs[:, 0] + inputs[:, 1])
         steering_acc = (wheel_radius / wheel_separation) * (inputs[:, 0] - inputs[:, 1])
-
-        n_points = self.generator_dict['n_points']
-        boundary_vertexes = np.array(self.generator_dict['boundary_vertexes'])
+        n_areas = self.generator_dict['n_areas']
+        areas = np.array(self.generator_dict['areas'])
         input_bounds = np.array(self.generator_dict['input_bounds'])
         v_bounds = np.array(self.generator_dict['v_bounds'])
         omega_bounds = np.array(self.generator_dict['omega_bounds'])
@@ -627,13 +617,15 @@ class Plotter:
         if self.n_filters > 0:
             agents_predictions = np.array(self.generator_dict['agents_predictions'])
         simulation = self.generator_dict['simulation']
-        if simulation and self.perception_mode != 'Perception.FAKE':
+        if simulation:
             n_agents = self.generator_dict['n_agents']
             agents_pos = np.array(self.generator_dict['agents_pos'])
         robot_radius = self.generator_dict['robot_radius']
         agent_radius = self.generator_dict['agent_radius']
         frequency = self.generator_dict['frequency']
         base_radius = self.generator_dict['base_radius']
+        dt = self.generator_dict['dt']
+        N_horizon = self.generator_dict['N_horizon']
         laser_rel_pos = np.array(self.generator_dict['laser_rel_pos'])
         shooting_nodes = inputs.shape[0]
         t = inputs[:, 2]
@@ -791,7 +783,7 @@ class Plotter:
         goal = ax_wrld.scatter([], [], s=100, marker='*', label='goal', color='magenta')
         goal_label = ax_wrld.text(np.nan, np.nan, goal.get_label(), fontsize=16, ha='left', va='bottom')
         if self.n_filters > 0:
-            if simulation and self.perception_mode != 'Perception.FAKE':
+            if simulation:
                 agents = []
                 agents_label = []
                 agents_clearance = []
@@ -816,25 +808,16 @@ class Plotter:
                 
         traj_line, = ax_wrld.plot([], [], color='blue', label='trajectory')
         robot_pred_line, = ax_wrld.plot([], [], color='green', label='prediction')
-        boundary_line = []
-        for i in range(n_points - 1):
-            x_values = [boundary_vertexes[i, 0], boundary_vertexes [i + 1, 0]]
-            y_values = [boundary_vertexes[i, 1], boundary_vertexes [i + 1, 1]]
-            line, = ax_wrld.plot(x_values, y_values, color='red', linestyle='--')
-            boundary_line.append(line)
-        x_values = [boundary_vertexes[n_points - 1, 0], boundary_vertexes [0, 0]]
-        y_values = [boundary_vertexes[n_points - 1, 1], boundary_vertexes [0, 1]]
-        line, = ax_wrld.plot(x_values, y_values, color='red', linestyle='--')
-        boundary_line.append(line)
 
         ax_wrld.set_title('TIAGo motion')
         ax_wrld.set_xlabel("$x \quad [m]$")
         ax_wrld.set_ylabel('$y \quad [m]$')
         ax_wrld.set_aspect('equal', adjustable='box')
-        ax_wrld.grid(True)
+        # ax_wrld.grid(True)
 
         # init and update function for the motion animation
         def init_motion():
+            self._plot_areas(ax_wrld, areas)
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
             ax_wrld.add_patch(robot)
@@ -848,7 +831,7 @@ class Plotter:
             goal_label.set_position(targets[0])
             if self.n_filters > 0:        
                 for i in range(self.n_filters):
-                    agent_estimate = agents_predictions[0, i, :, 0]
+                    agent_estimate = agents_predictions[0, i, :2]
                     estimates[i].set_offsets(agent_estimate)
                     estimates_clearance[i].set_center(agent_estimate)
                     estimates_clearance[i].set_radius(agent_radius)
@@ -858,7 +841,7 @@ class Plotter:
                     ax_wrld.add_patch(laser_fov)
                 if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
                     ax_wrld.add_patch(camera_fov)
-                if simulation and self.perception_mode != 'Perception.FAKE':
+                if simulation:
                     for i in range(n_agents):
                         agent_pos = agents_pos[0, i, :]
                         agents[i].set_offsets(agent_pos)
@@ -883,7 +866,7 @@ class Plotter:
             robot_prediction = robot_predictions[frame, :, :]
             current_target = targets[frame, :]
             traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
-            robot_pred_line.set_data(robot_prediction[0, :], robot_prediction[1, :])
+            robot_pred_line.set_data(robot_prediction[:, 0], robot_prediction[:, 1])
 
             robot.set_center(robot_center[frame])
             controlled_pt.set_offsets(configurations[frame, :2])
@@ -893,12 +876,13 @@ class Plotter:
             goal_label.set_position(current_target)
             if self.n_filters > 0:
                 for i in range(self.n_filters):
-                    agent_prediction = agents_predictions[frame, i, :, :]
-                    agent_estimate = agent_prediction[: , 0]
+                    agent_estimate = agents_predictions[frame, i, :2]
+                    agent_vel_estimate = agents_predictions[frame, i, 2:]
                     estimates[i].set_offsets(agent_estimate)
                     estimates_clearance[i].set_center(agent_estimate)
                     estimates_label[i].set_position(agent_estimate)
-                    predictions[i].set_data(agent_prediction[0, :], agent_prediction[1, :])
+                    agent_prediction = np.vstack((agent_estimate, agent_estimate + agent_vel_estimate * dt * N_horizon))
+                    predictions[i].set_data(agent_prediction[:, 0], agent_prediction[:, 1])
                 if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
                     theta = configurations[frame, 2]
                     current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_rel_pos)
@@ -915,7 +899,7 @@ class Plotter:
                     camera_fov.set_theta1((current_cam_angle - cam_horz_fov / 2) * 180 / np.pi)
                     camera_fov.set_theta2((current_cam_angle + cam_horz_fov / 2) * 180 / np.pi)
                     camera_fov.set_width(camera_range_max - camera_range_min)
-                if simulation and self.perception_mode != 'Perception.FAKE':
+                if simulation:
                     for i in range(n_agents):
                         agent_pos = agents_pos[frame, i, :]
                         agents[i].set_offsets(agent_pos)
@@ -937,7 +921,7 @@ class Plotter:
                                         blit=False,
                                         interval=1/frequency*500,
                                         repeat=False)
-        motion_fig.tight_layout()
+        # motion_fig.tight_layout()
         if self.save_video:
             motion_animation.save(motion_savepath, writer='ffmpeg', fps=frequency, dpi=80)
             print("Motion animation saved")

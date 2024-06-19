@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+
+import crowd_navigation_core.LaserPerceptionManager as LaserPerceptionManager
+if __name__ == '__main__':
+    LaserPerceptionManager.main()

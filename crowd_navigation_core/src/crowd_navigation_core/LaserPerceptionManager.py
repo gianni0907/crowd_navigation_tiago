@@ -17,7 +17,7 @@ import gazebo_msgs.msg
 import sensor_msgs.msg
 import crowd_navigation_msgs.msg
 
-class LaserDetectionManager:
+class LaserPerceptionManager:
     '''
     Extract the agents' representative 2D-point from the laser sensor 
     '''
@@ -43,7 +43,6 @@ class LaserDetectionManager:
             self.measurements_history = []
             self.robot_config_history = []
             self.laser_pos_history = []
-            self.boundary_vertexes = []
             if self.hparams.simulation:
                 self.agents_pos_history = []
 
@@ -98,22 +97,12 @@ class LaserDetectionManager:
             with self.data_lock:
                 self.agents_pos_nonrt = agents_pos
 
-    def tf2q(self, transform):
-        q = transform.transform.rotation
-        theta = math.atan2(
-            2.0 * (q.w * q.z + q.x * q.y),
-            1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-        )
-        self.robot_config.theta = theta
-        self.robot_config.x = transform.transform.translation.x + self.hparams.b * math.cos(theta)
-        self.robot_config.y = transform.transform.translation.y + self.hparams.b * math.sin(theta)
-
     def update_configuration(self):
         try:
             transform = self.tf_buffer.lookup_transform(
                 self.map_frame, self.base_footprint_frame, rospy.Time()
             )
-            self.tf2q(transform)
+            self.robot_config = Configuration.set_from_tf_transform(transform)
             return True
         except(tf2_ros.LookupException,
                tf2_ros.ConnectivityException,
@@ -168,7 +157,7 @@ class LaserDetectionManager:
                 point_las = self.polar2cartesian((idx + offset, value))
                 homo_point_las = np.append(point_las, np.append(self.laser_pose[2,3], 1))
                 point_wrld = np.matmul(self.laser_pose, homo_point_las)[:2]
-                if not is_outside(point_wrld, self.hparams.vertexes, self.hparams.normals):
+                if is_inside_areas(point_wrld, self.hparams.a_coefs, self.hparams.b_coefs, self.hparams.c_coefs):
                     output_points.append(point_wrld.tolist())
 
         return output_points
@@ -197,7 +186,7 @@ class LaserDetectionManager:
                     smoothed_points = moving_average(cluster_points, window_size)
                     min_distance = np.inf
                     for point in (smoothed_points):
-                        distance = euclidean_distance(point, robot_position)          
+                        distance = norm(point - robot_position)          
                         if distance < min_distance:
                             min_distance = distance
                             core_points[i] = point
@@ -223,13 +212,9 @@ class LaserDetectionManager:
         output_dict['measurements'] = self.measurements_history
         output_dict['robot_config'] = self.robot_config_history
         output_dict['laser_position'] = self.laser_pos_history
-        output_dict['frequency'] = self.hparams.laser_detector_frequency
+        output_dict['frequency'] = self.hparams.laser_frequency
         output_dict['b'] = self.hparams.b
         output_dict['n_filters'] = self.hparams.n_filters
-        output_dict['n_points'] = self.hparams.n_points
-        for i in range(self.hparams.n_points):
-            self.boundary_vertexes.append(self.hparams.vertexes[i].tolist())
-        output_dict['boundary_vertexes'] = self.boundary_vertexes
         output_dict['base_radius'] = self.hparams.base_radius
         output_dict['simulation'] = self.hparams.simulation
         if self.hparams.simulation:
@@ -249,7 +234,7 @@ class LaserDetectionManager:
 
         # log the data in a .json file
         log_dir = self.hparams.log_dir
-        filename = self.hparams.laser_detector_file
+        filename = self.hparams.laser_file
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
         log_path = os.path.join(log_dir, filename)
@@ -257,15 +242,15 @@ class LaserDetectionManager:
             json.dump(output_dict, file)     
 
     def run(self):
-        rate = rospy.Rate(self.hparams.laser_detector_frequency)
-
+        if self.hparams.perception == Perception.GTRUTH or self.hparams.perception == Perception.CAMERA:
+            rospy.logwarn("Laser perception disabled")
+            return
+        
         if self.hparams.n_filters == 0:
-            rospy.logwarn("No agent considered, laser detection disabled")
+            rospy.logwarn("No agent considered, laser perception disabled")
             return
 
-        if self.hparams.perception == Perception.FAKE or self.hparams.perception == Perception.CAMERA:
-            rospy.logwarn("Laser detection disabled")
-            return
+        rate = rospy.Rate(self.hparams.laser_frequency)
 
         if self.hparams.log:
             rospy.on_shutdown(self.log_values)
@@ -325,13 +310,13 @@ class LaserDetectionManager:
             rate.sleep()
 
 def main():
-    rospy.init_node('tiago_laser_detection', log_level=rospy.INFO)
-    rospy.loginfo('TIAGo laser detection module [OK]')
+    rospy.init_node('tiago_laser_perception', log_level=rospy.INFO)
+    rospy.loginfo('TIAGo laser perception module [OK]')
 
-    laser_detection_manager = LaserDetectionManager()
-    prof_filename = '/tmp/laser_detection.prof'
+    laser_perception_manager = LaserPerceptionManager()
+    prof_filename = '/tmp/laser_perception.prof'
     cProfile.runctx(
-        'laser_detection_manager.run()',
+        'laser_perception_manager.run()',
         globals=globals(),
         locals=locals(),
         filename=prof_filename

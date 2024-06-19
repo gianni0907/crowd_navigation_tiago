@@ -23,7 +23,6 @@ add_message_files(
 add_service_files(
   FILES
   SetDesiredTargetPosition.srv
-  SetAgentsTrajectory.srv
   SetDesiredHeadConfig.srv
 )
 

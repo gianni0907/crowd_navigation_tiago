@@ -1,0 +1,5 @@
+<launch>
+  <group ns="crowd_navigation_core">
+      <node pkg="crowd_navigation_core" type="camera_perception" name="camera_perception" output="screen" />
+  </group>
+</launch>

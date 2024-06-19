@@ -91,8 +91,8 @@
 
 
     <group ns="crowd_navigation_core">
-        <node pkg="crowd_navigation_core" type="camera_detection" name="camera_detection" output="screen" launch-prefix="bash -c 'sleep $(arg delay1); $0 $@' "/>
-        <node pkg="crowd_navigation_core" type="laser_detection" name="laser_detection" output="screen" launch-prefix="bash -c 'sleep $(arg delay1); $0 $@' "/>
+        <node pkg="crowd_navigation_core" type="camera_perception" name="camera_perception" output="screen" launch-prefix="bash -c 'sleep $(arg delay1); $0 $@' "/>
+        <node pkg="crowd_navigation_core" type="laser_perception" name="laser_perception" output="screen" launch-prefix="bash -c 'sleep $(arg delay1); $0 $@' "/>
         <node pkg="crowd_navigation_core" type="crowd_prediction" name="crowd_prediction" output="screen" launch-prefix="bash -c 'sleep $(arg delay1); $0 $@' "/>
         <node pkg="crowd_navigation_core" type="motion_generation" name="motion_generation" output="screen" launch-prefix="bash -c 'sleep $(arg delay1); $0 $@' "/>
         <node pkg="crowd_navigation_core" type="send_desired_target_position" name="send_desired_target_position" output="screen" launch-prefix="bash -c 'sleep $(arg delay2); $0 $@' " />
