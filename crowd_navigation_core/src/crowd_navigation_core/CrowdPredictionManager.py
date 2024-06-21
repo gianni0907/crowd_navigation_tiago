@@ -246,8 +246,8 @@ class CrowdPredictionManager:
                     fsm_next_state = fsm.next_state
                     if self.hparams.log:
                         self.kalman_infos['KF_{}'.format(i + 1)].append([FSMStates.print(fsm.state),
-                                                                            FSMStates.print(fsm_next_state),
-                                                                            start_time])
+                                                                         FSMStates.print(fsm_next_state),
+                                                                         start_time])
                     if fsm_next_state in (FSMStates.ACTIVE, FSMStates.HOLD):
                         predicted_position = predict_next_position(fsm.current_estimate, self.hparams.dt)
                         predicted_cov = fsm.kalman_f.Pk

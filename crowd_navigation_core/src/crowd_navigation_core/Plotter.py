@@ -803,11 +803,11 @@ class Plotter:
                 estimates.append(ax_wrld.scatter([], [], marker='.', label='KF-{}'.format(i+1), color='red'))
                 estimates_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='red', linestyle='--'))
                 estimates_label.append(ax_wrld.text(np.nan, np.nan, estimates[i].get_label(), fontsize=16, ha='left', va='bottom'))
-                prediction, = ax_wrld.plot([], [], color='orange', label='actor prediction')
+                prediction, = ax_wrld.plot([], [], color='orange', label='actor prediction', linewidth=agent_radius*50, alpha=0.4)
                 predictions.append(prediction)
                 
         traj_line, = ax_wrld.plot([], [], color='blue', label='trajectory')
-        robot_pred_line, = ax_wrld.plot([], [], color='green', label='prediction')
+        robot_pred_line, = ax_wrld.plot([], [], color='green', label='prediction', linewidth=robot_radius*50, alpha=0.4)
 
         ax_wrld.set_title('TIAGo motion')
         ax_wrld.set_xlabel("$x \quad [m]$")
@@ -931,18 +931,14 @@ class Plotter:
     def run(self):
         self.plot_times()
         if self.n_filters > 0:
-            if self.perception_mode == 'Perception.FAKE':
-                pass
-            elif self.perception_mode == 'Perception.BOTH':
+            if self.perception_mode == 'Perception.BOTH':
                 self.plot_camera()
                 self.plot_laser()
-                self.plot_estimation()
             elif self.perception_mode == 'Perception.LASER':
                 self.plot_laser()
-                self.plot_estimation()
             elif self.perception_mode == 'Perception.CAMERA':
                 self.plot_camera()
-                self.plot_estimation()
+        self.plot_estimation()
         self.plot_motion()
 
 def main():
