@@ -1,4 +1,5 @@
 import numpy as np
+from crowd_navigation_core.Hparams import *
 
 class Kalman:
     '''
@@ -12,20 +13,30 @@ class Kalman:
     def __init__(self,
                  init_state,
                  init_time,
-                 print_info = False):
+                 print_info = False,
+                 init_cov = 1,
+                 var_v_static = 0.01,
+                 var_v_dyn = 1,
+                 var_w = 1):
         self.print_info = print_info
         self.X_k = np.array(init_state).T
         self.t_start = init_time
+        self.var_v_static = var_v_static
+        self.var_v_dyn = var_v_dyn
         
-        self.Pk = np.eye(4) * 1e-2
-        var_v = 0.01
-        self.Vk = np.eye(4) * var_v
-        var_w = 0.01
+        self.Pk = np.eye(4) * init_cov
+        self.Vk = np.eye(4) * self.var_v_static
         self.Wk = np.eye(2) * var_w
 
         if self.print_info:
             print(f"State covariance: {self.Vk}")
             print(f"Output covariance: {self.Wk}")
+
+    def adjust_process_noise(self, speed_threshold = 0.1):
+        if np.linalg.norm(self.X_k[2:]) > speed_threshold:
+            self.Vk = np.eye(4) * self.var_v_dyn
+        else:
+            self.Vk = np.eye(4) * self.var_v_static
     
     def predict(self, time):
         dt = time - self.t_start

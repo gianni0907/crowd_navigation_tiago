@@ -173,7 +173,7 @@ class MotionGenerationManager:
             self.wheels_vel_nonrt = np.array([msg.velocity[right_wheel_idx], msg.velocity[left_wheel_idx]])
 
     def crowd_motion_prediction_stamped_callback(self, msg):
-        with self.data_lock:
+        with self.data_lock: 
             self.crowd_motion_prediction_stamped_nonrt = CrowdMotionPredictionStamped.from_message(msg)
 
     def measurements_callback(self, msg):
@@ -194,15 +194,7 @@ class MotionGenerationManager:
             with self.data_lock:
                 self.agents_pos_nonrt = agents_pos
 
-    def tf2q(self, transform):
-        q = np.array([transform.transform.rotation.x,
-                      transform.transform.rotation.y,
-                      transform.transform.rotation.z,
-                      transform.transform.rotation.w])
-        theta = math.atan2(
-            2.0 * (q[3] * q[2] + q[0] * q[1]),
-            1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2])
-        )
+    def unwrap_theta(self, theta):
         product = self.previous_theta * theta
         if product < - 8:
             # passing through pi [rad]
@@ -213,28 +205,33 @@ class MotionGenerationManager:
                 # from positive angle to negative angle
                 self.k += 1
         self.previous_theta = theta
-        self.state.theta = theta + self.k * 2 * math.pi
-        self.state.x = transform.transform.translation.x + self.hparams.b * math.cos(self.state.theta)
-        self.state.y = transform.transform.translation.y + self.hparams.b * math.sin(self.state.theta)
+        return theta + self.k * 2 * math.pi
 
-        pos = np.array([transform.transform.translation.x,
-                        transform.transform.translation.y,
-                        transform.transform.translation.z])
-        rotation_matrix = R.from_quat(q).as_matrix().T
-        self.base_pose = np.eye(4)
-        self.base_pose[:3, :3] = rotation_matrix
-        self.base_pose[:3, 3] = - np.matmul(rotation_matrix, pos)
-
-    def update_state(self):
+    def update_state(self, time):
         try:
-            # Update [x, y, theta]
             transform = self.tf_buffer.lookup_transform(
-                self.map_frame, self.base_footprint_frame, rospy.Time()
+                self.map_frame, self.base_footprint_frame, time
             )
-            self.tf2q(transform)
-            # Update [v, omega]
+            robot_config = Configuration.set_from_tf_transform(transform, self.hparams.b)
+            # Update state
+            self.state.theta = self.unwrap_theta(robot_config.theta)
+            self.state.x = robot_config.x
+            self.state.y = robot_config.y
             self.state.v = self.v
             self.state.omega = self.omega
+
+            pos = np.array([transform.transform.translation.x,
+                            transform.transform.translation.y,
+                            transform.transform.translation.z])
+            q = np.array([transform.transform.rotation.x,
+                          transform.transform.rotation.y,
+                          transform.transform.rotation.z,
+                          transform.transform.rotation.w])
+            rotation_matrix = R.from_quat(q).as_matrix().T
+            self.base_pose = np.eye(4)
+            self.base_pose[:3, :3] = rotation_matrix
+            self.base_pose[:3, 3] = - np.matmul(rotation_matrix, pos)
+            self.state
             return True
         except(tf2_ros.LookupException,
                tf2_ros.ConnectivityException,
@@ -242,10 +239,10 @@ class MotionGenerationManager:
             rospy.logwarn("Missing current state")
             return False
         
-    def get_laser_relative_position(self):
+    def get_laser_relative_position(self, time):
         try:
             transform = self.tf_buffer.lookup_transform(
-                self.base_footprint_frame, self.laser_frame, rospy.Time()
+                self.base_footprint_frame, self.laser_frame, time
             )            
             pos = np.array([transform.transform.translation.x - self.hparams.b, 
                             transform.transform.translation.y])
@@ -257,10 +254,10 @@ class MotionGenerationManager:
             rospy.logwarn("Missing laser pose")
             return None
 
-    def get_camera_pose(self):
+    def get_camera_pose(self, time):
         try:
             transform = self.tf_buffer.lookup_transform(
-                self.map_frame, self.camera_frame, rospy.Time()
+                self.map_frame, self.camera_frame, time
             )
             q = np.array([transform.transform.rotation.x,
                           transform.transform.rotation.y,
@@ -397,8 +394,8 @@ class MotionGenerationManager:
         if self.hparams.simulation:
             output_dict['n_agents'] = self.hparams.n_agents
             output_dict['agents_pos'] = self.agents_pos_history
-        output_dict['n_areas'] = self.hparams.n_areas
         output_dict['areas'] = [arr.tolist() for arr in self.hparams.areas]
+        output_dict['walls'] = self.hparams.walls
         output_dict['input_bounds'] = [self.hparams.alpha_min, self.hparams.alpha_max]
         output_dict['v_bounds'] = [self.hparams.driving_vel_min, self.hparams.driving_vel_max]
         output_dict['omega_bounds'] = [self.hparams.steering_vel_max_neg, self.hparams.steering_vel_max]
@@ -525,9 +522,9 @@ class MotionGenerationManager:
             start_time = time.time()
 
             if self.status == Status.WAITING:
-                if self.update_state():
+                self.laser_relative_position = self.get_laser_relative_position(rospy.Time())
+                if self.update_state(rospy.Time()) and self.get_camera_pose(rospy.Time()) and self.laser_relative_position is not None:
                     self.init()
-                    self.laser_relative_position = self.get_laser_relative_position()
                     self.status = Status.READY
                     print("Initial state ****************************")
                     print(self.state)
@@ -544,13 +541,16 @@ class MotionGenerationManager:
             with self.data_lock:
                 if self.hparams.n_filters > 0:
                     self.crowd_motion_prediction_stamped = self.crowd_motion_prediction_stamped_nonrt
+                    timestamp = self.crowd_motion_prediction_stamped.time
+                else:
+                    timestamp = rospy.Time()
                 measurements = self.adapt_measurements_format(self.measurements_stamped_nonrt)
                 wheels_vel = self.wheels_vel_nonrt
                 if self.hparams.simulation:
                     agents_pos = self.agents_pos_nonrt
 
-            self.update_state()
-            self.get_camera_pose()
+            self.update_state(rospy.Time())
+            self.get_camera_pose(rospy.Time())
             self.point_head(measurements)
             # Generate control inputs (wheels accelerations)
             control_input = self.update_control_input()

@@ -156,7 +156,7 @@
       </link>
     </model>
     <model name="wall_5_model">
-      <pose>-2 5 1 0 0 0</pose>
+      <pose>-2.1 5 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_5_body">
         <inertial>
@@ -173,7 +173,7 @@
         <collision name="collision">
           <geometry>
             <box>
-              <size>6 0.2 2</size>
+              <size>5.8 0.2 2</size>
             </box>
           </geometry>
         </collision>
@@ -187,7 +187,7 @@
       </link>
     </model>
     <model name="wall_6_model">
-      <pose>3.5 5 1 0 0 0</pose>
+      <pose>3.6 5 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_6_body">
         <inertial>
@@ -204,7 +204,7 @@
         <collision name="collision">
           <geometry>
             <box>
-              <size>3 0.2 2</size>
+              <size>2.8 0.2 2</size>
             </box>
           </geometry>
         </collision>

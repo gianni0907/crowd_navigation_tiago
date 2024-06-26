@@ -231,8 +231,8 @@ class CrowdPredictionManager:
             for measurement in measurements:
                 measurements_set.append(Measurement(measurement[0], measurement[1]))
             measurements_set_stamped = MeasurementsSetStamped(rospy.Time.from_sec(start_time),
-                                                            'map',
-                                                            measurements_set)
+                                                              'map',
+                                                              measurements_set)
             measurements_set_stamped_msg = MeasurementsSetStamped.to_message(measurements_set_stamped)
             self.measurements_publisher.publish(measurements_set_stamped_msg)        
 
@@ -253,10 +253,10 @@ class CrowdPredictionManager:
                         predicted_cov = fsm.kalman_f.Pk
                     elif fsm_next_state is FSMStates.START:
                         predicted_position = fsm.current_estimate[:2]
-                        predicted_cov = np.eye(4) * 1e-2
+                        predicted_cov = np.eye(4) * self.hparams.init_cov
                     else:
                         predicted_position = self.hparams.nullstate[:2]
-                        predicted_cov = np.eye(4) * 1e-2
+                        predicted_cov = np.eye(4) * self.hparams.init_cov
 
                     next_predicted_positions[i] = predicted_position
                     next_positions_cov[i] = predicted_cov[:2, :2]

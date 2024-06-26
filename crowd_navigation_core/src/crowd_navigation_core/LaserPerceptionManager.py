@@ -97,12 +97,12 @@ class LaserPerceptionManager:
             with self.data_lock:
                 self.agents_pos_nonrt = agents_pos
 
-    def update_configuration(self):
+    def update_configuration(self, time):
         try:
             transform = self.tf_buffer.lookup_transform(
-                self.map_frame, self.base_footprint_frame, rospy.Time()
+                self.map_frame, self.base_footprint_frame, time
             )
-            self.robot_config = Configuration.set_from_tf_transform(transform)
+            self.robot_config = Configuration.set_from_tf_transform(transform, self.hparams.b)
             return True
         except(tf2_ros.LookupException,
                tf2_ros.ConnectivityException,
@@ -110,10 +110,10 @@ class LaserPerceptionManager:
             rospy.logwarn("Missing current configuration")
             return False
         
-    def get_laser_pose(self):
+    def get_laser_pose(self, time):
         try:
             transform = self.tf_buffer.lookup_transform(
-                self.map_frame, self.laser_frame, rospy.Time()
+                self.map_frame, self.laser_frame, time
             )
             quat = np.array([transform.transform.rotation.x,
                              transform.transform.rotation.y,
@@ -259,7 +259,7 @@ class LaserPerceptionManager:
             start_time = time.time()
 
             if self.status == Status.WAITING:
-                if self.update_configuration() and self.get_laser_pose():
+                if self.update_configuration(rospy.Time()) and self.get_laser_pose(rospy.Time()):
                     self.status = Status.READY
                 else:
                     rate.sleep()
@@ -272,11 +272,12 @@ class LaserPerceptionManager:
 
             with self.data_lock:
                 self.laser_scan = self.laser_scan_nonrt
+                timestamp = self.laser_scan.time
                 if self.hparams.simulation:
                     agents_pos = self.agents_pos_nonrt
 
-            self.update_configuration()
-            self.get_laser_pose()
+            self.update_configuration(rospy.Time())
+            self.get_laser_pose(rospy.Time())
             # Perform data preprocessing
             observations = self.data_preprocessing()
             # Perform data clustering

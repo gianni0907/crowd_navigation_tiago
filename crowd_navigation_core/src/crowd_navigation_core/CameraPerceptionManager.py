@@ -119,7 +119,7 @@ class CameraPerceptionManager:
     def image_callback(self, data):
         with self.data_lock:
             try:
-                self.timestamp = data.header.stamp
+                self.timestamp_nonrt = data.header.stamp
                 self.rgb_image_nonrt = self.bridge.imgmsg_to_cv2(data, 'bgr8')
             except Exception as e:
                 rospy.logerr(e)
@@ -127,7 +127,6 @@ class CameraPerceptionManager:
     def compressed_image_callback(self, data):
         with self.data_lock:
             try:
-                self.timestamp = data.header.stamp
                 self.rgb_image_nonrt = self.bridge.compressed_imgmsg_to_cv2(data, 'bgr8')
             except Exception as e:
                 rospy.logerr(e)
@@ -160,12 +159,12 @@ class CameraPerceptionManager:
             with self.data_lock:
                 self.agents_pos_nonrt = agents_pos
 
-    def update_configuration(self):
+    def update_configuration(self, time):
         try:
             transform = self.tf_buffer.lookup_transform(
-                self.map_frame, self.base_footprint_frame, rospy.Time()
+                self.map_frame, self.base_footprint_frame, time
             )
-            self.robot_config = Configuration.set_from_tf_transform(transform)
+            self.robot_config = Configuration.set_from_tf_transform(transform, self.hparams.b)
             return True
         except(tf2_ros.LookupException,
                tf2_ros.ConnectivityException,
@@ -176,7 +175,7 @@ class CameraPerceptionManager:
     def get_camera_pose(self, time):
         try:
             transform = self.tf_buffer.lookup_transform(
-                self.map_frame, self.camera_frame, time
+                self.map_frame, self.camera_frame, time,
             )
             q = np.array([transform.transform.rotation.x,
                           transform.transform.rotation.y,
@@ -218,14 +217,13 @@ class CameraPerceptionManager:
                 x_max = int(box[2])
                 y_max = int(box[3])
                 depth = np.nanpercentile(depth_img[y_min: y_max + 1, x_min: x_max + 1], 30)
-                if depth >= self.hparams.cam_min_range:
-                    point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
-                    scale = depth / point_cam[2]
-                    point_cam = point_cam * scale
-                    homo_point_cam = np.append(point_cam, 1)
-                    point_wrld = np.matmul(self.camera_pose, homo_point_cam)[:2]
-                    if is_inside_areas(point_wrld, self.hparams.a_coefs, self.hparams.b_coefs, self.hparams.c_coefs):
-                        core_points.append(point_wrld)
+                point_cam = np.array(self.imgproc.projectPixelTo3dRay(box_center))
+                scale = depth / point_cam[2]
+                point_cam = point_cam * scale
+                homo_point_cam = np.append(point_cam, 1)
+                point_wrld = np.matmul(self.camera_pose, homo_point_cam)[:2]
+                if is_inside_areas(point_wrld, self.hparams.a_coefs, self.hparams.b_coefs, self.hparams.c_coefs):
+                    core_points.append(point_wrld)
 
         core_points = np.array(core_points)
         core_points, _ = sort_by_distance(core_points, robot_position)
@@ -292,7 +290,7 @@ class CameraPerceptionManager:
             start_time = time.time()
 
             if self.status == Status.WAITING:
-                if self.update_configuration() and self.get_camera_pose(rospy.Time()):
+                if self.update_configuration(rospy.Time()) and self.get_camera_pose(rospy.Time()):
                     self.status = Status.READY
                 else:
                     rate.sleep()
@@ -305,11 +303,12 @@ class CameraPerceptionManager:
 
             with self.data_lock:
                 rgb_image = self.rgb_image_nonrt
+                timestamp = self.timestamp_nonrt
                 depth_image = self.depth_image_nonrt
                 if self.hparams.simulation:
                     agents_pos = self.agents_pos_nonrt
 
-            self.update_configuration()
+            self.update_configuration(rospy.Time())
             self.get_camera_pose(rospy.Time())
             measurements, processed_image = self.data_extraction(rgb_image, depth_image)
 

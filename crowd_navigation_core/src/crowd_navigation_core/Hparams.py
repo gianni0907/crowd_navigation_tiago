@@ -1,13 +1,11 @@
 import numpy as np
 from crowd_navigation_core.utils import *
 
-from shapely.geometry import Polygon
-
 class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
     save_video = True
-    world_type = WorldType.TWO_ROOMS
+    world_type = WorldType.EMPTY
     if log:
         log_dir = '/tmp/crowd_navigation_tiago/data'
         filename = 'test'
@@ -32,7 +30,7 @@ class Hparams:
     # LASER: only laser sensor enabled
     # CAMERA: only camera enabled
     # BOTH: both laser and camera enabled
-    perception = Perception.GTRUTH
+    perception = Perception.BOTH
 
     if perception == Perception.GTRUTH and not simulation:
         raise ValueError("Cannot use ground truth in real world")
@@ -52,11 +50,12 @@ class Hparams:
     elif perception == Perception.LASER:
         generator_frequency = laser_frequency
     elif perception == Perception.GTRUTH: 
-        generator_frequency = 20
-    N_horizon = int(generator_frequency * 2.5)
+        generator_frequency = 15
+    T_horizon = 2.7 # [s]
+    N_horizon = int(generator_frequency * T_horizon)
     predictor_frequency = generator_frequency
     dt = 1.0 / generator_frequency # [s]
-    unbounded = 1000
+    unbounded = 100000
 
     # Driving and steering acceleration limits
     driving_acc_max = 1.0 # [m/s^2]
@@ -73,7 +72,7 @@ class Hparams:
     steering_bound_factor = 1.0
     
     # Driving and steering velocity limits
-    driving_vel_max = 1 * driving_bound_factor # [m/s]
+    driving_vel_max = 0.6 * driving_bound_factor # [m/s]
     driving_vel_min = - 0.2 # [m/s]
     steering_vel_max = 1.05 * steering_bound_factor # [rad/s]
     steering_vel_max_neg = - steering_vel_max
@@ -86,20 +85,24 @@ class Hparams:
     ### NOTE: define the points in a counter-clockwise order
     max_vertexes = 6
     if world_type == WorldType.EMPTY:
-        n_areas = 1
         if simulation:
-            area0 = np.array([[-6, 6], [-6, -6], [6, -6], [6, 6]])
+            area0 = np.array([[-10, 10], [-10, -10], [10, -10], [10, 10]])
         else:
             area0 = np.array([[-0.6, -4], [4.5, -4], [4.5, 1.8], [-0.6, 1.8]])
         areas = [area0]
+        walls = []
     elif world_type == WorldType.TWO_ROOMS:
-        n_areas = 3
-        area0 = np.array([[4.7, -4.7], [4.7, 4.7], [-4.7, 4.7], [-4.7, -4.7]])
+        area0 = np.array([[4.8, -4.8], [4.8, 4.8], [-4.8, 4.8], [-4.8, -4.8]])
         area1 = np.array([[1, -4], [2, -4], [2, 9], [1, 9]])
-        area2 = np.array([[4.7, 5.3], [4.7, 9.7], [-4.7, 9.7], [-4.7, 5.3]])
+        area2 = np.array([[4.8, 5.2], [4.8, 9.8], [-4.8, 9.8], [-4.8, 5.2]])
         areas = [area0, area1, area2]
+        walls = [((-5, -5), (-5, 10)),
+                ((-5, 10), (5, 10)),
+                ((5, 10), (5, -5)),
+                ((5, -5), (-5, -5)),
+                ((-5, 5), (0.8, 5)),
+                ((2.2, 5), (5, 5))]
     elif world_type == WorldType.THREE_ROOMS:
-        n_areas = 7
         area0 = np.array([[0, -3.5], [0, -0.3], [-4.7, -0.3], [-4.7, -4.7], [-3,-4.7]])
         area1 = np.array([[4.7, -4.7], [4.7, -2.5], [-3.0, -2.5], [0.0, -4.7]])
         area2 = np.array([[4.7, -4.7], [4.7, -0.2], [1.5, -0.2], [2.5, -4.7]])
@@ -109,7 +112,6 @@ class Hparams:
         area6 = np.array([[4.7, 5.5], [4.7, 9.5], [-0.5, 9.5], [-4.7, 6.5], [-4.7, 5.5]])
         areas = [area0, area1, area2, area3, area4, area5, area6]
     elif world_type == WorldType.CORRIDOR:
-        n_areas = 4
         area0 = np.array([[-2.0, 0.0], [-9.0, 0.0], [-9.0, -2.5], [-4.0, -4.7], [-2.0, -4.7]])
         area1 = np.array([[-8.7, -4.0], [-6.2, -4.0], [-6.2, 4.7], [-7.7, 4.7], [-8.7, 3.7]])
         area2 = np.array([[-7.7, 0.2], [-5.2, 0.2], [-5.2, 9.7], [-6.2, 9.7], [-7.7, 6.0]])
@@ -139,7 +141,7 @@ class Hparams:
         v_weight = 5e1 # driving velocity weight
         omega_weight = 1e-5 # steering velocity weight
         u_weight = 1e1 # input weights
-        h_weight = 1e2 # heading term weight
+        h_weight = 120 # heading term weight
         terminal_factor_p = 8e0 # factor for the terminal position weights
         terminal_factor_v = 3e2 # factor for the terminal velocities (v and omega) weights
     else:
@@ -147,7 +149,7 @@ class Hparams:
         v_weight = 5e1 # driving velocity weight
         omega_weight = 1e-5 # steering velocity weight
         u_weight = 1e1 # input weights
-        h_weight = 1e2 # heading term weight
+        h_weight = 120 # heading term weight
         terminal_factor_p = 8e0 # factor for the terminal position weights
         terminal_factor_v = 3e2 # factor for the terminal velocities (v and omega) weights
 
@@ -169,6 +171,11 @@ class Hparams:
         nullstate = np.array([nullpos, nullpos, 0.0, 0.0])
         innovation_threshold = 1
         max_pred_time = dt * N_horizon
+        init_cov = 1
+        proc_noise_static = 1e-2
+        proc_noise_dyn = 1
+        meas_noise = 10
+        speed_threshold = 0.1
         if simulation:
             offset = 20
         else:
@@ -188,7 +195,7 @@ class Hparams:
         if simulation:
             cam_min_range = 0.3 # [m]
             cam_max_range = 8 # [m]
-            cam_horz_fov = 1.0996 # [rad]
+            cam_horz_fov = 1.0996 # 1.7453 [rad]
         else:
             cam_min_range = 0.4 # [m]
             cam_max_range = 8 # [m]

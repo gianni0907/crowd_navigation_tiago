@@ -25,7 +25,6 @@ class NMPC:
         self.dt = self.hparams.dt
         self.T = self.dt * self.N # [s]
 
-        self.n_areas = self.hparams.n_areas
         self.max_vertexes = self.hparams.max_vertexes
         self.areas = self.hparams.areas
         self.n_filters = self.hparams.n_filters
@@ -363,7 +362,7 @@ class NMPC:
 
     def predict_trajectory(self, position, velocity):
         predicted_trajectory = np.zeros((self.N+1, 2))
-        dt = self.hparams.dt
+        dt = self.dt
         state = np.array([position.x,
                           position.y,
                           velocity.x,
@@ -374,14 +373,12 @@ class NMPC:
 
         return predicted_trajectory
 
-    def update(
-            self,
-            state: State,
-            q_ref: np.array,
-            u_ref: np.array,
-            area_index,
-            crowd_motion_predictions
-            ):
+    def update(self,
+               state: State,
+               q_ref: np.array,
+               u_ref: np.array,
+               area_index,
+               crowd_motion_predictions):
         # Set parameters
         self.predicted_agent_trajectories = []
         for motion_prediction in crowd_motion_predictions:

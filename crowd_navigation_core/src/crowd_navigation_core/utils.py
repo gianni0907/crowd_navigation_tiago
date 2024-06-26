@@ -27,15 +27,14 @@ class Configuration:
         self.theta = theta
 
     @staticmethod
-    def set_from_tf_transform(transform):
-        
-        x = transform.transform.translation.x
-        y = transform.transform.translation.y
+    def set_from_tf_transform(transform, b):
         q = transform.transform.rotation
         theta = math.atan2(
           2.0 * (q.w * q.z + q.x * q.y),
           1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         )
+        x = transform.transform.translation.x + b * math.cos(theta)
+        y = transform.transform.translation.y + b * math.sin(theta)
         config = Configuration(x, y, theta)
         return config
 
@@ -238,7 +237,7 @@ class LaserScan:
     @staticmethod
     def from_message(msg):
         return LaserScan(
-            msg.header.stamp.to_sec(),
+            msg.header.stamp,
             msg.header.frame_id,
             msg.angle_min,
             msg.angle_max,
@@ -366,7 +365,7 @@ def get_areas_coefficients(areas, max_vertexes):
         c = np.append(np.divide(np.multiply(area[:n_vertexes, 0], shifted_area[:n_vertexes, 1]) - \
                                 np.multiply(area[:n_vertexes, 1], shifted_area[:n_vertexes, 0]),
                                 norms),
-                      10000 * np.ones(max_vertexes - n_vertexes))
+                      np.ones(max_vertexes - n_vertexes))
 
         a_coefs.append(a)
         b_coefs.append(b)

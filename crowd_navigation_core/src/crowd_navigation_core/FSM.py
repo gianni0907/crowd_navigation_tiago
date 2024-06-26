@@ -18,6 +18,11 @@ class FSM():
         
         self.kalman_f = None
         self.T_bar = self.hparams.max_pred_time
+        self.init_cov = self.hparams.init_cov
+        self.proc_noise_static = self.hparams.proc_noise_static
+        self.proc_noise_dyn = self.hparams.proc_noise_dyn
+        self.meas_noise = self.hparams.meas_noise
+        self.speed_threshold = self.hparams.speed_threshold
         self.next_state = FSMStates.IDLE
         self.state = FSMStates.IDLE
         self.last_valid_measure = self.hparams.nullstate[:2]
@@ -51,7 +56,13 @@ class FSM():
                                  0.0])
             self.next_state = FSMStates.ACTIVE
             # Kalman Filter initialization
-            self.kalman_f = Kalman(estimate, time, print_info=False)
+            self.kalman_f = Kalman(estimate,
+                                   time,
+                                   False,
+                                   self.init_cov,
+                                   self.proc_noise_static,
+                                   self.proc_noise_dyn,
+                                   self.meas_noise)
         else:
             estimate = self.previous_estimate
             self.next_state = FSMStates.IDLE
@@ -61,6 +72,7 @@ class FSM():
     
     def active_state(self, time, measure):
         if measure is not None:
+            self.kalman_f.adjust_process_noise(self.speed_threshold)
             self.kalman_f.predict(time)
             _, innovation = self.kalman_f.correct(measure)
             if np.linalg.norm(innovation) < self.innovation_threshold:
@@ -74,6 +86,7 @@ class FSM():
                                      0.0])
                 self.next_state = FSMStates.START
         else:
+            self.kalman_f.adjust_process_noise(self.speed_threshold)
             self.kalman_f.predict(time)
             estimate, _ = self.kalman_f.correct(self.last_valid_measure)
             self.next_state = FSMStates.HOLD
@@ -82,6 +95,7 @@ class FSM():
     
     def hold_state(self, time, measure):
         if measure is not None:
+            self.kalman_f.adjust_process_noise(self.speed_threshold)
             self.kalman_f.predict(time)
             _, innovation = self.kalman_f.correct(measure)
             if np.linalg.norm(innovation) < self.innovation_threshold:
@@ -96,8 +110,9 @@ class FSM():
                 self.next_state = FSMStates.START
         else:
             if time <= self.last_valid_time + self.T_bar:
+                self.kalman_f.adjust_process_noise(self.speed_threshold)
                 self.kalman_f.predict(time)
-                estimate, _ = self.kalman_f.correct(self.last_valid_measure)
+                estimate = self.kalman_f.X_k
                 self.next_state = FSMStates.HOLD
             else:
                 estimate = self.previous_estimate
