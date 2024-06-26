@@ -20,7 +20,7 @@ class Plotter:
     def __init__(self, filename):
         self.filename = filename
         self.save_video = Hparams.save_video
-        plt.style.use('seaborn-darkgrid')
+        plt.style.use('seaborn-whitegrid')
 
         # Specify logging directory
         log_dir = Hparams.log_dir
@@ -30,8 +30,8 @@ class Plotter:
         # Set the loggers
         self.log_generator = os.path.join(log_dir, filename + '_generator.json')
         self.log_predictor = os.path.join(log_dir, filename + '_predictor.json')
-        self.log_laser_detector = os.path.join(log_dir, filename + '_laser_detector.json')
-        self.log_camera_detector = os.path.join(log_dir, filename + '_camera_detector.json')
+        self.log_laser = os.path.join(log_dir, filename + '_laser.json')
+        self.log_camera = os.path.join(log_dir, filename + '_camera.json')
 
         # Extract the generator dictionary
         if os.path.exists(self.log_generator):
@@ -56,9 +56,9 @@ class Plotter:
 
         if self.perception_mode in ('Perception.BOTH', 'Perception.CAMERA'):
             # Extract the camera detector dictionary
-            if os.path.exists(self.log_camera_detector):
-                with open(self.log_camera_detector, 'r') as file:
-                    self.camera_detector_dict = json.load(file)
+            if os.path.exists(self.log_camera):
+                with open(self.log_camera, 'r') as file:
+                    self.camera_dict = json.load(file)
             else:
                 raise Exception(
                     f"Camera detector logfile not found"
@@ -66,9 +66,9 @@ class Plotter:
 
         if self.perception_mode in ('Perception.BOTH', 'Perception.LASER'):
             # Extract the laser detector dictionary
-            if os.path.exists(self.log_laser_detector):
-                with open(self.log_laser_detector, 'r') as file:
-                    self.laser_detector_dict = json.load(file)
+            if os.path.exists(self.log_laser):
+                with open(self.log_laser, 'r') as file:
+                    self.laser_dict = json.load(file)
             else:
                 raise Exception(
                     f"Laser detector logfile not found"
@@ -88,15 +88,61 @@ class Plotter:
         color = 'r'
         for i, vertexes in enumerate(areas):
             area = Area(vertexes,
-                              closed=True,
-                              fill=True,
-                              facecolor=color,
-                              alpha=0.05,
-                              edgecolor=color,
-                              linestyle='--',
-                              linewidth=5,
-                              label=f'Area {i}')
+                        closed=True,
+                        fill=True,
+                        facecolor=color,
+                        alpha=0.05,
+                        edgecolor=color,
+                        linestyle='--',
+                        linewidth=5,
+                        label=f'Area {i}')
             ax.add_patch(area)
+
+    def _plot_walls(self, ax, walls):
+        for wall_start, wall_end in walls:
+            ax.plot([wall_start[0], wall_end[0]],
+                    [wall_start[1], wall_end[1]],
+                    'k-',
+                    linewidth=2)
+    
+    def _plot_laser_fov(self, fov, theta, laser_pos, range_min, range_max, angle_min, angle_max):
+        fov.set_center(laser_pos)
+        fov.set_radius(range_max)
+        fov.set_theta1((theta + angle_min) * 180 / np.pi)
+        fov.set_theta2((theta + angle_max) * 180 / np.pi)
+        fov.set_width(range_max - range_min)
+
+    def _plot_camera_fov(self, fov, cam_pos, cam_angle, cam_horz_fov, min_length, max_length):
+        vertexes = np.zeros((4, 2))
+        min_angle = cam_angle - cam_horz_fov / 2
+        max_angle = cam_angle + cam_horz_fov / 2
+        vertexes[0, :] = cam_pos + np.array([math.cos(min_angle), math.sin(min_angle)]) * min_length
+        vertexes[1] = cam_pos + np.array([math.cos(min_angle), math.sin(min_angle)]) * max_length
+        vertexes[2] = cam_pos + np.array([math.cos(max_angle), math.sin(max_angle)]) * max_length
+        vertexes[3] = cam_pos + np.array([math.cos(max_angle), math.sin(max_angle)]) * min_length
+        fov.set_xy(vertexes)
+    
+    def _set_axis_properties(self,
+                             ax,
+                             xlabel,
+                             ylabel,
+                             title = None,
+                             set_aspect = False,
+                             legend = False,   
+                             xlim = None,
+                             ylim = None):
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        if set_aspect:
+            ax.set_aspect('equal', adjustable='box')
+        ax.grid(True)
+        if legend:
+            ax.legend(loc='lower left')
+        if xlim is not None:
+            ax.set_xlim(xlim)
+        if ylim is not None:
+            ax.set_ylim(ylim)
 
     def plot_times(self):
         # Specify the saving path
@@ -111,29 +157,29 @@ class Plotter:
             all_times = np.concatenate([all_times, predictor_time[:, 1]])
             # Plot timing
             if self.perception_mode == 'Perception.BOTH':
-                camera_detector_frequency = self.camera_detector_dict['frequency']
-                laser_detector_frequency = self.laser_detector_dict['frequency']
-                camera_detector_time = np.array(self.camera_detector_dict['cpu_time'])
-                laser_detector_time = np.array(self.laser_detector_dict['cpu_time'])
+                camera_frequency = self.camera_dict['frequency']
+                laser_frequency = self.laser_dict['frequency']
+                camera_time = np.array(self.camera_dict['cpu_time'])
+                laser_time = np.array(self.laser_dict['cpu_time'])
                 # Determine xlim
                 all_times = np.concatenate([all_times,
-                                            camera_detector_time[:, 1],
-                                            laser_detector_time[:, 1]])
+                                            camera_time[:, 1],
+                                            laser_time[:, 1]])
 
                 time_fig, time_ax = plt.subplots(4, 1, figsize=(16,8))        
             elif self.perception_mode == 'Perception.LASER':
-                laser_detector_frequency = self.laser_detector_dict['frequency']
-                laser_detector_time = np.array(self.laser_detector_dict['cpu_time'])
+                laser_frequency = self.laser_dict['frequency']
+                laser_time = np.array(self.laser_dict['cpu_time'])
                 # Determine xlim
                 all_times = np.concatenate([all_times,
-                                            laser_detector_time[:, 1]])
+                                            laser_time[:, 1]])
                 time_fig, time_ax = plt.subplots(3, 1, figsize=(16,8))  
             elif self.perception_mode == 'Perception.CAMERA':
-                camera_detector_frequency = self.camera_detector_dict['frequency']
-                camera_detector_time = np.array(self.camera_detector_dict['cpu_time'])
+                camera_frequency = self.camera_dict['frequency']
+                camera_time = np.array(self.camera_dict['cpu_time'])
                 # Determine xlim
                 all_times = np.concatenate([all_times,
-                                            camera_detector_time[:, 1]])
+                                            camera_time[:, 1]])
                 time_fig, time_ax = plt.subplots(3, 1, figsize=(16,8))
             else:
                 time_fig, time_ax = plt.subplots(2, 1, figsize=(16,8))
@@ -144,66 +190,59 @@ class Plotter:
         max_time = np.max(all_times)
 
         time_ax[0].step(generator_time[:, 1], generator_time[:, 0], label='generator')
-
-        time_ax[0].set_title('Generator time')
-        time_ax[0].set_xlabel('$t \quad [s]$')
-        time_ax[0].set_ylabel('$iteration \ time \quad [s]$')
         time_ax[0].hlines(1 / generator_frequency, min_time, max_time, colors='r', linestyles='--')
-        time_ax[0].set_xlim([min_time, max_time])
-        time_ax[0].set_ylim([-0.02, 1 / generator_frequency + 0.02])
-        time_ax[0].grid(True)
+        self._set_axis_properties(time_ax[0],
+                                  xlabel='$t \quad [s]$',
+                                  ylabel='$iteration \ time \quad [s]$',
+                                  title='Generator time',
+                                  xlim=[min_time, max_time],
+                                  ylim=[-0.02, 1 / generator_frequency + 0.02])
 
         if self.n_filters > 0:
             time_ax[1].step(predictor_time[:, 1], predictor_time[:, 0], label='predictor')
-
-            time_ax[1].set_title('Predictor time')
-            time_ax[1].set_xlabel('$t \quad [s]$')
-            time_ax[1].set_ylabel('$iteration \ time \quad [s]$')
             time_ax[1].hlines(1 / predictor_frequency, min_time, max_time, colors='r', linestyles='--')
-            time_ax[1].set_xlim([min_time, max_time])
-            time_ax[1].set_ylim([-0.02, 1 / predictor_frequency + 0.02])
-            time_ax[1].grid(True)
+            self._set_axis_properties(time_ax[1],
+                                      xlabel='$t \quad [s]$',
+                                      ylabel='$iteration \ time \quad [s]$',
+                                      title='Predictor time',
+                                      xlim=[min_time, max_time],
+                                      ylim=[-0.02, 1 / predictor_frequency + 0.02])
 
             if self.perception_mode == 'Perception.BOTH':
-                time_ax[2].step(laser_detector_time[:, 1], laser_detector_time[:, 0], label='laser')
-                time_ax[3].step(camera_detector_time[:, 1], camera_detector_time[:, 0], label='camera')
-
-                time_ax[2].set_title('Laser detector time')
-                time_ax[2].set_xlabel('$t \quad [s]$')
-                time_ax[2].set_ylabel('$iteration \ time \quad [s]$')
-                time_ax[2].hlines(1 / laser_detector_frequency, min_time, max_time, colors='r', linestyles='--')
-                time_ax[2].set_xlim([min_time, max_time])
-                time_ax[2].set_ylim([-0.02, 1 / laser_detector_frequency + 0.02])
-                time_ax[2].grid(True)
-
-                time_ax[3].set_title('Camera detector time')
-                time_ax[3].set_xlabel('$t \quad [s]$')
-                time_ax[3].set_ylabel('$iteration \ time \quad [s]$')
-                time_ax[3].hlines(1 / camera_detector_frequency, min_time, max_time, colors='r', linestyles='--')
-                time_ax[3].set_xlim([min_time, max_time])
-                time_ax[3].set_ylim([-0.02, 1 / camera_detector_frequency + 0.02])
-                time_ax[3].grid(True)
-            elif self.perception_mode == 'Perception.LASER':
-                time_ax[2].step(laser_detector_time[:, 1], laser_detector_time[:, 0], label='laser')
-
-                time_ax[2].set_title('Laser detector time')
-                time_ax[2].set_xlabel('$t \quad [s]$')
-                time_ax[2].set_ylabel('$iteration \ time \quad [s]$')
-                time_ax[2].hlines(1 / laser_detector_frequency, min_time, max_time, colors='r', linestyles='--')
-                time_ax[2].set_xlim([min_time, max_time])
-                time_ax[2].set_ylim([-0.02, 1 / laser_detector_frequency + 0.02])
-                time_ax[2].grid(True)
+                time_ax[2].step(laser_time[:, 1], laser_time[:, 0], label='laser')
+                time_ax[2].hlines(1 / laser_frequency, min_time, max_time, colors='r', linestyles='--')
+                self._set_axis_properties(time_ax[2],
+                                xlabel='$t \quad [s]$',
+                                ylabel='$iteration \ time \quad [s]$',
+                                title='Laser time',
+                                xlim=[min_time, max_time],
+                                ylim=[-0.02, 1 / laser_frequency + 0.02])
+                time_ax[3].step(camera_time[:, 1], camera_time[:, 0], label='camera')
+                time_ax[3].hlines(1 / camera_frequency, min_time, max_time, colors='r', linestyles='--')
+                self._set_axis_properties(time_ax[3],
+                                xlabel='$t \quad [s]$',
+                                ylabel='$iteration \ time \quad [s]$',
+                                title='Camera time',
+                                xlim=[min_time, max_time],
+                                ylim=[-0.02, 1 / camera_frequency + 0.02])
             elif self.perception_mode == 'Perception.CAMERA':
-                time_ax[2].step(camera_detector_time[:, 1], camera_detector_time[:, 0], label='camera')
-
-                time_ax[2].set_title('Camera detector time')
-                time_ax[2].set_xlabel('$t \quad [s]$')
-                time_ax[2].set_ylabel('$iteration \ time \quad [s]$')
-                time_ax[2].hlines(1 / camera_detector_frequency, min_time, max_time, colors='r', linestyles='--')
-                time_ax[2].set_xlim([min_time, max_time])
-                time_ax[2].set_ylim([-0.02, 1 / camera_detector_frequency + 0.02])
-                time_ax[2].grid(True)
-
+                time_ax[2].step(camera_time[:, 1], camera_time[:, 0], label='camera')
+                time_ax[2].hlines(1 / camera_frequency, min_time, max_time, colors='r', linestyles='--')
+                self._set_axis_properties(time_ax[2],
+                                xlabel='$t \quad [s]$',
+                                ylabel='$iteration \ time \quad [s]$',
+                                title='Camera time',
+                                xlim=[min_time, max_time],
+                                ylim=[-0.02, 1 / camera_frequency + 0.02])
+            elif self.perception_mode == 'Perception.LASER':
+                time_ax[2].step(laser_time[:, 1], laser_time[:, 0], label='laser')
+                time_ax[2].hlines(1 / laser_frequency, min_time, max_time, colors='r', linestyles='--')
+                self._set_axis_properties(time_ax[2],
+                                xlabel='$t \quad [s]$',
+                                ylabel='$iteration \ time \quad [s]$',
+                                title='Laser time',
+                                xlim=[min_time, max_time],
+                                ylim=[-0.02, 1 / laser_frequency + 0.02])
         time_fig.tight_layout()
         time_fig.savefig(time_path)
         plt.show()
@@ -213,39 +252,41 @@ class Plotter:
         cam_path = os.path.join(self.animation_dir, self.filename + '_camera.mp4')
         
         # Extract the camera detector data
-        time = np.array(self.camera_detector_dict['cpu_time'])
-        measurements = self.camera_detector_dict['measurements']
-        robot_config = np.array(self.camera_detector_dict['robot_config'])
-        camera_pos = np.array(self.camera_detector_dict['camera_position'])
-        camera_angle = - np.array(self.camera_detector_dict['camera_horz_angle']) - np.pi / 2
-        b = self.camera_detector_dict['b']
+        time = np.array(self.camera_dict['cpu_time'])
+        measurements = self.camera_dict['measurements']
+        robot_config = np.array(self.camera_dict['robot_config'])
+        camera_pos = np.array(self.camera_dict['camera_position'])
+        camera_angle = - np.array(self.camera_dict['camera_horz_angle']) - np.pi / 2
+        b = self.camera_dict['b']
         shooting_nodes = robot_config.shape[0]
         robot_center = np.empty((shooting_nodes, 2))
         for i in range(shooting_nodes):
             robot_center[i, 0] = robot_config[i, 0] - b * math.cos(robot_config[i, 2])
             robot_center[i, 1] = robot_config[i, 1] - b * math.sin(robot_config[i, 2])
 
-        frequency = self.camera_detector_dict['frequency']
-        base_radius = self.camera_detector_dict['base_radius']
-        simulation = self.camera_detector_dict['simulation']
+        frequency = self.camera_dict['frequency']
+        base_radius = self.camera_dict['base_radius']
+        simulation = self.camera_dict['simulation']
         if simulation:
-            n_agents = self.camera_detector_dict['n_agents']
-            agents_pos = np.array(self.camera_detector_dict['agents_pos'])
-            agent_radius = self.camera_detector_dict['agent_radius']
-        cam_horz_fov = self.camera_detector_dict['horz_fov']
-        range_min = self.camera_detector_dict['min_range']
-        range_max = self.camera_detector_dict['max_range']
+            n_agents = self.camera_dict['n_agents']
+            agents_pos = np.array(self.camera_dict['agents_pos'])
+            agent_radius = self.camera_dict['agent_radius']
+        cam_horz_fov = self.camera_dict['horz_fov']
+        range_min = self.camera_dict['min_range']
+        range_max = self.camera_dict['max_range']
+        min_fov_length = range_min / math.cos(cam_horz_fov / 2)
+        max_fov_length = range_max / math.cos(cam_horz_fov / 2)
+        areas = np.array(self.generator_dict['areas'])
+        walls = self.generator_dict['walls']
 
         # Plot animation with camera measurements
-        fig = plt.figure(figsize=(8, 8))
-        gs = gridspec.GridSpec(1,1)
-        ax = plt.subplot(gs[0, 0])
+        fig, ax = plt.subplots(figsize=(8, 8))
 
-        robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
+        robot = Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
         controlled_pt = ax.scatter([], [], marker='.', color='k')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
         meas, = ax.plot([], [], color='blue', marker='.', markersize=5, linestyle='', label='meas')
-        fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='purple', alpha=0.1)
+        fov = Area(np.full((1, 2), np.nan), closed=True, fill=True, facecolor='purple', alpha=0.1)
 
         if simulation:
             agents = []
@@ -253,17 +294,19 @@ class Plotter:
             agents_clearance = []
             for i in range(n_agents):
                 agents.append(ax.scatter([], [], marker='.', label='ag{}'.format(i+1), color='k', alpha=0.3))
-                agents_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', linestyle='--', alpha=0.3))
+                agents_clearance.append(Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='k', linestyle='--', alpha=0.3))
                 agents_label.append(ax.text(np.nan, np.nan, agents[i].get_label(), fontsize=16, ha='left', va='bottom', alpha=0.3))
 
-        ax.set_title('TIAGo camera measurements')
-        ax.set_xlabel("$x \quad [m]$")
-        ax.set_ylabel('$y \quad [m]$')
-        ax.set_aspect('equal', adjustable='box')
-        ax.grid(True)
+        self._set_axis_properties(ax,
+                                  xlabel="$x \quad [m]$",
+                                  ylabel="$y \quad [m]$",
+                                  title='TIAGo camera measurements',
+                                  set_aspect=True)
 
         # init and update function for the camera animation
         def init():
+            self._plot_walls(ax, walls)
+            self._plot_areas(ax, areas)
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
             ax.add_patch(robot)
@@ -289,13 +332,12 @@ class Plotter:
             controlled_pt.set_offsets(robot_config[frame, :2])
             robot_label.set_position(robot_center[frame])
             current_meas = np.array(measurements[frame])
-            current_cam_angle = - camera_angle[frame]
-            current_cam_pos = camera_pos[frame]
-            fov.set_center(current_cam_pos)
-            fov.set_radius(range_max)
-            fov.set_theta1((current_cam_angle - cam_horz_fov / 2) * 180 / np.pi)
-            fov.set_theta2((current_cam_angle + cam_horz_fov / 2) * 180 / np.pi)
-            fov.set_width(range_max - range_min)
+            self._plot_camera_fov(fov,
+                                  camera_pos[frame],
+                                  -camera_angle[frame],
+                                  cam_horz_fov,
+                                  min_fov_length,
+                                  max_fov_length)
             if current_meas.shape[0] > 0:
                 meas.set_data(current_meas[:, 0], current_meas[:, 1])
             else:
@@ -306,7 +348,7 @@ class Plotter:
                     agents[i].set_offsets(agent_pos)
                     agents_clearance[i].set_center(agent_pos)
                     agents_label[i].set_position(agent_pos)
-                return robot, robot_label, controlled_pt, meas, fov,\
+                return robot, robot_label, controlled_pt, meas, \
                        agents, agents_clearance, agents_label
             return robot, robot_label, controlled_pt, meas
 
@@ -316,7 +358,6 @@ class Plotter:
                                   interval=1/frequency,
                                   blit=False,
                                   repeat=False)
-        fig.tight_layout()
 
         if self.save_video:
             animation.save(cam_path, writer='ffmpeg', fps=frequency, dpi=80)
@@ -329,38 +370,38 @@ class Plotter:
         las_path = os.path.join(self.animation_dir, self.filename + '_laser.mp4')
         
         # Extract the laser detector data
-        time = np.array(self.laser_detector_dict['cpu_time'])
-        laser_scans = self.laser_detector_dict['laser_scans']
-        measurements = self.laser_detector_dict['measurements']
-        robot_config = np.array(self.laser_detector_dict['robot_config'])
-        laser_pos = np.array(self.laser_detector_dict['laser_position'])
-        b = self.laser_detector_dict['b']
+        time = np.array(self.laser_dict['cpu_time'])
+        laser_scans = self.laser_dict['laser_scans']
+        measurements = self.laser_dict['measurements']
+        robot_config = np.array(self.laser_dict['robot_config'])
+        laser_pos = np.array(self.laser_dict['laser_position'])
+        b = self.laser_dict['b']
         shooting_nodes = robot_config.shape[0]
         robot_center = np.empty((shooting_nodes, 2))
         for i in range(shooting_nodes):
             robot_center[i, 0] = robot_config[i, 0] - b * math.cos(robot_config[i, 2])
             robot_center[i, 1] = robot_config[i, 1] - b * math.sin(robot_config[i, 2])
 
-        frequency = self.laser_detector_dict['frequency']
-        base_radius = self.laser_detector_dict['base_radius']
-        simulation = self.laser_detector_dict['simulation']
+        frequency = self.laser_dict['frequency']
+        base_radius = self.laser_dict['base_radius']
+        simulation = self.laser_dict['simulation']
         if simulation:
-            n_agents = self.laser_detector_dict['n_agents']
-            agents_pos = np.array(self.laser_detector_dict['agents_pos'])
-            agent_radius = self.laser_detector_dict['agent_radius']
-        angle_inc = self.laser_detector_dict['angle_inc']
-        laser_offset = self.laser_detector_dict['laser_offset']
-        angle_min = self.laser_detector_dict['angle_min'] + angle_inc * laser_offset
-        angle_max = self.laser_detector_dict['angle_max'] - angle_inc * laser_offset
-        range_min = self.laser_detector_dict['range_min']
-        range_max = self.laser_detector_dict['range_max']
+            n_agents = self.laser_dict['n_agents']
+            agents_pos = np.array(self.laser_dict['agents_pos'])
+            agent_radius = self.laser_dict['agent_radius']
+        angle_inc = self.laser_dict['angle_inc']
+        laser_offset = self.laser_dict['laser_offset']
+        angle_min = self.laser_dict['angle_min'] + angle_inc * laser_offset
+        angle_max = self.laser_dict['angle_max'] - angle_inc * laser_offset
+        range_min = self.laser_dict['range_min']
+        range_max = self.laser_dict['range_max']
+        areas = np.array(self.generator_dict['areas'])
+        walls = self.generator_dict['walls']
 
         # Plot animation with laser measurements
-        fig = plt.figure(figsize=(8, 8))
-        gs = gridspec.GridSpec(1,1)
-        ax = plt.subplot(gs[0, 0])
+        fig, ax = plt.subplots(figsize=(8, 8))
 
-        robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
+        robot = Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
         controlled_pt = ax.scatter([], [], marker='.', color='k')
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
         scans, = ax.plot([], [], color='magenta', marker='.', markersize=3, linestyle='', label='scans') 
@@ -373,17 +414,19 @@ class Plotter:
             agents_clearance = []
             for i in range(n_agents):
                 agents.append(ax.scatter([], [], marker='.', label='ag{}'.format(i+1), color='k', alpha=0.3))
-                agents_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', linestyle='--', alpha=0.3))
+                agents_clearance.append(Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='k', linestyle='--', alpha=0.3))
                 agents_label.append(ax.text(np.nan, np.nan, agents[i].get_label(), fontsize=16, ha='left', va='bottom', alpha=0.3))
 
-        ax.set_title('TIAGo laser measurements')
-        ax.set_xlabel("$x \quad [m]$")
-        ax.set_ylabel('$y \quad [m]$')
-        ax.set_aspect('equal', adjustable='box')
-        ax.grid(True)
+        self._set_axis_properties(ax,
+                                  xlabel="$x \quad [m]$",
+                                  ylabel="$y \quad [m]$",
+                                  title='TIAGo laser measurements',
+                                  set_aspect=True)
 
         # init and update function for the laser animation
         def init():
+            self._plot_walls(ax, walls)
+            self._plot_areas(ax, areas)
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
             ax.add_patch(robot)
@@ -410,13 +453,13 @@ class Plotter:
             robot_label.set_position(robot_center[frame])
             current_meas = np.array(measurements[frame])
             current_scans = np.array(laser_scans[frame])
-            current_theta = robot_config[frame, 2]
-            current_laser_pos = laser_pos[frame]
-            fov.set_center(current_laser_pos)
-            fov.set_radius(range_max)
-            fov.set_theta1((current_theta + angle_min) * 180 / np.pi)
-            fov.set_theta2((current_theta + angle_max) * 180 / np.pi)
-            fov.set_width(range_max - range_min)
+            self._plot_laser_fov(fov,
+                                 robot_config[frame, 2],
+                                 laser_pos[frame],
+                                 range_min,
+                                 range_max,
+                                 angle_min,
+                                 angle_max)
             if current_scans.shape[0] > 0:
                 scans.set_data(current_scans[:, 0], current_scans[:, 1])
             else:
@@ -431,7 +474,7 @@ class Plotter:
                     agents[i].set_offsets(agent_pos)
                     agents_clearance[i].set_center(agent_pos)
                     agents_label[i].set_position(agent_pos)
-                return robot, robot_label, controlled_pt, meas, scans, fov, \
+                return robot, robot_label, controlled_pt, meas, scans, \
                        agents, agents_clearance, agents_label
             return robot, robot_label, controlled_pt, meas
 
@@ -441,7 +484,6 @@ class Plotter:
                                   interval=1/frequency,
                                   blit=False,
                                   repeat=False)
-        fig.tight_layout()
 
         if self.save_video:
             animation.save(las_path, writer='ffmpeg', fps=frequency, dpi=80)
@@ -547,28 +589,27 @@ class Plotter:
                 kfs_ax[2, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 2], color=colors[i], label='$\hat{\dot{x}}$')
                 kfs_ax[3, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 3], color=colors[i], label='$\hat{\dot{y}}$')
 
-            kfs_ax[0, i].set_title(f'KF-{i + 1}')
-            kfs_ax[0, i].set_xlabel("$t \quad [s]$")
-            kfs_ax[0, i].set_ylabel('$\hat{x} \quad [m]$')
-            kfs_ax[1, i].set_title(f'KF-{i + 1}')
-            kfs_ax[1, i].set_xlabel("$t \quad [s]$")
-            kfs_ax[1, i].set_ylabel('$\hat{y} \quad [m]$')
-            kfs_ax[2, i].set_xlabel("$t \quad [s]$")
-            kfs_ax[2, i].set_ylabel('$\hat{\dot{x}} \quad [m/s]$')
-            kfs_ax[3, i].set_xlabel("$t \quad [s]$")
-            kfs_ax[3, i].set_ylabel('$\hat{\dot{y}} \quad [m/s]$')
-            kfs_ax[0, i].set_xlim([t_predictor[0], t_predictor[-1]])
-            kfs_ax[1, i].set_xlim([t_predictor[0], t_predictor[-1]])
-            kfs_ax[2, i].set_xlim([t_predictor[0], t_predictor[-1]])
-            kfs_ax[3, i].set_xlim([t_predictor[0], t_predictor[-1]])
-            kfs_ax[0, i].set_ylim([min_x, max_x])
-            kfs_ax[1, i].set_ylim([min_y, max_y])
-            kfs_ax[2, i].set_ylim([min_xd, max_xd])
-            kfs_ax[3, i].set_ylim([min_yd, max_yd])
-            kfs_ax[0, i].grid(True)
-            kfs_ax[1, i].grid(True) 
-            kfs_ax[2, i].grid(True)
-            kfs_ax[3, i].grid(True)
+            self._set_axis_properties(kfs_ax[0, i],
+                                      xlabel="$t \quad [s]$",
+                                      ylabel='$\hat{x} \quad [m]$',
+                                      title=f'KF-{i + 1}',
+                                      xlim=[t_predictor[0], t_predictor[-1]],
+                                      ylim=[min_x, max_x])
+            self._set_axis_properties(kfs_ax[1, i],
+                                      xlabel="$t \quad [s]$",
+                                      ylabel='$\hat{y} \quad [m]$',
+                                      xlim=[t_predictor[0], t_predictor[-1]],
+                                      ylim=[min_y, max_y])
+            self._set_axis_properties(kfs_ax[2, i],
+                                      xlabel="$t \quad [s]$",
+                                      ylabel='$\hat{\dot{x}} \quad [m/s]$',
+                                      xlim=[t_predictor[0], t_predictor[-1]],
+                                      ylim=[min_xd, max_xd])
+            self._set_axis_properties(kfs_ax[3, i],
+                                      xlabel="$t \quad [s]$",
+                                      ylabel='$\hat{\dot{y}} \quad [m/s]$',
+                                      xlim=[t_predictor[0], t_predictor[-1]],
+                                      ylim=[min_yd, max_yd])
 
         kfs_fig.tight_layout()
         kfs_fig.savefig(kalman_savepath)
@@ -585,8 +626,6 @@ class Plotter:
         generator_time = np.array(self.generator_dict['cpu_time'])
         robot_states = np.array(self.generator_dict['robot_state'])
         configurations = robot_states[:, :3]
-        # driving_velocities = robot_states[:, 3]
-        # steering_velocities = robot_states[:, 4]
         robot_center = np.empty((configurations.shape[0], 2))
         b = self.generator_dict['b']
         for i in range(configurations.shape[0]):
@@ -605,8 +644,8 @@ class Plotter:
         inputs = np.array(self.generator_dict['inputs'])
         driving_acc = wheel_radius * 0.5 * (inputs[:, 0] + inputs[:, 1])
         steering_acc = (wheel_radius / wheel_separation) * (inputs[:, 0] - inputs[:, 1])
-        n_areas = self.generator_dict['n_areas']
         areas = np.array(self.generator_dict['areas'])
+        walls = self.generator_dict['walls']
         input_bounds = np.array(self.generator_dict['input_bounds'])
         v_bounds = np.array(self.generator_dict['v_bounds'])
         omega_bounds = np.array(self.generator_dict['omega_bounds'])
@@ -631,17 +670,19 @@ class Plotter:
         t = inputs[:, 2]
 
         if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-            laser_range_max = self.laser_detector_dict['range_max']
-            laser_range_min = self.laser_detector_dict['range_min']
-            angle_inc = self.laser_detector_dict['angle_inc']
-            laser_offset = self.laser_detector_dict['laser_offset']
-            angle_min = self.laser_detector_dict['angle_min'] + angle_inc * laser_offset
-            angle_max = self.laser_detector_dict['angle_max'] - angle_inc * laser_offset
+            laser_range_max = self.laser_dict['range_max']
+            laser_range_min = self.laser_dict['range_min']
+            angle_inc = self.laser_dict['angle_inc']
+            laser_offset = self.laser_dict['laser_offset']
+            angle_min = self.laser_dict['angle_min'] + angle_inc * laser_offset
+            angle_max = self.laser_dict['angle_max'] - angle_inc * laser_offset
 
         if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-            camera_range_max = self.camera_detector_dict['max_range']
-            camera_range_min = self.camera_detector_dict['min_range']
-            cam_horz_fov = self.camera_detector_dict['horz_fov']
+            camera_range_max = self.camera_dict['max_range']
+            camera_range_min = self.camera_dict['min_range']
+            cam_horz_fov = self.camera_dict['horz_fov']
+            min_fov_length = 2 * camera_range_min / cam_horz_fov
+            max_fov_length = 2 * camera_range_max / cam_horz_fov 
             camera_pos = np.array(self.generator_dict['camera_position'])
             camera_angle = - np.array(self.generator_dict['camera_horz_angle']) - np.pi / 2
 
@@ -656,34 +697,31 @@ class Plotter:
         config_ax[2].plot(t, errors[:, 1], label='$e_y$')
         config_ax[3].plot(t, configurations[:, 2], label='$\theta$')
 
-        config_ax[0].set_title('x-position')
-        config_ax[0].set_xlabel('$t \quad [s]$')
-        config_ax[0].set_ylabel('$[m]$')
-        config_ax[0].legend(loc='upper left')
-        config_ax[0].set_xlim([t[0], t[-1]])
-        config_ax[0].grid(True)
-
-        config_ax[1].set_title('y-position')
-        config_ax[1].set_xlabel('$t \quad [s]$')
-        config_ax[1].set_ylabel('$[m]$')
-        config_ax[1].legend(loc='upper left')
-        config_ax[1].set_xlim([t[0], t[-1]])
-        config_ax[1].grid(True)
-
-        config_ax[2].set_title('position errors')
-        config_ax[2].set_xlabel("$t \quad [s]$")
-        config_ax[2].set_ylabel('$[m]$')
-        config_ax[2].legend(loc='upper left')
-        config_ax[2].set_xlim([t[0], t[-1]])
-        config_ax[2].grid(True)
-
-        config_ax[3].set_title('TIAGo orientation')
-        config_ax[3].set_xlabel('$t \quad [s]$')
-        config_ax[3].set_ylabel('$[rad]$')
-        config_ax[3].set_ylim([-1 + np.min(configurations[:, 2]), 1 + np.max(configurations[:, 2])])
-        config_ax[3].set_xlim([t[0], t[-1]])
-        config_ax[3].grid(True)
-
+        
+        self._set_axis_properties(config_ax[0],
+                                  title='x-position',
+                                  xlabel='$t \quad [s]$',
+                                  ylabel='$[m]$',
+                                  legend=True,
+                                  xlim=[t[0], t[-1]])
+        self._set_axis_properties(config_ax[1],
+                                  title='y-position',
+                                  xlabel='$t \quad [s]$',
+                                  ylabel='$[m]$',
+                                  legend=True,
+                                  xlim=[t[0], t[-1]])
+        self._set_axis_properties(config_ax[2],
+                                  title='position errors',
+                                  xlabel='$t \quad [s]$',
+                                  ylabel='$[m]$',
+                                  legend=True,
+                                  xlim=[t[0], t[-1]])
+        self._set_axis_properties(config_ax[3],
+                                  title='TIAGo orientation',
+                                  xlabel='$t \quad [s]$',
+                                  ylabel='$[rad]$',
+                                  xlim=[t[0], t[-1]],
+                                  ylim=[-1 + np.min(configurations[:, 2]), 1 + np.max(configurations[:, 2])])
         config_fig.tight_layout()
         config_fig.savefig(configuration_savepath)
 
@@ -692,41 +730,37 @@ class Plotter:
 
         vel_ax[0].plot(t, wheels_velocities[:, 0], label='$\omega^R$')
         vel_ax[0].plot(t, wheels_velocities[:, 1], label='$\omega^L$')
-        vel_ax[1].plot(t, v_actual, label='$v$')
-        vel_ax[1].plot(t, commands[:, 0], label='$v^{cmd}$')
-        vel_ax[2].plot(t, omega_actual, label='$\omega$')
-        vel_ax[2].plot(t, commands[:, 1], label='$\omega^{cmd}$')
-
-        vel_ax[0].set_title('wheels velocities')
-        vel_ax[0].set_xlabel("$t \quad [s]$")
-        vel_ax[0].set_ylabel('$[rad/s]$')
-        vel_ax[0].legend(loc='upper left')
         vel_ax[0].hlines(wheels_vel_bounds[0], t[0], t[-1], color='red', linestyle='--')
         vel_ax[0].hlines(wheels_vel_bounds[1], t[0], t[-1], color='red', linestyle="--")
-        vel_ax[0].set_ylim([-1 + wheels_vel_bounds[0], 1 + wheels_vel_bounds[1]])
-        vel_ax[0].set_xlim([t[0], t[-1]])
-        vel_ax[0].grid(True)
-
-        vel_ax[1].set_title('TIAGo driving velocity')
-        vel_ax[1].set_xlabel("$t \quad [s]$")
-        vel_ax[1].set_ylabel('$[m/s]$')
-        vel_ax[1].legend(loc='upper left')
+        self._set_axis_properties(vel_ax[0],
+                                  title='wheels velocities',
+                                  xlabel="$t \quad [s]$",
+                                  ylabel='$[rad/s]$',
+                                  legend=True,
+                                  xlim=[t[0], t[-1]],
+                                  ylim=[-1 + wheels_vel_bounds[0], 1 + wheels_vel_bounds[1]])
+        vel_ax[1].plot(t, v_actual, label='$v$')
+        vel_ax[1].plot(t, commands[:, 0], label='$v^{cmd}$')
         vel_ax[1].hlines(v_bounds[0], t[0], t[-1], color='red', linestyle='--')
         vel_ax[1].hlines(v_bounds[1], t[0], t[-1], color='red', linestyle="--")
-        vel_ax[1].set_ylim([-1 + v_bounds[0], 1 + v_bounds[1]])
-        vel_ax[1].set_xlim([t[0], t[-1]])
-        vel_ax[1].grid(True)
-
-        vel_ax[2].set_title('TIAGo steering velocity')
-        vel_ax[2].set_xlabel("$t \quad [s]$")
-        vel_ax[2].set_ylabel('$[rad/s]$')
-        vel_ax[2].legend(loc='upper left')
+        self._set_axis_properties(vel_ax[1],
+                                  title='TIAGo driving velocity',
+                                  xlabel="$t \quad [s]$",
+                                  ylabel='$[m/s]$',
+                                  legend=True,
+                                  xlim=[t[0], t[-1]],
+                                  ylim=[-1 + v_bounds[0], 1 + v_bounds[1]])
+        vel_ax[2].plot(t, omega_actual, label='$\omega$')
+        vel_ax[2].plot(t, commands[:, 1], label='$\omega^{cmd}$')
         vel_ax[2].hlines(omega_bounds[0], t[0], t[-1], color='red', linestyle='--')
         vel_ax[2].hlines(omega_bounds[1], t[0], t[-1], color='red', linestyle="--")
-        vel_ax[2].set_ylim([-1 + omega_bounds[0], 1 + omega_bounds[1]])
-        vel_ax[2].set_xlim([t[0], t[-1]])
-        vel_ax[2].grid(True)
-
+        self._set_axis_properties(vel_ax[2],
+                                  title='TIAGo steering velocity',
+                                  xlabel="$t \quad [s]$",
+                                  ylabel='$[rad/s]$',
+                                  legend=True,
+                                  xlim=[t[0], t[-1]],
+                                  ylim=[-1 + omega_bounds[0], 1 + omega_bounds[1]])
         vel_fig.tight_layout()
         vel_fig.savefig(velocity_savepath)
 
@@ -735,119 +769,109 @@ class Plotter:
 
         acc_ax[0].plot(t, inputs[:, 0], label='$\dot{\omega}^R$')
         acc_ax[0].plot(t, inputs[:, 1], label='$\dot{\omega}^L$')
-        acc_ax[1].plot(t, driving_acc, label='$\dot{v}$')
-        acc_ax[2].plot(t, steering_acc, label='$\dot{omega}$')
-        
-        acc_ax[0].set_title('wheels accelerations')
-        acc_ax[0].set_xlabel("$t \quad [s]$")
-        acc_ax[0].set_ylabel('$[rad/s^2]$')
-        acc_ax[0].legend(loc='upper left')
         acc_ax[0].hlines(input_bounds[0], t[0], t[-1], color='red', linestyle='--')
         acc_ax[0].hlines(input_bounds[1], t[0], t[-1], color='red', linestyle="--")
-        acc_ax[0].set_ylim([-1 + input_bounds[0], 1 + input_bounds[1]])
-        acc_ax[0].set_xlim([t[0], t[-1]])
-        acc_ax[0].grid(True)
-
-        acc_ax[1].set_title('TIAGo driving acceleration')
-        acc_ax[1].set_xlabel("$t \quad [s]$")
-        acc_ax[1].set_ylabel('$\dot{v} \ [m/s^2]$')
+        self._set_axis_properties(acc_ax[0],
+                                  title='wheels accelerations',
+                                  xlabel="$t \quad [s]$",
+                                  ylabel='$[rad/s^2]$',
+                                  legend=True,
+                                  xlim=[t[0], t[-1]],
+                                  ylim=[-1 + input_bounds[0], 1 + input_bounds[1]])
+        acc_ax[1].plot(t, driving_acc, label='$\dot{v}$')
         acc_ax[1].hlines(vdot_bounds[0], t[0], t[-1], color='red', linestyle='--')
         acc_ax[1].hlines(vdot_bounds[1], t[0], t[-1], color='red', linestyle="--")
-        acc_ax[1].set_ylim([-1 + vdot_bounds[0], 1 + vdot_bounds[1]])
-        acc_ax[1].set_xlim([t[0], t[-1]])
-        acc_ax[1].grid(True)
-
-        acc_ax[2].set_title('TIAGo steering acceleration')
-        acc_ax[2].set_xlabel("$t \quad [s]$")
-        acc_ax[2].set_ylabel('$\dot{\omega} \ [rad/s^2]$')
+        self._set_axis_properties(acc_ax[1],
+                                  title='TIAGo driving acceleration',
+                                  xlabel="$t \quad [s]$",
+                                  ylabel='$\dot{v} \ [m/s^2]$',
+                                  xlim=[t[0], t[-1]],
+                                  ylim=[-1 + vdot_bounds[0], 1 + vdot_bounds[1]])
+        acc_ax[2].plot(t, steering_acc, label='$\dot{omega}$')
         acc_ax[2].hlines(omegadot_bounds[0], t[0], t[-1], color='red', linestyle='--')
         acc_ax[2].hlines(omegadot_bounds[1], t[0], t[-1], color='red', linestyle="--")
-        acc_ax[2].set_ylim([-1 + omegadot_bounds[0], 1 + omegadot_bounds[1]])
-        acc_ax[2].set_xlim([t[0], t[-1]])
-        acc_ax[2].grid(True) 
-
+        self._set_axis_properties(acc_ax[2],
+                                  title='TIAGo steering acceleration',
+                                  xlabel="$t \quad [s]$",
+                                  ylabel='$\dot{omega} \ [rad/s^2]$',
+                                  xlim=[t[0], t[-1]],
+                                  ylim=[-1 + omegadot_bounds[0], 1 + omegadot_bounds[1]])
         acc_fig.tight_layout()
         acc_fig.savefig(acceleration_savepath)
 
         plt.show()
 
         # Figure to plot motion animation
-        motion_fig = plt.figure(figsize=(8, 8))
-        gs = gridspec.GridSpec(1,1)
-        ax_wrld = plt.subplot(gs[0, 0])
+        fig, ax = plt.subplots(figsize=(8, 8))
 
-        robot = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
-        controlled_pt = ax_wrld.scatter([], [], marker='.', color='k')
-        robot_label = ax_wrld.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
-        robot_clearance = Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='r', linestyle='--')
-        goal = ax_wrld.scatter([], [], s=100, marker='*', label='goal', color='magenta')
-        goal_label = ax_wrld.text(np.nan, np.nan, goal.get_label(), fontsize=16, ha='left', va='bottom')
+        robot = Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='k', label='TIAGo')
+        controlled_pt = ax.scatter([], [], marker='.', color='k')
+        robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
+        robot_clearance = Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='r', linestyle='--')
+        goal = ax.scatter([], [], s=100, marker='*', label='goal', color='magenta')
+        goal_label = ax.text(np.nan, np.nan, goal.get_label(), fontsize=16, ha='left', va='bottom')
         if self.n_filters > 0:
             if simulation:
                 agents = []
                 agents_label = []
                 agents_clearance = []
                 for i in range(n_agents):
-                    agents.append(ax_wrld.scatter([], [], marker='.', label='ag{}'.format(i+1), color='k', alpha=0.3))
-                    agents_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='k', linestyle='--', alpha=0.3))
-                    agents_label.append(ax_wrld.text(np.nan, np.nan, agents[i].get_label(), fontsize=16, ha='left', va='bottom', alpha=0.3))
+                    agents.append(ax.scatter([], [], marker='.', label='ag{}'.format(i+1), color='k', alpha=0.3))
+                    agents_clearance.append(Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='k', linestyle='--', alpha=0.3))
+                    agents_label.append(ax.text(np.nan, np.nan, agents[i].get_label(), fontsize=16, ha='left', va='bottom', alpha=0.3))
             if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
                 laser_fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='cyan', alpha=0.1)
             if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-                camera_fov = Wedge(np.zeros(1), np.zeros(1), 0.0, 0.0, color='purple', alpha=0.1)
+                camera_fov = Area(np.full((1, 2), np.nan), closed=True, fill=True, facecolor='purple', alpha=0.1)
             estimates = []
             estimates_label = []
             estimates_clearance = []
             predictions = []
             for i in range(self.n_filters):
-                estimates.append(ax_wrld.scatter([], [], marker='.', label='KF-{}'.format(i+1), color='red'))
-                estimates_clearance.append(Circle(np.zeros(1), np.zeros(1), facecolor='none', edgecolor='red', linestyle='--'))
-                estimates_label.append(ax_wrld.text(np.nan, np.nan, estimates[i].get_label(), fontsize=16, ha='left', va='bottom'))
-                prediction, = ax_wrld.plot([], [], color='orange', label='actor prediction', linewidth=agent_radius*50, alpha=0.4)
+                estimates.append(ax.scatter([], [], marker='.', label='KF-{}'.format(i+1), color='red'))
+                estimates_clearance.append(Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='red', linestyle='--'))
+                estimates_label.append(ax.text(np.nan, np.nan, estimates[i].get_label(), fontsize=16, ha='left', va='bottom'))
+                prediction, = ax.plot([], [], color='orange', label='actor prediction', linewidth=agent_radius*60, alpha=0.4)
                 predictions.append(prediction)
                 
-        traj_line, = ax_wrld.plot([], [], color='blue', label='trajectory')
-        robot_pred_line, = ax_wrld.plot([], [], color='green', label='prediction', linewidth=robot_radius*50, alpha=0.4)
+        traj_line, = ax.plot([], [], color='blue', label='trajectory')
+        robot_pred_line, = ax.plot([], [], color='green', label='prediction', linewidth=robot_radius*60, alpha=0.4)
 
-        ax_wrld.set_title('TIAGo motion')
-        ax_wrld.set_xlabel("$x \quad [m]$")
-        ax_wrld.set_ylabel('$y \quad [m]$')
-        ax_wrld.set_aspect('equal', adjustable='box')
-        # ax_wrld.grid(True)
+        self._set_axis_properties(ax,
+                                  xlabel="$x \quad [m]$",
+                                  ylabel="$y \quad [m]$",
+                                  title='TIAGo motion',
+                                  set_aspect=True)
 
         # init and update function for the motion animation
         def init_motion():
-            self._plot_areas(ax_wrld, areas)
+            self._plot_walls(ax, walls)
+            self._plot_areas(ax, areas)
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
-            ax_wrld.add_patch(robot)
+            ax.add_patch(robot)
             controlled_pt.set_offsets(configurations[0, :2])
             robot_clearance.set_center(configurations[0, :2])
             robot_clearance.set_radius(robot_radius)
-            ax_wrld.add_patch(robot_clearance)
+            ax.add_patch(robot_clearance)
             robot_label.set_position(robot_center[0])
 
             goal.set_offsets(targets[0, :2])
             goal_label.set_position(targets[0])
             if self.n_filters > 0:        
                 for i in range(self.n_filters):
-                    agent_estimate = agents_predictions[0, i, :2]
-                    estimates[i].set_offsets(agent_estimate)
-                    estimates_clearance[i].set_center(agent_estimate)
-                    estimates_clearance[i].set_radius(agent_radius)
-                    ax_wrld.add_patch(estimates_clearance[i])
-                    estimates_label[i].set_position(agent_estimate)
+                    ax.add_patch(estimates_clearance[i])
                 if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-                    ax_wrld.add_patch(laser_fov)
+                    ax.add_patch(laser_fov)
                 if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-                    ax_wrld.add_patch(camera_fov)
+                    ax.add_patch(camera_fov)
                 if simulation:
                     for i in range(n_agents):
                         agent_pos = agents_pos[0, i, :]
                         agents[i].set_offsets(agent_pos)
                         agents_clearance[i].set_center(agent_pos)
                         agents_clearance[i].set_radius(agent_radius)
-                        ax_wrld.add_patch(agents_clearance[i])
+                        ax.add_patch(agents_clearance[i])
                         agents_label[i].set_position(agent_pos)
                     return robot, robot_clearance, robot_label, \
                             controlled_pt, goal, goal_label, \
@@ -862,7 +886,7 @@ class Plotter:
             if frame == shooting_nodes - 1:
                 motion_animation.event_source.stop()
 
-            ax_wrld.set_title(f'TIAGo motion, t={generator_time[frame, 1]}')
+            ax.set_title(f'TIAGo motion, t={generator_time[frame, 1]}')
             robot_prediction = robot_predictions[frame, :, :]
             current_target = targets[frame, :]
             traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
@@ -877,28 +901,39 @@ class Plotter:
             if self.n_filters > 0:
                 for i in range(self.n_filters):
                     agent_estimate = agents_predictions[frame, i, :2]
-                    agent_vel_estimate = agents_predictions[frame, i, 2:]
-                    estimates[i].set_offsets(agent_estimate)
-                    estimates_clearance[i].set_center(agent_estimate)
-                    estimates_label[i].set_position(agent_estimate)
-                    agent_prediction = np.vstack((agent_estimate, agent_estimate + agent_vel_estimate * dt * N_horizon))
-                    predictions[i].set_data(agent_prediction[:, 0], agent_prediction[:, 1])
+                    if all(coord != Hparams.nullpos for coord in agent_estimate):
+                        agent_vel_estimate = agents_predictions[frame, i, 2:]
+                        estimates[i].set_offsets(agent_estimate)
+                        estimates[i].set_visible(True)
+                        estimates_clearance[i].set_center(agent_estimate)
+                        estimates_clearance[i].set_radius(agent_radius)
+                        estimates_label[i].set_position(agent_estimate)
+                        estimates_label[i].set_visible(True)
+                        agent_prediction = np.vstack((agent_estimate, agent_estimate + agent_vel_estimate * dt * N_horizon))
+                        predictions[i].set_data(agent_prediction[:, 0], agent_prediction[:, 1])
+                        estimates_label[i].set_visible(True)
+                    else:
+                        estimates[i].set_visible(False)
+                        estimates_clearance[i].set_radius(0.0)
+                        estimates_label[i].set_visible(False)
+                        predictions[i].set_data([],[])
                 if self.perception_mode in ('Perception.LASER', 'Perception.BOTH'):
-                    theta = configurations[frame, 2]
-                    current_laser_pos = configurations[frame, :2] + z_rotation(theta, laser_rel_pos)
-                    laser_fov.set_center(current_laser_pos)
-                    laser_fov.set_radius(laser_range_max)
-                    laser_fov.set_theta1((theta + angle_min) * 180 / np.pi)
-                    laser_fov.set_theta2((theta + angle_max) * 180 / np.pi)
-                    laser_fov.set_width(laser_range_max - laser_range_min)
+                    current_theta = configurations[frame, 2]
+                    current_laser_pos = configurations[frame, :2] + z_rotation(current_theta, laser_rel_pos)
+                    self._plot_laser_fov(laser_fov,
+                                         current_theta,
+                                         current_laser_pos,
+                                         laser_range_min,
+                                         laser_range_max,
+                                         angle_min,
+                                         angle_max)
                 if self.perception_mode in ('Perception.CAMERA', 'Perception.BOTH'):
-                    current_cam_angle = - camera_angle[frame]
-                    current_cam_pos = camera_pos[frame]
-                    camera_fov.set_center(current_cam_pos)
-                    camera_fov.set_radius(camera_range_max)
-                    camera_fov.set_theta1((current_cam_angle - cam_horz_fov / 2) * 180 / np.pi)
-                    camera_fov.set_theta2((current_cam_angle + cam_horz_fov / 2) * 180 / np.pi)
-                    camera_fov.set_width(camera_range_max - camera_range_min)
+                    self._plot_camera_fov(camera_fov,
+                                          camera_pos[frame],
+                                          -camera_angle[frame],
+                                          cam_horz_fov,
+                                          min_fov_length,
+                                          max_fov_length)
                 if simulation:
                     for i in range(n_agents):
                         agent_pos = agents_pos[frame, i, :]
@@ -915,13 +950,13 @@ class Plotter:
             return robot, robot_clearance, robot_label, goal, goal_label, \
                 traj_line, robot_pred_line
         
-        motion_animation = FuncAnimation(motion_fig, update_motion,
+        motion_animation = FuncAnimation(fig, update_motion,
                                         frames=shooting_nodes,
                                         init_func=init_motion,
                                         blit=False,
                                         interval=1/frequency*500,
                                         repeat=False)
-        # motion_fig.tight_layout()
+
         if self.save_video:
             motion_animation.save(motion_savepath, writer='ffmpeg', fps=frequency, dpi=80)
             print("Motion animation saved")
@@ -942,7 +977,7 @@ class Plotter:
         self.plot_motion()
 
 def main():
-    rospy.init_node('tiago_plotter', log_level=rospy.INFO)
+    rospy.init_node('tiago_plotter', anonymous=True, log_level=rospy.INFO)
     rospy.loginfo('TIAGo plotter module [OK]')
 
     filename = rospy.get_param('/filename')
