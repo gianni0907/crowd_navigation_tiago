@@ -392,7 +392,7 @@ class NMPC:
                 next_agent_position = agent_trajectory[k+1]
                 parameters.extend(current_agent_position)
                 parameters.extend(next_agent_position)
-            for a,b,c in zip(self.hparams.a_coefs[area_index[k]], self.hparams.b_coefs[area_index[k]], self.hparams.c_coefs[area_index[k]]):
+            for a,b,c in zip(self.hparams.a_coefs[area_index], self.hparams.b_coefs[area_index], self.hparams.c_coefs[area_index]):
                 parameters.extend([a, b, c])
             self.acados_ocp_solver.set(k, 'p', np.array(parameters))
         self.acados_ocp_solver.set(self.N, 'y_ref', q_ref[:, self.N])

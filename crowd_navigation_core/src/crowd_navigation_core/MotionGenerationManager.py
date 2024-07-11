@@ -11,6 +11,7 @@ from scipy.spatial.transform import Rotation as R
 
 from crowd_navigation_core.Hparams import *
 from crowd_navigation_core.NMPC import *
+from crowd_navigation_core.Planner import *
 from crowd_navigation_core.utils import *
 
 import gazebo_msgs.msg
@@ -42,6 +43,9 @@ class MotionGenerationManager:
         self.k = 0
         self.previous_theta = 0.0
 
+        # Planner
+        self.planner = Planner(self.hparams.areas_index, self.hparams.intersections, self.hparams.viapoints)
+
         # NMPC:
         self.nmpc_controller = NMPC(self.hparams)
 
@@ -68,6 +72,8 @@ class MotionGenerationManager:
             self.inputs_history = []
             self.commands_history = []
             self.target_history = []
+            self.target_viapoint_history = []
+            self.area_index_history = []
             if self.hparams.n_filters > 0:
                 self.agents_prediction_history = []
             if self.hparams.simulation:
@@ -156,15 +162,16 @@ class MotionGenerationManager:
         # Initialize target position to the current position
         self.target_position = np.array([self.state.x,
                                          self.state.y])
-        self.error = np.zeros((4,1))
+        self.current_target_position = self.target_position
+        self.error = np.zeros((4))
         # Initialize the NMPC controller
         self.nmpc_controller.init(self.state)
-        self.predicted_trajectory = np.tile(self.target_position, (self.hparams.N_horizon+1, 1))
-        self.area_index = get_area_index(self.hparams.areas,
-                                         self.hparams.a_coefs,
-                                         self.hparams.b_coefs,
-                                         self.hparams.c_coefs,
-                                         self.predicted_trajectory)
+        self.area_idx = get_area_index(self.hparams.areas,
+                                       self.hparams.a_coefs,
+                                       self.hparams.b_coefs,
+                                       self.hparams.c_coefs,
+                                       self.state.get_state()[:2])[0]
+        self.next_area_idx = self.area_idx
 
     def joint_states_callback(self, msg):
         left_wheel_idx = msg.name.index('wheel_left_joint')
@@ -301,13 +308,28 @@ class MotionGenerationManager:
         else:
             self.target_position[self.hparams.x_idx] = request.x
             self.target_position[self.hparams.y_idx] = request.y
-            if self.status == Status.READY:
-                self.status = Status.MOVING
-                self.point_head(self.adapt_measurements_format(self.measurements_stamped_nonrt))   
+            if self.status == Status.READY: 
+                self.status = Status.MOVING   
                 rospy.loginfo(f"Desired target position successfully set: {self.target_position}")
             elif self.status == Status.MOVING:
-                self.point_head(self.adapt_measurements_format(self.measurements_stamped_nonrt))
                 rospy.loginfo(f"Desired target position successfully changed: {self.target_position}")
+            target_area_indexes = get_area_index(self.hparams.areas,
+                                                 self.hparams.a_coefs,
+                                                 self.hparams.b_coefs,
+                                                 self.hparams.c_coefs,
+                                                 self.target_position)
+            if len(target_area_indexes) > 0:
+                target_area_idx = target_area_indexes[0]
+            else:
+                target_area_idx = get_closest_area_index(self.hparams.areas,
+                                                         self.target_position)
+            _, path = self.planner.compute_path(self.area_idx, target_area_idx)
+            print(f'Path={path}')
+            self.next_area_idx, self.current_target_position = self.planner.get_next_step()
+            print(f'Next area index={self.next_area_idx}')
+            if self.current_target_position is None:
+                self.current_target_position = self.target_position
+            self.point_head(self.adapt_measurements_format(self.measurements_stamped_nonrt))
             return crowd_navigation_msgs.srv.SetDesiredTargetPositionResponse(True)
         
     def set_desired_head_config_request(self, request):
@@ -386,6 +408,8 @@ class MotionGenerationManager:
         output_dict['inputs'] = self.inputs_history
         output_dict['commands'] = self.commands_history
         output_dict['targets'] = self.target_history
+        output_dict['target_viapoints'] = self.target_viapoint_history
+        output_dict['area_index'] = self.area_index_history
         output_dict['n_filters'] = self.hparams.n_filters
         if self.hparams.n_filters > 0:        
             output_dict['agents_predictions'] = self.agents_prediction_history
@@ -395,6 +419,7 @@ class MotionGenerationManager:
             output_dict['n_agents'] = self.hparams.n_agents
             output_dict['agents_pos'] = self.agents_pos_history
         output_dict['areas'] = [arr.tolist() for arr in self.hparams.areas]
+        output_dict['viapoints'] = [point.tolist() for point in self.hparams.viapoints.values() if point is not None]
         output_dict['walls'] = self.hparams.walls
         output_dict['input_bounds'] = [self.hparams.alpha_min, self.hparams.alpha_max]
         output_dict['v_bounds'] = [self.hparams.driving_vel_min, self.hparams.driving_vel_max]
@@ -436,21 +461,24 @@ class MotionGenerationManager:
             json.dump(output_dict, file)
 
     def update_control_input(self):
-        area_index = get_area_index(self.hparams.areas,
+        if self.status == Status.MOVING:
+            indexes = get_area_index(self.hparams.areas,
                                     self.hparams.a_coefs,
                                     self.hparams.b_coefs,
                                     self.hparams.c_coefs,
-                                    self.predicted_trajectory,
+                                    self.state.get_state()[:2],
                                     self.hparams.rho_cbf)
-        if area_index is not None:
-            self.area_index = area_index
-        q_ref = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
-        for k in range(self.hparams.N_horizon):
-            q_ref[:self.hparams.y_idx + 1, k] = self.target_position
-        u_ref = np.zeros((self.nmpc_controller.nu, self.hparams.N_horizon))
-        q_ref[:self.hparams.y_idx + 1, self.hparams.N_horizon] = self.target_position
-
-        if self.status == Status.MOVING:
+            if self.next_area_idx in indexes:
+                self.area_idx = self.next_area_idx
+                self.next_area_idx, self.current_target_position = self.planner.get_next_step()
+                print(f'Next are index={self.next_area_idx}')
+                if self.current_target_position is None:
+                    self.current_target_position = self.target_position
+            q_ref = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
+            for k in range(self.hparams.N_horizon):
+                q_ref[:self.hparams.y_idx + 1, k] = self.current_target_position
+            u_ref = np.zeros((self.nmpc_controller.nu, self.hparams.N_horizon))
+            q_ref[:self.hparams.y_idx + 1, self.hparams.N_horizon] = self.current_target_position
             # Compute the position and velocity error
             self.error = np.array([self.target_position[self.hparams.x_idx] - self.state.x, 
                                    self.target_position[self.hparams.y_idx] - self.state.y,
@@ -469,7 +497,7 @@ class MotionGenerationManager:
                         self.state,
                         q_ref,
                         u_ref,
-                        self.area_index,
+                        self.area_idx,
                         self.crowd_motion_prediction_stamped.crowd_motion_prediction.motion_predictions
                     )
                     control_input = self.nmpc_controller.get_control_input()
@@ -489,7 +517,7 @@ class MotionGenerationManager:
             # Select the target to point: the closest agent, if any, or the target position
             if measurements is None or len(measurements) == 0 or self.hparams.perception == Perception.CAMERA:
                 if norm(self.error) > self.hparams.pointing_error_tol:
-                    point = self.target_position
+                    point = self.current_target_position
                 else:
                     return                
             else:
@@ -568,11 +596,12 @@ class MotionGenerationManager:
                 if self.hparams.perception in (Perception.CAMERA, Perception.BOTH):
                     self.camera_pos_history.append(self.camera_pose[:2, 3].tolist())
                     self.camera_horz_angle_history.append(self.camera_horz_angle)
+                predicted_trajectory = np.zeros((self.hparams.N_horizon+1, 2))
                 for i in range(self.hparams.N_horizon):
-                    self.predicted_trajectory[i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')[:2]
-                self.predicted_trajectory[self.hparams.N_horizon] = \
+                    predicted_trajectory[i] = self.nmpc_controller.acados_ocp_solver.get(i,'x')[:2]
+                predicted_trajectory[self.hparams.N_horizon] = \
                     self.nmpc_controller.acados_ocp_solver.get(self.hparams.N_horizon, 'x')[:2]
-                self.robot_prediction_history.append(self.predicted_trajectory.tolist())
+                self.robot_prediction_history.append(predicted_trajectory.tolist())
                 self.wheels_vel_history.append([wheels_vel[self.hparams.r_wheel_idx],
                                                 wheels_vel[self.hparams.l_wheel_idx],
                                                 start_time])
@@ -583,6 +612,8 @@ class MotionGenerationManager:
                 self.target_history.append([self.target_position[self.hparams.x_idx],
                                             self.target_position[self.hparams.y_idx],
                                             start_time])
+                self.area_index_history.append(self.area_idx)
+                self.target_viapoint_history.append(self.current_target_position.tolist())
 
                 if self.hparams.n_filters > 0:
                     predicted_agent_trajectories = []

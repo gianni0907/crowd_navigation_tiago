@@ -84,8 +84,9 @@ class Plotter:
         if not os.path.exists(self.animation_dir):
             os.makedirs(self.animation_dir)
 
-    def _plot_areas(self, ax, areas):
+    def _plot_areas(self, ax, areas, viapoints):
         color = 'r'
+        area_patches = []
         for i, vertexes in enumerate(areas):
             area = Area(vertexes,
                         closed=True,
@@ -94,9 +95,11 @@ class Plotter:
                         alpha=0.05,
                         edgecolor=color,
                         linestyle='--',
-                        linewidth=5,
                         label=f'Area {i}')
             ax.add_patch(area)
+            area_patches.append(area)
+        ax.scatter(viapoints[:, 0], viapoints[:, 1], marker='s', color='blue', alpha=0.1)
+        return area_patches
 
     def _plot_walls(self, ax, walls):
         for wall_start, wall_end in walls:
@@ -640,11 +643,14 @@ class Plotter:
         omega_actual = (wheel_radius / wheel_separation) * (wheels_velocities[:, 0] - wheels_velocities[:, 1])
         commands = np.array(self.generator_dict['commands'])
         targets = np.array(self.generator_dict['targets'])
+        target_viapoints = np.array(self.generator_dict['target_viapoints'])
+        area_index = np.array(self.generator_dict['area_index'])
         errors = targets[:, :2] - configurations[:, :2]
         inputs = np.array(self.generator_dict['inputs'])
         driving_acc = wheel_radius * 0.5 * (inputs[:, 0] + inputs[:, 1])
         steering_acc = (wheel_radius / wheel_separation) * (inputs[:, 0] - inputs[:, 1])
-        areas = np.array(self.generator_dict['areas'])
+        areas = self.generator_dict['areas']
+        viapoints = np.array(self.generator_dict['viapoints'])
         walls = self.generator_dict['walls']
         input_bounds = np.array(self.generator_dict['input_bounds'])
         v_bounds = np.array(self.generator_dict['v_bounds'])
@@ -809,6 +815,7 @@ class Plotter:
         robot_label = ax.text(np.nan, np.nan, robot.get_label(), fontsize=16, ha='left', va='bottom')
         robot_clearance = Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='r', linestyle='--')
         goal = ax.scatter([], [], s=100, marker='*', label='goal', color='magenta')
+        target_viapoint = ax.scatter([], [], marker='s', color='red', alpha=0.5)
         goal_label = ax.text(np.nan, np.nan, goal.get_label(), fontsize=16, ha='left', va='bottom')
         if self.n_filters > 0:
             if simulation:
@@ -843,10 +850,10 @@ class Plotter:
                                   title='TIAGo motion',
                                   set_aspect=True)
 
+        self._plot_walls(ax, walls)
+        area_patches = self._plot_areas(ax, areas, viapoints)
         # init and update function for the motion animation
         def init_motion():
-            self._plot_walls(ax, walls)
-            self._plot_areas(ax, areas)
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
             ax.add_patch(robot)
@@ -858,6 +865,9 @@ class Plotter:
 
             goal.set_offsets(targets[0, :2])
             goal_label.set_position(targets[0])
+            if targets[0, 0] != target_viapoints[0, 0] and targets[0, 1] != target_viapoints[0, 1]:
+                target_viapoint.set_offsets(target_viapoints[0])
+            area_patches[area_index[0]].set_alpha(0.2)
             if self.n_filters > 0:        
                 for i in range(self.n_filters):
                     ax.add_patch(estimates_clearance[i])
@@ -873,14 +883,14 @@ class Plotter:
                         agents_clearance[i].set_radius(agent_radius)
                         ax.add_patch(agents_clearance[i])
                         agents_label[i].set_position(agent_pos)
-                    return robot, robot_clearance, robot_label, \
-                            controlled_pt, goal, goal_label, \
+                    return robot, robot_clearance, robot_label, area_patches, \
+                            controlled_pt, goal, goal_label, target_viapoint, \
                             estimates, estimates_clearance, estimates_label, \
                             agents, agents_clearance, agents_label
-                return robot, robot_clearance, robot_label, \
-                       controlled_pt, goal, goal_label, \
+                return robot, robot_clearance, robot_label, area_patches, \
+                       controlled_pt, goal, goal_label, target_viapoint, \
                        estimates, estimates_clearance, estimates_label
-            return robot, robot_clearance, robot_label, controlled_pt, goal, goal_label
+            return robot, robot_clearance, robot_label, area_patches, controlled_pt, goal, goal_label, target_viapoint
             
         def update_motion(frame):
             if frame == shooting_nodes - 1:
@@ -889,6 +899,7 @@ class Plotter:
             ax.set_title(f'TIAGo motion, t={generator_time[frame, 1]}')
             robot_prediction = robot_predictions[frame, :, :]
             current_target = targets[frame, :]
+            current_viapoint = target_viapoints[frame]
             traj_line.set_data(configurations[:frame + 1, 0], configurations[:frame + 1, 1])
             robot_pred_line.set_data(robot_prediction[:, 0], robot_prediction[:, 1])
 
@@ -898,6 +909,16 @@ class Plotter:
             robot_label.set_position(robot_center[frame])
             goal.set_offsets(current_target[:2])
             goal_label.set_position(current_target)
+            if current_viapoint[0] != current_target[0] and current_viapoint[1] != current_target[1]:
+                target_viapoint.set_visible(True)
+                target_viapoint.set_offsets(target_viapoints[frame])
+            else:
+                target_viapoint.set_visible(False)
+            area_patches[area_index[frame]].set_alpha(0.2)
+            for patch in area_patches[:area_index[frame]]:
+                patch.set_alpha(0.05)
+            for patch in area_patches[area_index[frame] + 1:]:
+                patch.set_alpha(0.05)
             if self.n_filters > 0:
                 for i in range(self.n_filters):
                     agent_estimate = agents_predictions[frame, i, :2]
@@ -940,14 +961,14 @@ class Plotter:
                         agents[i].set_offsets(agent_pos)
                         agents_clearance[i].set_center(agent_pos)
                         agents_label[i].set_position(agent_pos)       
-                    return robot, robot_clearance, robot_label, goal, goal_label, \
+                    return robot, robot_clearance, robot_label, goal, goal_label, target_viapoint, area_patches, \
                             traj_line, robot_pred_line, \
                             agents, agents_clearance, agents_label, \
                             estimates, estimates_clearance, estimates_label, prediction
-                return robot, robot_clearance, robot_label, goal, goal_label, \
+                return robot, robot_clearance, robot_label, goal, goal_label, target_viapoint, area_patches, \
                         traj_line, robot_pred_line, \
                         estimates, estimates_clearance, estimates_label, prediction
-            return robot, robot_clearance, robot_label, goal, goal_label, \
+            return robot, robot_clearance, robot_label, goal, goal_label, target_viapoint, area_patches, \
                 traj_line, robot_pred_line
         
         motion_animation = FuncAnimation(fig, update_motion,

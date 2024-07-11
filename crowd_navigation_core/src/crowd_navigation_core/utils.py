@@ -372,12 +372,40 @@ def get_areas_coefficients(areas, max_vertexes):
         c_coefs.append(c)
     return a_coefs, b_coefs, c_coefs
 
-def get_area_index(areas, a_coefs, b_coefs, c_coefs, predicted_motion, threshold=0):
-    area_index = None
+def get_area_index(areas, a_coefs, b_coefs, c_coefs, point, threshold=0):
+    area_index = []
     for idx, area in enumerate(areas):
-        if is_inside_area(predicted_motion[0], a_coefs[idx], b_coefs[idx], c_coefs[idx], threshold):
-            area_index = [idx] * len(predicted_motion)
+        if is_inside_area(point, a_coefs[idx], b_coefs[idx], c_coefs[idx], threshold):
+            area_index.append(idx)
     return area_index
+
+def point_to_segment_distance_vec(point, line_start, line_end):
+    # Vectorized computation of the distance from a point to multiple line segments
+    line_vec = line_end - line_start
+    point_vec = point - line_start
+    line_len = np.linalg.norm(line_vec, axis=1)
+    line_unitvec = line_vec / line_len[:, np.newaxis]
+    t = np.sum(point_vec * line_unitvec, axis=1) / line_len
+    t = np.clip(t, 0, 1)
+    nearest = line_start + t[:, np.newaxis] * line_vec
+    return np.linalg.norm(point - nearest, axis=1)
+
+def get_closest_area_index(areas, query_point):
+    query_point = np.array(query_point)
+    min_distance = float('inf')
+    closest_area_index = -1
+
+    for i, area in enumerate(areas):
+        num_vertices = len(area)
+        line_start = area
+        line_end = np.roll(area, -1, axis=0)
+        dists = point_to_segment_distance_vec(query_point, line_start, line_end)
+        min_area_distance = np.min(dists)
+        if min_area_distance < min_distance:
+            min_distance = min_area_distance
+            closest_area_index = i
+
+    return closest_area_index
 
 def is_inside_areas(point, a_coefs, b_coefs, c_coefs, threshold=0.0):
     for a,b,c in zip(a_coefs, b_coefs, c_coefs):

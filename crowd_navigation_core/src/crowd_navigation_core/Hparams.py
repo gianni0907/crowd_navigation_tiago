@@ -5,7 +5,7 @@ class Hparams:
     # Specify whether to save data for plots and .json filename
     log = True
     save_video = True
-    world_type = WorldType.EMPTY
+    world_type = WorldType.TWO_ROOMS
     if log:
         log_dir = '/tmp/crowd_navigation_tiago/data'
         filename = 'test'
@@ -93,9 +93,17 @@ class Hparams:
         walls = []
     elif world_type == WorldType.TWO_ROOMS:
         area0 = np.array([[4.8, -4.8], [4.8, 4.8], [-4.8, 4.8], [-4.8, -4.8]])
-        area1 = np.array([[1, -4], [2, -4], [2, 9], [1, 9]])
+        area1 = np.array([[1, 3.4], [2, 3.4], [2, 6.6], [1, 6.6]])
         area2 = np.array([[4.8, 5.2], [4.8, 9.8], [-4.8, 9.8], [-4.8, 5.2]])
         areas = [area0, area1, area2]
+        areas_index = [0, 1, 2]
+        intersections = {
+            (0, 1), (1, 2)
+        }
+        viapoints = {
+            (0, 1): np.array([1.5, 4.1]),
+            (1, 2): np.array([1.5, 5.9])
+        }
         walls = [((-5, -5), (-5, 10)),
                 ((-5, 10), (5, 10)),
                 ((5, 10), (5, -5)),
@@ -103,22 +111,64 @@ class Hparams:
                 ((-5, 5), (0.8, 5)),
                 ((2.2, 5), (5, 5))]
     elif world_type == WorldType.THREE_ROOMS:
-        area0 = np.array([[0, -3.5], [0, -0.3], [-4.7, -0.3], [-4.7, -4.7], [-3,-4.7]])
-        area1 = np.array([[4.7, -4.7], [4.7, -2.5], [-3.0, -2.5], [0.0, -4.7]])
-        area2 = np.array([[4.7, -4.7], [4.7, -0.2], [1.5, -0.2], [2.5, -4.7]])
-        area3 = np.array([[3, -2.0], [3, 4.7], [2, 4.7], [2, -2.0]])
-        area4 = np.array([[4.7, 0.5], [4.7, 3.0], [-1.0, 4.7], [-4.7, 4.7], [-4.7, 0.5]])
-        area5 = np.array([[-2.0, 0.5], [-2.0, 9.7], [-3.0, 9.7], [-3.0, 0.5]])
-        area6 = np.array([[4.7, 5.5], [4.7, 9.5], [-0.5, 9.5], [-4.7, 6.5], [-4.7, 5.5]])
+        area0 = np.array([[0, -3.6], [0, -0.2], [-4.8, -0.2], [-4.8, -4.8], [-3,-4.8]])
+        area1 = np.array([[4.8, -4.8], [4.8, -2.5], [-3.0, -2.5], [0.0, -4.8]])
+        area2 = np.array([[4.8, -4.8], [4.8, -0.2], [1.5, -0.2], [2.5, -4.8]])
+        area3 = np.array([[3, -1.6], [3, 1.8], [2, 1.8], [2, -1.6]])
+        area4 = np.array([[4.8, 0.4], [4.8, 3.1], [-1.0, 4.8], [-4.8, 4.8], [-4.8, 0.4]])
+        area5 = np.array([[-2.0, 3.4], [-2.0, 6.8], [-3.0, 6.8], [-3.0, 3.4]])
+        area6 = np.array([[4.8, 5.4], [4.8, 9.8], [-0.5, 9.8], [-4.8, 6.5], [-4.8, 5.4]])
         areas = [area0, area1, area2, area3, area4, area5, area6]
+        areas_index = [0, 1, 2, 3, 4, 5, 6]
+        intersections = {
+            (0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6)
+        }
+        viapoints = {
+            (0, 1): np.array([-1.0, -3.0]),
+            (1, 2): np.array([3.5, -3.5]),
+            (2, 3): np.array([2.5, -0.9]),
+            (3, 4): np.array([2.5, 1.1]),
+            (4, 5): np.array([-2.5, 4.1]),
+            (5, 6): np.array([-2.5, 6.1])
+        }
+        walls = [((-5, -5), (-5, 10)),
+                ((-5, 10), (5, 10)),
+                ((5, 10), (5, -5)),
+                ((5, -5), (-5, -5)),
+                ((-5, 5), (-3.2, 5)),
+                ((-1.8, 5), (5, 5)),
+                ((3.2, 0), (5, 0)),
+                ((-5, 0), (1.8, 0))]
     elif world_type == WorldType.CORRIDOR:
         area0 = np.array([[-2.0, 0.0], [-9.0, 0.0], [-9.0, -2.5], [-4.0, -4.7], [-2.0, -4.7]])
         area1 = np.array([[-8.7, -4.0], [-6.2, -4.0], [-6.2, 4.7], [-7.7, 4.7], [-8.7, 3.7]])
         area2 = np.array([[-7.7, 0.2], [-5.2, 0.2], [-5.2, 9.7], [-6.2, 9.7], [-7.7, 6.0]])
-        area3 = np.array([[-4.0, 5.2], [-0.2, 7.0], [-0.2, 8.2], [-3.0, 9.7], [-7.0, 9.7], [-9.7, 5.2]])
+        area3 = np.array([[-4.0, 5.2], [-0.2, 7.0], [-0.2, 8.2], [-3.0, 9.8], [-7.0, 9.8], [-9.8, 5.2]])
         areas = [area0, area1, area2, area3]
+        areas_index = [0, 1, 2, 3]
+        intersections = {
+            (0, 1), (1, 2), (2, 3)
+        }
+        viapoints = {
+            (0, 1): np.array([-7.5, -1.5]),
+            (1, 2): np.array([-7.0, 2.5]),
+            (2, 3): np.array([-6.0, 7.0])
+        }
+        walls = [((-10, -5), (0, -5)),
+                 ((-10, -5), (-10, 0)),
+                 ((0, -5), (0, 0)),
+                 ((0, 0), (-6, 0)),
+                 ((-10, 0), (-9, 0)),
+                 ((-9, 0), (-9, 5)),
+                 ((-5, 0), (-5, 5)),
+                 ((-8, 5), (-10, 5)),
+                 ((-5, 5), (0, 5)),
+                 ((0, 5), (0, 10)),
+                 ((-10, 5), (-10, 10)),
+                 ((0, 10), (-10, 10))]
 
     a_coefs, b_coefs, c_coefs = get_areas_coefficients(areas, max_vertexes)
+    print(get_closest_area_index(areas, np.array([0, -6])))
     
     # State indices:
     x_idx = 0
@@ -132,7 +182,7 @@ class Hparams:
     l_wheel_idx = 1
 
     # Tolerances on the (position and velocity) error
-    nmpc_error_tol = 0.1
+    nmpc_error_tol = 0.15
     pointing_error_tol = 0.4
 
     # Cost function weights
@@ -156,7 +206,7 @@ class Hparams:
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
-    gamma_agent = 0.1 # in (0,1], hyperparameter for the h function associated to agent
+    gamma_agent = 0.5 # in (0,1], hyperparameter for the h function associated to agent
     gamma_area = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
     n_filters = 5 # maximum number of simultaneously tracked agents

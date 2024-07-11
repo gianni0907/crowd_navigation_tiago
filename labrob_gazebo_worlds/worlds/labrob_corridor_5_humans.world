@@ -30,9 +30,86 @@
       <uri>model://ground_plane</uri>
     </include>
 
-    
+
+    <!-- Lamp corridor -->
+    <include>
+      <name>floor_lamp_0</name>
+      <uri>model://floor_lamp</uri>
+      <pose>-8.5 4.5 0.01 0 0 1.570796</pose>
+    </include>
+
+    <!-- Add a wardrobe -->
+    <include>
+    <name>wardrobe_0</name>
+      <uri>model://wardrobe</uri>
+      <pose>-9.100000 -1.500000 0.0100000 0.000000 0.000000 1.570796</pose>
+    </include>
+
+    <!-- Add a kitchen table -->
+    <include>
+    <name>table_0</name>
+      <uri>model://kitchen_table</uri>
+      <pose>-6.50000 -4.6 0.1 0.000000 0.000000 1.570796</pose>
+    </include>
+
+    <!-- Coffee -->
+    <include>
+      <name>coffee_table_0</name>
+      <uri>model://coffee_table</uri>
+      <pose>-8.5 9.0 0.01 0 0 -1.570796</pose>
+    </include>
+    <!-- Add a dining chair -->
+    <include>
+    <name>dining_chair_2</name>
+      <uri>model://dining_chair</uri>
+      <pose> -8.00000 9.5 0.1 0.000000 0.000000 3.14159265359</pose>
+    </include>
+        <!-- Add a dining chair -->
+    <include>
+    <name>dining_chair_3</name>
+      <uri>model://dining_chair</uri>
+      <pose> -7.30000 9.5 0.1 0.000000 0.000000 3.14159265359</pose>
+    </include>
+
+   <!-- Sofa -->
+    <include>
+      <name>sofa</name>
+      <uri>model://sofa</uri>
+      <pose>-0.4 5.8 0.5 0 0 3.14159265359</pose>
+    </include>
+
+    <!-- Add a arm_chair -->
+    <include>
+    <name>arm_chair</name>
+      <uri>model://arm_chair</uri>
+      <pose>-1.00000 9.2 0.01 0.000000 0.000000 0.0</pose>
+    </include>
+
+    <!-- Lamp -->
+    <include>
+      <name>floor_lamp_1</name>
+      <uri>model://floor_lamp</uri>
+      <pose>-1.55 9.6 0.01 0 0 0</pose>
+    </include>
+
+
+    <!-- Add a macrlolink_table -->
+    <include>
+    <name>macrololink_table_0</name>
+      <uri>model://reemc_table</uri>
+      <pose> -1.50000 -2.8 0.1 0.000000 0.000000 1.570796</pose>
+    </include>
+
+    <!-- Add a dining chair -->
+    <include>
+    <name>dining_chair_0</name>
+      <uri>model://dining_chair</uri>
+      <pose> -1.00000 -1.5 0.1 0.000000 0.000000 3.14159265359</pose>
+    </include>
+
+
     <model name="wall_1_model">
-      <pose>0 -5 1 0 0 0</pose>
+      <pose>-5 -5 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_1_body">
         <inertial>
@@ -63,7 +140,7 @@
       </link>
     </model>
     <model name="wall_2_model">
-      <pose>0 10 1 0 0 0</pose>
+      <pose>-5 10 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_2_body">
         <inertial>
@@ -94,7 +171,7 @@
       </link>
     </model>
     <model name="wall_3_model">
-      <pose>-5 2.5 1 0 0 0</pose>
+      <pose>-10 -2.5 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_3_body">
         <inertial>
@@ -111,21 +188,21 @@
         <collision name="collision">
           <geometry>
             <box>
-              <size>0.2 15 2</size>
+              <size>0.2 5 2</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>0.2 15 2</size>
+              <size>0.2 5 2</size>
             </box>
           </geometry>
         </visual>
       </link>
     </model>
     <model name="wall_4_model">
-      <pose>5 2.5 1 0 0 0</pose>
+      <pose>0 -2.5 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_4_body">
         <inertial>
@@ -142,21 +219,21 @@
         <collision name="collision">
           <geometry>
             <box>
-              <size>0.2 15 2</size>
+              <size>0.2 5 2</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>0.2 15 2</size>
+              <size>0.2 5 2</size>
             </box>
           </geometry>
         </visual>
       </link>
     </model>
     <model name="wall_5_model">
-      <pose>-2.1 5 1 0 0 0</pose>
+      <pose>-9.0 5 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_5_body">
         <inertial>
@@ -173,21 +250,21 @@
         <collision name="collision">
           <geometry>
             <box>
-              <size>5.8 0.2 2</size>
+              <size>2.0 0.2 2</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>5.8 0.2 2</size>
+              <size>2.0 0.2 2</size>
             </box>
           </geometry>
         </visual>
       </link>
     </model>
     <model name="wall_6_model">
-      <pose>3.6 5 1 0 0 0</pose>
+      <pose>-2.5 5 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_6_body">
         <inertial>
@@ -204,21 +281,206 @@
         <collision name="collision">
           <geometry>
             <box>
-              <size>2.8 0.2 2</size>
+              <size>5 0.2 2</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>2.8 0.2 2</size>
+              <size>5 0.2 2</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_7_model">
+      <pose>-9.5 0 1 0 0 0</pose>
+      <static>true</static>
+      <link name="wall_7_body">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>1.0</ixx>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyy>1.0</iyy>
+            <iyz>0.0</iyz>
+            <izz>1.0</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1.0 0.2 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.0 0.2 2</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_8_model">
+      <pose>-3 0 1 0 0 0</pose>
+      <static>true</static>
+      <link name="wall_8_body">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>1.0</ixx>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyy>1.0</iyy>
+            <iyz>0.0</iyz>
+            <izz>1.0</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>6 0.2 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6 0.2 2</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_9_model">
+      <pose>-10 7.5 1 0 0 0</pose>
+      <static>true</static>
+      <link name="wall_9_body">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>1.0</ixx>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyy>1.0</iyy>
+            <iyz>0.0</iyz>
+            <izz>1.0</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.2 5 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.2 5 2</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_10_model">
+      <pose>0 7.5 1 0 0 0</pose>
+      <static>true</static>
+      <link name="wall_10_body">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>1.0</ixx>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyy>1.0</iyy>
+            <iyz>0.0</iyz>
+            <izz>1.0</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.2 5 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.2 5 2</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_11_model">
+      <pose>-5 2.5 1 0 0 0</pose>
+      <static>true</static>
+      <link name="wall_11_body">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>1.0</ixx>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyy>1.0</iyy>
+            <iyz>0.0</iyz>
+            <izz>1.0</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.2 5 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.2 5 2</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_12_model">
+      <pose>-9 2.5 1 0 0 0</pose>
+      <static>true</static>
+      <link name="wall_12_body">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>1.0</ixx>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyy>1.0</iyy>
+            <iyz>0.0</iyz>
+            <izz>1.0</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.2 5 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.2 5 2</size>
             </box>
           </geometry>
         </visual>
       </link>
     </model>
 
-    <!-- Actors -->
     <!-- Actors -->
     <actor name="actor_0">
       <skin>
@@ -235,19 +497,19 @@
         <trajectory id="0" type="walking">
           <waypoint>
             <time>0</time>
-            <pose>-2 6 0 0 0 1.57</pose>
+            <pose>-4.0 6 0 0 0 1.57</pose>
           </waypoint>
           <waypoint>
             <time>15</time>
-            <pose>-2 9 0 0 0 1.57</pose>
+            <pose>-4.0 9 0 0 0 1.57</pose>
           </waypoint>
           <waypoint>
             <time>20</time>
-            <pose>-2 9 0 0 0 -1.57</pose>
+            <pose>-4.0 9 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>35</time>
-            <pose>-2 6 0 0 0 -1.57</pose>
+            <pose>-4.0 6 0 0 0 -1.57</pose>
           </waypoint>
         </trajectory>
       </script>
@@ -267,19 +529,19 @@
         <trajectory id="0" type="walking">
           <waypoint>
             <time>0</time>
-            <pose>4 3 0 0 0 -3.14</pose>
+            <pose>-7.5 4 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>15</time>
-            <pose>-4  3   0 0 0 -3.14</pose>
+            <pose>-7.5 1 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>20</time>
-            <pose>-4  3 0 0 0 0</pose>
+            <pose>-7.5 1  0 0 0 1.57</pose>
           </waypoint>
           <waypoint>
             <time>35</time>
-            <pose>4 3 0 0 0 0</pose>
+            <pose>-7.5 4 0 0 0 1.57</pose>
           </waypoint>
         </trajectory>
       </script>
@@ -299,19 +561,19 @@
         <trajectory id="0" type="walking">
           <waypoint>
             <time>0</time>
-            <pose>-4 4 0 0 0 0</pose>
+            <pose>-9 -1 0 0 0 0</pose>
           </waypoint>
           <waypoint>
             <time>15</time>
-            <pose> 4 4 0 0 0 0</pose>
+            <pose>-1.5  -1   0 0 0 0</pose>
           </waypoint>
           <waypoint>
             <time>20</time>
-            <pose> 4 4 0 0 0 -3.14</pose>
+            <pose>-1.5  -1 0 0 0 -3.14</pose>
           </waypoint>
           <waypoint>
             <time>35</time>
-            <pose>-4 4 0 0 0 -3.14</pose>
+            <pose>-9 -1 0 0 0 -3.14</pose>
           </waypoint>
         </trajectory>
       </script>
@@ -331,19 +593,19 @@
         <trajectory id="0" type="walking">
           <waypoint>
             <time>0</time>
-            <pose>2 4 0 0 0 -1.57</pose>
+            <pose>-6.0 -1.5 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>15</time>
-            <pose>2 -4 0 0 0 -1.57</pose>
+            <pose>-6.0 -4 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>20</time>
-            <pose>2 -4  0 0 0 1.57</pose>
+            <pose>-6.0 -4 0 0 0 1.57</pose>
           </waypoint>
           <waypoint>
             <time>35</time>
-            <pose>2 4 0 0 0 1.57</pose>
+            <pose>-6.0 -0.5 0 0 0 1.57</pose>
           </waypoint>
         </trajectory>
       </script>
@@ -363,19 +625,19 @@
         <trajectory id="0" type="walking">
           <waypoint>
             <time>0</time>
-            <pose>0.5 9 0 0 0 -1.57</pose>
+            <pose>-2 6 0 0 0 -3.14</pose>
           </waypoint>
           <waypoint>
             <time>15</time>
-            <pose>0.5 6 0 0 0 -1.57</pose>
+            <pose>-8 6 0 0 0 -3.14</pose>
           </waypoint>
           <waypoint>
             <time>20</time>
-            <pose>0.5 6 0 0 0 1.57</pose>
+            <pose>-8 6 0 0 0 0</pose>
           </waypoint>
           <waypoint>
             <time>35</time>
-            <pose>0.5 9 0 0 0 1.57</pose>
+            <pose>-2 6 0 0 0 0</pose>
           </waypoint>
         </trajectory>
       </script>

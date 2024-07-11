@@ -88,7 +88,7 @@ class FSM():
         else:
             self.kalman_f.adjust_process_noise(self.speed_threshold)
             self.kalman_f.predict(time)
-            estimate, _ = self.kalman_f.correct(self.last_valid_measure)
+            estimate = self.kalman_f.X_k
             self.next_state = FSMStates.HOLD
 
         return estimate

@@ -30,7 +30,6 @@
       <uri>model://ground_plane</uri>
     </include>
 
-    
     <model name="wall_1_model">
       <pose>0 -5 1 0 0 0</pose>
       <static>true</static>
@@ -156,7 +155,7 @@
       </link>
     </model>
     <model name="wall_5_model">
-      <pose>-2.1 5 1 0 0 0</pose>
+      <pose>-4.1 5 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_5_body">
         <inertial>
@@ -173,21 +172,21 @@
         <collision name="collision">
           <geometry>
             <box>
-              <size>5.8 0.2 2</size>
+              <size>1.8 0.2 2</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>5.8 0.2 2</size>
+              <size>1.8 0.2 2</size>
             </box>
           </geometry>
         </visual>
       </link>
     </model>
     <model name="wall_6_model">
-      <pose>3.6 5 1 0 0 0</pose>
+      <pose>1.6 5 1 0 0 0</pose>
       <static>true</static>
       <link name="wall_6_body">
         <inertial>
@@ -204,14 +203,76 @@
         <collision name="collision">
           <geometry>
             <box>
-              <size>2.8 0.2 2</size>
+              <size>6.8 0.2 2</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>2.8 0.2 2</size>
+              <size>6.8 0.2 2</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_7_model">
+      <pose>4.1 0 1 0 0 0</pose>
+      <static>true</static>
+      <link name="wall_7_body">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>1.0</ixx>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyy>1.0</iyy>
+            <iyz>0.0</iyz>
+            <izz>1.0</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1.8 0.2 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.8 0.2 2</size>
+            </box>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+    <model name="wall_8_model">
+      <pose>-1.6 0 1 0 0 0</pose>
+      <static>true</static>
+      <link name="wall_8_body">
+        <inertial>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>1.0</ixx>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyy>1.0</iyy>
+            <iyz>0.0</iyz>
+            <izz>1.0</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>6.8 0.2 2</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>6.8 0.2 2</size>
             </box>
           </geometry>
         </visual>
@@ -219,40 +280,7 @@
     </model>
 
     <!-- Actors -->
-    <!-- Actors -->
     <actor name="actor_0">
-      <skin>
-        <filename>walk.dae</filename>
-        <scale>1.0</scale>
-      </skin>
-      <animation name="walking">
-        <filename>walk.dae</filename>
-        <scale>1.0</scale>
-        <interpolate_x>true</interpolate_x>
-      </animation>
-      <script>
-        <loop>true</loop>
-        <trajectory id="0" type="walking">
-          <waypoint>
-            <time>0</time>
-            <pose>-2 6 0 0 0 1.57</pose>
-          </waypoint>
-          <waypoint>
-            <time>15</time>
-            <pose>-2 9 0 0 0 1.57</pose>
-          </waypoint>
-          <waypoint>
-            <time>20</time>
-            <pose>-2 9 0 0 0 -1.57</pose>
-          </waypoint>
-          <waypoint>
-            <time>35</time>
-            <pose>-2 6 0 0 0 -1.57</pose>
-          </waypoint>
-        </trajectory>
-      </script>
-    </actor>
-    <actor name="actor_1">
       <skin>
         <filename>walk.dae</filename>
         <scale>1.0</scale>
@@ -284,6 +312,38 @@
         </trajectory>
       </script>
     </actor>
+    <actor name="actor_1">
+      <skin>
+        <filename>walk.dae</filename>
+        <scale>1.0</scale>
+      </skin>
+      <animation name="walking">
+        <filename>walk.dae</filename>
+        <scale>1.0</scale>
+        <interpolate_x>true</interpolate_x>
+      </animation>
+      <script>
+        <loop>true</loop>
+        <trajectory id="0" type="walking">
+          <waypoint>
+            <time>0</time>
+            <pose>-3.5 4 0 0 0 0</pose>
+          </waypoint>
+          <waypoint>
+            <time>15</time>
+            <pose> 2.0 4 0 0 0 0</pose>
+          </waypoint>
+          <waypoint>
+            <time>20</time>
+            <pose> 2.0 4 0 0 0 -3.14</pose>
+          </waypoint>
+          <waypoint>
+            <time>35</time>
+            <pose>-3.5 4 0 0 0 -3.14</pose>
+          </waypoint>
+        </trajectory>
+      </script>
+    </actor>
     <actor name="actor_2">
       <skin>
         <filename>walk.dae</filename>
@@ -299,56 +359,24 @@
         <trajectory id="0" type="walking">
           <waypoint>
             <time>0</time>
-            <pose>-4 4 0 0 0 0</pose>
+            <pose>-0.5 4 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>15</time>
-            <pose> 4 4 0 0 0 0</pose>
+            <pose>-0.5 1 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>20</time>
-            <pose> 4 4 0 0 0 -3.14</pose>
+            <pose>-0.5  1  0 0 0 1.57</pose>
           </waypoint>
           <waypoint>
             <time>35</time>
-            <pose>-4 4 0 0 0 -3.14</pose>
+            <pose>-0.5 4 0 0 0 1.57</pose>
           </waypoint>
         </trajectory>
       </script>
     </actor>
     <actor name="actor_3">
-      <skin>
-        <filename>walk.dae</filename>
-        <scale>1.0</scale>
-      </skin>
-      <animation name="walking">
-        <filename>walk.dae</filename>
-        <scale>1.0</scale>
-        <interpolate_x>true</interpolate_x>
-      </animation>
-      <script>
-        <loop>true</loop>
-        <trajectory id="0" type="walking">
-          <waypoint>
-            <time>0</time>
-            <pose>2 4 0 0 0 -1.57</pose>
-          </waypoint>
-          <waypoint>
-            <time>15</time>
-            <pose>2 -4 0 0 0 -1.57</pose>
-          </waypoint>
-          <waypoint>
-            <time>20</time>
-            <pose>2 -4  0 0 0 1.57</pose>
-          </waypoint>
-          <waypoint>
-            <time>35</time>
-            <pose>2 4 0 0 0 1.57</pose>
-          </waypoint>
-        </trajectory>
-      </script>
-    </actor>
-    <actor name="actor_4">
       <skin>
         <filename>walk.dae</filename>
         <scale>1.0</scale>
@@ -380,6 +408,88 @@
         </trajectory>
       </script>
     </actor>
+    <actor name="actor_4">
+      <skin>
+        <filename>walk.dae</filename>
+        <scale>1.0</scale>
+      </skin>
+      <animation name="walking">
+        <filename>walk.dae</filename>
+        <scale>1.0</scale>
+        <interpolate_x>true</interpolate_x>
+      </animation>
+      <script>
+        <loop>true</loop>
+        <trajectory id="0" type="walking">
+          <waypoint>
+            <time>0</time>
+            <pose>-1.5 -1.2 0 0 0 -1.57</pose>
+          </waypoint>
+          <waypoint>
+            <time>15</time>
+            <pose>-1.5 -4.2 0 0 0 -1.57</pose>
+          </waypoint>
+          <waypoint>
+            <time>20</time>
+            <pose>-1.5 -4.2  0 0 0 1.57</pose>
+          </waypoint>
+          <waypoint>
+            <time>35</time>
+            <pose>-1.5 -1.2 0 0 0 1.57</pose>
+          </waypoint>
+        </trajectory>
+      </script>
+    </actor>
+    <!-- Add obstacles -->
+    <include>
+    <name>wardrobe_0</name>
+      <uri>model://wardrobe</uri>
+      <pose>-2.000000 -5.000000 0.000000 0.000000 0.000000 0.000000</pose>
+    </include>
+    <include>
+      <uri>model://dining_chair</uri>
+      <pose>1.8 -2.0 0 0 0 1.570796 </pose>
+    </include>
+    <include>
+    <name>table_0</name>
+      <uri>model://kitchen_table</uri>
+      <pose>1.500000 -2.0 0 0.000000 0.000000 1.570796</pose>
+    </include>
+     <include>
+      <name>floor_lamp_0</name>
+      <uri>model://floor_lamp</uri>
+      <pose>-4.500000 -0.417350 0.000000 0.000000 0.000000 0.000000</pose>
+    </include>
+    <include>
+    <name>sofa_0</name>
+      <uri>model://sofa</uri>
+      <pose>2.0 4.2 0.000000 0.000000 0.000000 0</pose>
+    </include>
+    <include>
+      <uri>model://closet</uri>
+      <pose>1.000000 0.000000 0.000000 0.000000 0.000000 0.000000</pose>
+    </include>
+    <include>
+    <name>table_1</name>
+      <uri>model://kitchen_table</uri>
+      <pose>-4.000000 7.551060 0.000000 0.000000 0.000000 0.000000</pose>
+    </include>
+    <include>
+    <name>wardrobe_1</name>
+      <uri>model://wardrobe</uri>
+      <pose>0.000000 5.00000 0.000000 0.000000 0.000000 0</pose>
+    </include>
+    <include>
+      <name>floor_lamp_1</name>
+      <uri>model://floor_lamp</uri>
+      <pose>1.500000 4.617350 0.000000 0.000000 0.000000 0.000000</pose>
+    </include>
+    <include>
+      <name>floor_lamp_2</name>
+      <uri>model://floor_lamp</uri>
+      <pose>0.00000 9.617350 0.000000 0.000000 0.000000 0.000000</pose>
+    </include>
+
     <!-- Change the gazebo camera point of view -->
     <gui fullscreen="0">
       <camera name="user_camera">
