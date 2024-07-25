@@ -360,19 +360,6 @@ class NMPC:
             h_constraints.append(cbf_condition)
         return casadi.vertcat(*h_constraints)
 
-    def predict_trajectory(self, position, velocity):
-        predicted_trajectory = np.zeros((self.N+1, 2))
-        dt = self.dt
-        state = np.array([position.x,
-                          position.y,
-                          velocity.x,
-                          velocity.y])
-        for i in range(self.N+1):
-            time = dt * (i + 1)
-            predicted_trajectory[i] = predict_next_position(state, time)
-
-        return predicted_trajectory
-
     def update(self,
                state: State,
                q_ref: np.array,
@@ -382,8 +369,10 @@ class NMPC:
         # Set parameters
         self.predicted_agent_trajectories = []
         for motion_prediction in crowd_motion_predictions:
-            self.predicted_agent_trajectories.append(self.predict_trajectory(motion_prediction.position,
-                                                                             motion_prediction.velocity))
+            self.predicted_agent_trajectories.append(predict_trajectory(motion_prediction.position,
+                                                                        motion_prediction.velocity,
+                                                                        self.N,
+                                                                        self.dt))
         for k in range(self.N):
             self.acados_ocp_solver.set(k, 'y_ref', np.concatenate((q_ref[:, k], u_ref[:, k])))
             parameters = []

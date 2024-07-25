@@ -593,7 +593,7 @@
         <trajectory id="0" type="walking">
           <waypoint>
             <time>0</time>
-            <pose>-6.0 -1.5 0 0 0 -1.57</pose>
+            <pose>-6.0 -0.5 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>15</time>

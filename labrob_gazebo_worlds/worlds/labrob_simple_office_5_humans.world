@@ -331,19 +331,19 @@
         <trajectory id="0" type="walking">
           <waypoint>
             <time>0</time>
-            <pose>2 4 0 0 0 -1.57</pose>
+            <pose>2.4 4 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>15</time>
-            <pose>2 -4 0 0 0 -1.57</pose>
+            <pose>2.4 -4 0 0 0 -1.57</pose>
           </waypoint>
           <waypoint>
             <time>20</time>
-            <pose>2 -4  0 0 0 1.57</pose>
+            <pose>2.4 -4  0 0 0 1.57</pose>
           </waypoint>
           <waypoint>
             <time>35</time>
-            <pose>2 4 0 0 0 1.57</pose>
+            <pose>2.4 4 0 0 0 1.57</pose>
           </waypoint>
         </trajectory>
       </script>

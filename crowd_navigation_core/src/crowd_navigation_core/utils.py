@@ -280,6 +280,7 @@ class WorldType(Enum):
     TWO_ROOMS = 1
     THREE_ROOMS = 2
     CORRIDOR = 3
+    DIAG = 4
 
 def predict_next_position(state, dt):
     F = np.array([[1.0, 0.0, dt, 0.0],
@@ -287,6 +288,18 @@ def predict_next_position(state, dt):
     next_position = np.matmul(F, state)
 
     return next_position
+
+def predict_trajectory(position, velocity, N, dt):
+    predicted_trajectory = np.zeros((N+1, 2))
+    state = np.array([position.x,
+                      position.y,
+                      velocity.x,
+                      velocity.y])
+    for i in range(N+1):
+        time = dt * (i + 1)
+        predicted_trajectory[i] = predict_next_position(state, time)
+
+    return predicted_trajectory
 
 def moving_average(points, window_size=1):
     smoothed_points = np.zeros(points.shape)

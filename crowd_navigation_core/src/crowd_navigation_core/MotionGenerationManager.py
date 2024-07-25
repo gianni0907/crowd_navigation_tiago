@@ -326,7 +326,6 @@ class MotionGenerationManager:
             _, path = self.planner.compute_path(self.area_idx, target_area_idx)
             print(f'Path={path}')
             self.next_area_idx, self.current_target_position = self.planner.get_next_step()
-            print(f'Next area index={self.next_area_idx}')
             if self.current_target_position is None:
                 self.current_target_position = self.target_position
             self.point_head(self.adapt_measurements_format(self.measurements_stamped_nonrt))
@@ -471,7 +470,6 @@ class MotionGenerationManager:
             if self.next_area_idx in indexes:
                 self.area_idx = self.next_area_idx
                 self.next_area_idx, self.current_target_position = self.planner.get_next_step()
-                print(f'Next are index={self.next_area_idx}')
                 if self.current_target_position is None:
                     self.current_target_position = self.target_position
             q_ref = np.zeros((self.nmpc_controller.nq, self.hparams.N_horizon+1))
@@ -536,7 +534,7 @@ class MotionGenerationManager:
             point_head_msg.goal.pointing_frame = self.camera_frame
 
             point_head_msg.goal.min_duration = rospy.Duration(0.1)
-            point_head_msg.goal.max_velocity = 2
+            point_head_msg.goal.max_velocity = 0.5
 
             self.point_head_action_publisher.publish(point_head_msg)
             

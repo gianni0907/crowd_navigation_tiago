@@ -90,6 +90,9 @@ class Hparams:
         else:
             area0 = np.array([[-0.6, -4], [4.5, -4], [4.5, 1.8], [-0.6, 1.8]])
         areas = [area0]
+        areas_index = [0]
+        intersections = {}
+        viapoints = {}
         walls = []
     elif world_type == WorldType.TWO_ROOMS:
         area0 = np.array([[4.8, -4.8], [4.8, 4.8], [-4.8, 4.8], [-4.8, -4.8]])
@@ -114,9 +117,9 @@ class Hparams:
         area0 = np.array([[0, -3.6], [0, -0.2], [-4.8, -0.2], [-4.8, -4.8], [-3,-4.8]])
         area1 = np.array([[4.8, -4.8], [4.8, -2.5], [-3.0, -2.5], [0.0, -4.8]])
         area2 = np.array([[4.8, -4.8], [4.8, -0.2], [1.5, -0.2], [2.5, -4.8]])
-        area3 = np.array([[3, -1.6], [3, 1.8], [2, 1.8], [2, -1.6]])
+        area3 = np.array([[3.1, -1.6], [3.1, 1.8], [1.9, 1.8], [1.9, -1.6]])
         area4 = np.array([[4.8, 0.4], [4.8, 3.1], [-1.0, 4.8], [-4.8, 4.8], [-4.8, 0.4]])
-        area5 = np.array([[-2.0, 3.4], [-2.0, 6.8], [-3.0, 6.8], [-3.0, 3.4]])
+        area5 = np.array([[-1.9, 3.4], [-1.9, 6.8], [-3.1, 6.8], [-3.1, 3.4]])
         area6 = np.array([[4.8, 5.4], [4.8, 9.8], [-0.5, 9.8], [-4.8, 6.5], [-4.8, 5.4]])
         areas = [area0, area1, area2, area3, area4, area5, area6]
         areas_index = [0, 1, 2, 3, 4, 5, 6]
@@ -140,9 +143,9 @@ class Hparams:
                 ((3.2, 0), (5, 0)),
                 ((-5, 0), (1.8, 0))]
     elif world_type == WorldType.CORRIDOR:
-        area0 = np.array([[-2.0, 0.0], [-9.0, 0.0], [-9.0, -2.5], [-4.0, -4.7], [-2.0, -4.7]])
-        area1 = np.array([[-8.7, -4.0], [-6.2, -4.0], [-6.2, 4.7], [-7.7, 4.7], [-8.7, 3.7]])
-        area2 = np.array([[-7.7, 0.2], [-5.2, 0.2], [-5.2, 9.7], [-6.2, 9.7], [-7.7, 6.0]])
+        area0 = np.array([[-2.0, -0.2], [-9.0, -0.2], [-9.0, -2.5], [-4.0, -4.8], [-2.0, -4.8]])
+        area1 = np.array([[-8.8, -4.0], [-6.2, -4.0], [-6.2, 4.8], [-7.8, 4.8], [-8.8, 3.8]])
+        area2 = np.array([[-7.8, 0.2], [-5.2, 0.2], [-5.2, 9.8], [-6.2, 9.8], [-7.8, 6.0]])
         area3 = np.array([[-4.0, 5.2], [-0.2, 7.0], [-0.2, 8.2], [-3.0, 9.8], [-7.0, 9.8], [-9.8, 5.2]])
         areas = [area0, area1, area2, area3]
         areas_index = [0, 1, 2, 3]
@@ -166,9 +169,46 @@ class Hparams:
                  ((0, 5), (0, 10)),
                  ((-10, 5), (-10, 10)),
                  ((0, 10), (-10, 10))]
+    elif world_type == WorldType.DIAG:
+        area0 = np.array([[1.6, -2.6], [1.6, 0.8], [0.3, 0.8], [-0.3, 0.2], [-0.4, -1.6], [0.5, -2.5]])
+        area1 = np.array([[0.75, -1.6], [0.75, -0.65], [-3.0, -0.45], [-3.0, -1.4]])
+        area2 = np.array([[-1.8, -1.7], [-1.6, 3.2], [-1.9, 4.4], [-2.9, 4.4], [-3.1, -1.7]])
+        area3 = np.array([[-1.9, 3.2], [-1.6, 6.3], [-3.5, 6.4], [-3.5, 3.3]])
+        area4 = np.array([[-1.0, 4.6], [-1.0, 5.6], [-1.6, 6.4], [-3.0, 6.5], [-3, 4.7]])
+        area5 = np.array([[-1.65, 5.1], [-1.65, 9.3], [-2.6, 9.3], [-2.6, 5.1]])
+        area6 = np.array([[-1.8, 4.1], [-1.6, 6.3], [-8.5, 6.5], [-8.4, 4.6]])
+        area7 = np.array([[-1.5, 7.9], [-1.6, 12], [-4.7, 12], [-4.7, 8.7], [-3.7, 8]])
+        area8 = np.array([[-2, -6.5], [-1.8, 0.55], [-3.5, 0.55], [-3.8, -6.5]])
+        areas = [area0, area1, area2, area3, area4, area5, area6, area7, area8]
+        areas_index = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        intersections = {
+            (0, 1), (1, 2), (1, 8), (2, 8), (2, 3), (3, 4), (3, 5), (3, 6), (4, 5), (5, 6), (5, 7)
+        }
+        viapoints = {
+            (0, 1): np.array([0.2, -1.1]),
+            (1, 2): np.array([-2.5, -1.0]),
+            (1, 8): np.array([-2.5, -1.0]),
+            (2, 8): np.array([-2.5, -1.0]),
+            (2, 3): np.array([-2.4, 3.8]),
+            (3, 4): np.array([-2.05, 5.7]),
+            (3, 5): np.array([-2.05, 5.7]),
+            (3, 6): np.array([-2.8, 5.0]),
+            (4, 5): np.array([-2.1, 5.7]),
+            (5, 6): np.array([-2.1, 5.7]),
+            (5, 7): np.array([-2.1, 8.5])
+        }
+        walls = [
+            # ((-5, -5), (-5, 10)),
+            # ((-5, 10), (5, 10)),
+            # ((5, 10), (5, -5)),
+            # ((5, -5), (-5, -5)),
+            # ((-5, 5), (-3.2, 5)),
+            # ((-1.8, 5), (5, 5)),
+            # ((3.2, 0), (5, 0)),
+            # ((-5, 0), (1.8, 0))
+        ]
 
     a_coefs, b_coefs, c_coefs = get_areas_coefficients(areas, max_vertexes)
-    print(get_closest_area_index(areas, np.array([0, -6])))
     
     # State indices:
     x_idx = 0
@@ -206,7 +246,7 @@ class Hparams:
     # Parameters for the CBF
     rho_cbf = base_radius + b + 0.01 # the radius of the circle around the robot center
     ds_cbf = 0.5 # safety clearance
-    gamma_agent = 0.5 # in (0,1], hyperparameter for the h function associated to agent
+    gamma_agent = 0.1 # in (0,1], hyperparameter for the h function associated to agent
     gamma_area = 0.1 # in (0,1], hyperparameter for the h function associated to bounds
     
     n_filters = 5 # maximum number of simultaneously tracked agents
@@ -238,14 +278,14 @@ class Hparams:
             avg_win_size = 5
         elif selection_mode == SelectionMode.AVERAGE:
             eps = 0.8
-            min_samples = 2
+            min_samples = 3
 
     # Camera Hparams
     if perception in (Perception.BOTH, Perception.CAMERA):
         if simulation:
             cam_min_range = 0.3 # [m]
             cam_max_range = 8 # [m]
-            cam_horz_fov = 1.0996 # 1.7453 [rad]
+            cam_horz_fov = 1.0996 # 2.0944 [rad] (120 [deg])
         else:
             cam_min_range = 0.4 # [m]
             cam_max_range = 8 # [m]

@@ -98,7 +98,8 @@ class Plotter:
                         label=f'Area {i}')
             ax.add_patch(area)
             area_patches.append(area)
-        ax.scatter(viapoints[:, 0], viapoints[:, 1], marker='s', color='blue', alpha=0.1)
+        if len(viapoints) > 0:
+            ax.scatter(viapoints[:, 0], viapoints[:, 1], marker='s', color='blue', alpha=0.1)
         return area_patches
 
     def _plot_walls(self, ax, walls):
@@ -129,17 +130,18 @@ class Plotter:
                              ax,
                              xlabel,
                              ylabel,
-                             title = None,
-                             set_aspect = False,
-                             legend = False,   
-                             xlim = None,
-                             ylim = None):
+                             title=None,
+                             set_aspect=False,
+                             grid=True,
+                             legend=False,   
+                             xlim=None,
+                             ylim=None):
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_title(title)
         if set_aspect:
             ax.set_aspect('equal', adjustable='box')
-        ax.grid(True)
+        ax.grid(grid)
         if legend:
             ax.legend(loc='lower left')
         if xlim is not None:
@@ -279,7 +281,8 @@ class Plotter:
         range_max = self.camera_dict['max_range']
         min_fov_length = range_min / math.cos(cam_horz_fov / 2)
         max_fov_length = range_max / math.cos(cam_horz_fov / 2)
-        areas = np.array(self.generator_dict['areas'])
+        areas = self.generator_dict['areas']
+        viapoints = []
         walls = self.generator_dict['walls']
 
         # Plot animation with camera measurements
@@ -309,7 +312,7 @@ class Plotter:
         # init and update function for the camera animation
         def init():
             self._plot_walls(ax, walls)
-            self._plot_areas(ax, areas)
+            self._plot_areas(ax, areas, viapoints)
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
             ax.add_patch(robot)
@@ -398,7 +401,8 @@ class Plotter:
         angle_max = self.laser_dict['angle_max'] - angle_inc * laser_offset
         range_min = self.laser_dict['range_min']
         range_max = self.laser_dict['range_max']
-        areas = np.array(self.generator_dict['areas'])
+        areas = self.generator_dict['areas']
+        viapoints = []
         walls = self.generator_dict['walls']
 
         # Plot animation with laser measurements
@@ -429,7 +433,7 @@ class Plotter:
         # init and update function for the laser animation
         def init():
             self._plot_walls(ax, walls)
-            self._plot_areas(ax, areas)
+            self._plot_areas(ax, areas, viapoints)
             robot.set_center(robot_center[0])
             robot.set_radius(base_radius)
             ax.add_patch(robot)
@@ -518,106 +522,107 @@ class Plotter:
         mask_y = all_y != Hparams.nullpos
         all_x = all_x[mask_x]
         all_y = all_y[mask_y]
-        min_x = np.min(all_x) - 0.2
-        max_x = np.max(all_x) + 0.2
-        min_y = np.min(all_y) - 0.2
-        max_y = np.max(all_y) + 0.2
-        # Determine velocity limits
-        all_x = np.array([])
-        all_y = np.array([])
-        for i in range(n_kfs):
-            all_x = np.concatenate([all_x, estimates[:, i, 2]])
-            all_y = np.concatenate([all_y, estimates[:, i, 3]])
-        min_xd = np.min(all_x) - 0.2
-        max_xd = np.max(all_x) + 0.2
-        min_yd = np.min(all_y) - 0.2
-        max_yd = np.max(all_y) + 0.2
-        t_predictor = predictor_time[:, 1]
-        colors = ['b', 'orange', 'g', 'r', 'c', 'purple', 'brown']
-        kfs_fig, kfs_ax = plt.subplots(4, n_kfs, figsize=(16, 8))
-        for i in range(n_kfs):
-            plot = True
-            active = False
-            plot_start_idx = 0
-            active_start_idx = 0
-            for j, time in enumerate(t_predictor):
-                if kfs_info[f'KF_{i + 1}'][j][0] == 'FSMStates.ACTIVE':
-                    if not active:
-                        active = True
-                        active_start_idx = j
-                else:
-                    if active:
-                        active = False
-                        kfs_ax[0, i].fill_between(t_predictor, min_x, max_x,
-                                                where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                color='gray', alpha=0.1)
-                        kfs_ax[1, i].fill_between(t_predictor, min_y, max_y,
-                                                where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                color='gray', alpha=0.1)
-                        kfs_ax[2, i].fill_between(t_predictor, min_xd, max_xd,
-                                                where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                color='gray', alpha=0.1)
-                        kfs_ax[3, i].fill_between(t_predictor, min_yd, max_yd,
-                                                where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
-                                                color='gray', alpha=0.1)
-                
-                if all(pos == Hparams.nullpos for pos in estimates[j, i, :2]):
-                    if not plot:
-                        kfs_ax[0, i].plot(t_predictor[plot_start_idx : j], estimates[plot_start_idx : j, i, 0], color=colors[i], label='$\hat{x}$')
-                        kfs_ax[1, i].plot(t_predictor[plot_start_idx : j], estimates[plot_start_idx : j, i, 1], color=colors[i], label='$\hat{y}$')
-                        kfs_ax[2, i].plot(t_predictor[plot_start_idx : j], estimates[plot_start_idx : j, i, 2], color=colors[i], label='$\hat{\dot{x}}$')
-                        kfs_ax[3, i].plot(t_predictor[plot_start_idx : j], estimates[plot_start_idx : j, i, 3], color=colors[i], label='$\hat{\dot{y}}$')          
-                        plot = True
-                else:
-                    if plot:
-                        plot_start_idx = j
-                        plot = False
+        if len(all_x) > 0:
+            min_x = np.min(all_x) - 0.2
+            max_x = np.max(all_x) + 0.2
+            min_y = np.min(all_y) - 0.2
+            max_y = np.max(all_y) + 0.2
+            # Determine velocity limits
+            all_x = np.array([])
+            all_y = np.array([])
+            for i in range(n_kfs):
+                all_x = np.concatenate([all_x, estimates[:, i, 2]])
+                all_y = np.concatenate([all_y, estimates[:, i, 3]])
+            min_xd = np.min(all_x) - 0.2
+            max_xd = np.max(all_x) + 0.2
+            min_yd = np.min(all_y) - 0.2
+            max_yd = np.max(all_y) + 0.2
+            t_predictor = predictor_time[:, 1]
+            colors = ['b', 'orange', 'g', 'r', 'c', 'purple', 'brown']
+            kfs_fig, kfs_ax = plt.subplots(4, n_kfs, figsize=(16, 8))
+            for i in range(n_kfs):
+                plot = True
+                active = False
+                plot_start_idx = 0
+                active_start_idx = 0
+                for j, time in enumerate(t_predictor):
+                    if kfs_info[f'KF_{i + 1}'][j][0] == 'FSMStates.ACTIVE':
+                        if not active:
+                            active = True
+                            active_start_idx = j
+                    else:
+                        if active:
+                            active = False
+                            kfs_ax[0, i].fill_between(t_predictor, min_x, max_x,
+                                                    where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                    color='gray', alpha=0.1)
+                            kfs_ax[1, i].fill_between(t_predictor, min_y, max_y,
+                                                    where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                    color='gray', alpha=0.1)
+                            kfs_ax[2, i].fill_between(t_predictor, min_xd, max_xd,
+                                                    where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                    color='gray', alpha=0.1)
+                            kfs_ax[3, i].fill_between(t_predictor, min_yd, max_yd,
+                                                    where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[j]),
+                                                    color='gray', alpha=0.1)
+                    
+                    if all(pos == Hparams.nullpos for pos in estimates[j, i, :2]):
+                        if not plot:
+                            kfs_ax[0, i].plot(t_predictor[plot_start_idx : j], estimates[plot_start_idx : j, i, 0], color=colors[i], label='$\hat{x}$')
+                            kfs_ax[1, i].plot(t_predictor[plot_start_idx : j], estimates[plot_start_idx : j, i, 1], color=colors[i], label='$\hat{y}$')
+                            kfs_ax[2, i].plot(t_predictor[plot_start_idx : j], estimates[plot_start_idx : j, i, 2], color=colors[i], label='$\hat{\dot{x}}$')
+                            kfs_ax[3, i].plot(t_predictor[plot_start_idx : j], estimates[plot_start_idx : j, i, 3], color=colors[i], label='$\hat{\dot{y}}$')          
+                            plot = True
+                    else:
+                        if plot:
+                            plot_start_idx = j
+                            plot = False
 
-            if active:
-                kfs_ax[0, i].fill_between(t_predictor, min_x, max_x,
-                                        where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
-                                        color='gray', alpha=0.1)
-                kfs_ax[1, i].fill_between(t_predictor, min_y, max_y,
-                                        where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
-                                        color='gray', alpha=0.1)
-                kfs_ax[2, i].fill_between(t_predictor, min_xd, max_xd,
-                                        where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
-                                        color='gray', alpha=0.1)
-                kfs_ax[3, i].fill_between(t_predictor, min_yd, max_yd,
-                                        where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
-                                        color='gray', alpha=0.1)
-            if not plot:
-                kfs_ax[0, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 0], color=colors[i], label='$\hat{x}$')
-                kfs_ax[1, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 1], color=colors[i], label='$\hat{y}$')
-                kfs_ax[2, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 2], color=colors[i], label='$\hat{\dot{x}}$')
-                kfs_ax[3, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 3], color=colors[i], label='$\hat{\dot{y}}$')
+                if active:
+                    kfs_ax[0, i].fill_between(t_predictor, min_x, max_x,
+                                            where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
+                                            color='gray', alpha=0.1)
+                    kfs_ax[1, i].fill_between(t_predictor, min_y, max_y,
+                                            where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
+                                            color='gray', alpha=0.1)
+                    kfs_ax[2, i].fill_between(t_predictor, min_xd, max_xd,
+                                            where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
+                                            color='gray', alpha=0.1)
+                    kfs_ax[3, i].fill_between(t_predictor, min_yd, max_yd,
+                                            where=(t_predictor >= t_predictor[active_start_idx]) & (t_predictor < t_predictor[-1]),
+                                            color='gray', alpha=0.1)
+                if not plot:
+                    kfs_ax[0, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 0], color=colors[i], label='$\hat{x}$')
+                    kfs_ax[1, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 1], color=colors[i], label='$\hat{y}$')
+                    kfs_ax[2, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 2], color=colors[i], label='$\hat{\dot{x}}$')
+                    kfs_ax[3, i].plot(t_predictor[plot_start_idx:], estimates[plot_start_idx:, i, 3], color=colors[i], label='$\hat{\dot{y}}$')
 
-            self._set_axis_properties(kfs_ax[0, i],
-                                      xlabel="$t \quad [s]$",
-                                      ylabel='$\hat{x} \quad [m]$',
-                                      title=f'KF-{i + 1}',
-                                      xlim=[t_predictor[0], t_predictor[-1]],
-                                      ylim=[min_x, max_x])
-            self._set_axis_properties(kfs_ax[1, i],
-                                      xlabel="$t \quad [s]$",
-                                      ylabel='$\hat{y} \quad [m]$',
-                                      xlim=[t_predictor[0], t_predictor[-1]],
-                                      ylim=[min_y, max_y])
-            self._set_axis_properties(kfs_ax[2, i],
-                                      xlabel="$t \quad [s]$",
-                                      ylabel='$\hat{\dot{x}} \quad [m/s]$',
-                                      xlim=[t_predictor[0], t_predictor[-1]],
-                                      ylim=[min_xd, max_xd])
-            self._set_axis_properties(kfs_ax[3, i],
-                                      xlabel="$t \quad [s]$",
-                                      ylabel='$\hat{\dot{y}} \quad [m/s]$',
-                                      xlim=[t_predictor[0], t_predictor[-1]],
-                                      ylim=[min_yd, max_yd])
+                self._set_axis_properties(kfs_ax[0, i],
+                                        xlabel="$t \quad [s]$",
+                                        ylabel='$\hat{x} \quad [m]$',
+                                        title=f'KF-{i + 1}',
+                                        xlim=[t_predictor[0], t_predictor[-1]],
+                                        ylim=[min_x, max_x])
+                self._set_axis_properties(kfs_ax[1, i],
+                                        xlabel="$t \quad [s]$",
+                                        ylabel='$\hat{y} \quad [m]$',
+                                        xlim=[t_predictor[0], t_predictor[-1]],
+                                        ylim=[min_y, max_y])
+                self._set_axis_properties(kfs_ax[2, i],
+                                        xlabel="$t \quad [s]$",
+                                        ylabel='$\hat{\dot{x}} \quad [m/s]$',
+                                        xlim=[t_predictor[0], t_predictor[-1]],
+                                        ylim=[min_xd, max_xd])
+                self._set_axis_properties(kfs_ax[3, i],
+                                        xlabel="$t \quad [s]$",
+                                        ylabel='$\hat{\dot{y}} \quad [m/s]$',
+                                        xlim=[t_predictor[0], t_predictor[-1]],
+                                        ylim=[min_yd, max_yd])
 
-        kfs_fig.tight_layout()
-        kfs_fig.savefig(kalman_savepath)
+            kfs_fig.tight_layout()
+            kfs_fig.savefig(kalman_savepath)
 
-        plt.show()
+            plt.show()
 
     def plot_motion(self):
         configuration_savepath = os.path.join(self.plots_dir, self.filename + '_configuration.png')
@@ -687,8 +692,8 @@ class Plotter:
             camera_range_max = self.camera_dict['max_range']
             camera_range_min = self.camera_dict['min_range']
             cam_horz_fov = self.camera_dict['horz_fov']
-            min_fov_length = 2 * camera_range_min / cam_horz_fov
-            max_fov_length = 2 * camera_range_max / cam_horz_fov 
+            min_fov_length = camera_range_min / math.cos(cam_horz_fov / 2)
+            max_fov_length = camera_range_max / math.cos(cam_horz_fov / 2)
             camera_pos = np.array(self.generator_dict['camera_position'])
             camera_angle = - np.array(self.generator_dict['camera_horz_angle']) - np.pi / 2
 
@@ -838,11 +843,11 @@ class Plotter:
                 estimates.append(ax.scatter([], [], marker='.', label='KF-{}'.format(i+1), color='red'))
                 estimates_clearance.append(Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='red', linestyle='--'))
                 estimates_label.append(ax.text(np.nan, np.nan, estimates[i].get_label(), fontsize=16, ha='left', va='bottom'))
-                prediction, = ax.plot([], [], color='orange', label='actor prediction', linewidth=agent_radius*60, alpha=0.4)
+                prediction, = ax.plot([], [], color='orange', label='actor prediction', linewidth=agent_radius*40, alpha=0.4)
                 predictions.append(prediction)
                 
         traj_line, = ax.plot([], [], color='blue', label='trajectory')
-        robot_pred_line, = ax.plot([], [], color='green', label='prediction', linewidth=robot_radius*60, alpha=0.4)
+        robot_pred_line, = ax.plot([], [], color='green', label='prediction', linewidth=robot_radius*40, alpha=0.4)
 
         self._set_axis_properties(ax,
                                   xlabel="$x \quad [m]$",
@@ -930,7 +935,8 @@ class Plotter:
                         estimates_clearance[i].set_radius(agent_radius)
                         estimates_label[i].set_position(agent_estimate)
                         estimates_label[i].set_visible(True)
-                        agent_prediction = np.vstack((agent_estimate, agent_estimate + agent_vel_estimate * dt * N_horizon))
+                        agent_prediction = np.vstack((agent_estimate + agent_vel_estimate * dt,
+                                                      agent_estimate + agent_vel_estimate * dt * (N_horizon+1)))
                         predictions[i].set_data(agent_prediction[:, 0], agent_prediction[:, 1])
                         estimates_label[i].set_visible(True)
                     else:

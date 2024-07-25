@@ -276,8 +276,8 @@ class LaserPerceptionManager:
                 if self.hparams.simulation:
                     agents_pos = self.agents_pos_nonrt
 
-            self.update_configuration(rospy.Time())
-            self.get_laser_pose(rospy.Time())
+            self.update_configuration(timestamp)
+            self.get_laser_pose(timestamp)
             # Perform data preprocessing
             observations = self.data_preprocessing()
             # Perform data clustering
