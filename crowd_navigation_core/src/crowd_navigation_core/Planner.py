@@ -23,10 +23,10 @@ class Planner:
         for (area1, area2) in intersections:
             if (area1, area2) in viapoints:
                 graph[area1][area2] = viapoints[(area1, area2)]
-                graph[area2][area1] = viapoints[(area1, area2)]
-            elif (area2, area1) in viapoints:
-                graph[area1][area2] = viapoints[(area2, area1)]
-                graph[area2][area1] = viapoints[(area2, area1)]
+            #     graph[area2][area1] = viapoints[(area1, area2)]
+            # elif (area2, area1) in viapoints:
+            #     graph[area1][area2] = viapoints[(area2, area1)]
+            #     graph[area2][area1] = viapoints[(area2, area1)]
         return graph
     
     def euclidean_distance(self, p1, p2):
@@ -56,9 +56,9 @@ class Planner:
                 new_cost = cost + 1  # Base cost for moving to a new node
                 
                 if len(path) > 1:
-                    last_viapoint = (self.viapoints.get((path[-2], node)) 
-                                     if (path[-2], node) in self.viapoints 
-                                     else self.viapoints.get((node, path[-2])))
+                    last_viapoint = (self.viapoints.get((path[-2], node)))
+                                    #  if (path[-2], node) in self.viapoints 
+                                    #  else self.viapoints.get((node, path[-2])))
                     new_cost += self.euclidean_distance(last_viapoint, viapoint)
 
                 if new_cost < prev_cost:
@@ -79,9 +79,9 @@ class Planner:
         
         current_node = self.path[self.path_index]
         next_node = self.path[self.path_index + 1]
-        viapoint = (self.viapoints.get((current_node, next_node)) 
-                    if (current_node, next_node) in self.viapoints 
-                    else self.viapoints.get((next_node, current_node)))
+        viapoint = (self.viapoints.get((current_node, next_node)))
+                    # if (current_node, next_node) in self.viapoints 
+                    # else self.viapoints.get((next_node, current_node)))
 
         self.path_index += 1
         return next_node, viapoint

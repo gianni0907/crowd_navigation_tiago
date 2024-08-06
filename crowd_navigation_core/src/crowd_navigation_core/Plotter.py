@@ -843,11 +843,11 @@ class Plotter:
                 estimates.append(ax.scatter([], [], marker='.', label='KF-{}'.format(i+1), color='red'))
                 estimates_clearance.append(Circle(np.zeros(2), np.zeros(1), facecolor='none', edgecolor='red', linestyle='--'))
                 estimates_label.append(ax.text(np.nan, np.nan, estimates[i].get_label(), fontsize=16, ha='left', va='bottom'))
-                prediction, = ax.plot([], [], color='orange', label='actor prediction', linewidth=agent_radius*40, alpha=0.4)
+                prediction, = ax.plot([], [], color='orange', label='actor prediction', linewidth=agent_radius*65, alpha=0.4)
                 predictions.append(prediction)
                 
         traj_line, = ax.plot([], [], color='blue', label='trajectory')
-        robot_pred_line, = ax.plot([], [], color='green', label='prediction', linewidth=robot_radius*40, alpha=0.4)
+        robot_pred_line, = ax.plot([], [], color='green', label='prediction', linewidth=robot_radius*65, alpha=0.4)
 
         self._set_axis_properties(ax,
                                   xlabel="$x \quad [m]$",
@@ -870,7 +870,7 @@ class Plotter:
 
             goal.set_offsets(targets[0, :2])
             goal_label.set_position(targets[0])
-            if targets[0, 0] != target_viapoints[0, 0] and targets[0, 1] != target_viapoints[0, 1]:
+            if targets[0, 0] != target_viapoints[0, 0] or targets[0, 1] != target_viapoints[0, 1]:
                 target_viapoint.set_offsets(target_viapoints[0])
             area_patches[area_index[0]].set_alpha(0.2)
             if self.n_filters > 0:        
@@ -914,7 +914,7 @@ class Plotter:
             robot_label.set_position(robot_center[frame])
             goal.set_offsets(current_target[:2])
             goal_label.set_position(current_target)
-            if current_viapoint[0] != current_target[0] and current_viapoint[1] != current_target[1]:
+            if current_viapoint[0] != current_target[0] or current_viapoint[1] != current_target[1]:
                 target_viapoint.set_visible(True)
                 target_viapoint.set_offsets(target_viapoints[frame])
             else:

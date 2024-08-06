@@ -281,6 +281,7 @@ class WorldType(Enum):
     THREE_ROOMS = 2
     CORRIDOR = 3
     DIAG = 4
+    HALL = 5
 
 def predict_next_position(state, dt):
     F = np.array([[1.0, 0.0, dt, 0.0],
